@@ -38,11 +38,13 @@ export interface GeneratedPost {
 }
 
 export enum ViewState {
+  LANDING = 'LANDING',
   LOGIN = 'LOGIN',
   SIGNUP = 'SIGNUP',
   ADMIN_LOGIN = 'ADMIN_LOGIN',
   SURVEY = 'SURVEY',
   CALENDAR = 'CALENDAR',
+  SETTINGS = 'SETTINGS',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD'
 }
 
