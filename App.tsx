@@ -6,7 +6,11 @@ import AdminDashboard from './components/AdminDashboard';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
 import Settings from './components/Settings';
-import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon } from 'lucide-react';
+import SupportWidget from './components/SupportWidget';
+import InsightsDashboard from './components/InsightsDashboard';
+import Billing from './components/Billing';
+import SupportDashboard from './components/SupportDashboard';
+import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard } from 'lucide-react';
 
 // Simple client-side data management
 const STORAGE_KEYS = {
@@ -170,6 +174,20 @@ const App: React.FC = () => {
         saveToStorage(STORAGE_KEYS.USERS, users);
         console.log('Admin user updated with correct credentials');
      }
+
+     // Initialize Support User
+     const supportEmail = 'support@kawayan.ph';
+     if (!users.find(u => u.email === supportEmail)) {
+        users.push({
+           id: 'support-1',
+           email: supportEmail,
+           passwordHash: 'client_support123',
+           role: 'support',
+           businessName: 'Kawayan Support Team'
+        });
+        saveToStorage(STORAGE_KEYS.USERS, users);
+        console.log('Default support user created');
+     }
   }, []);
 
   const handleLogin = (loggedInUser: User) => {
@@ -177,6 +195,8 @@ const App: React.FC = () => {
     
     if (loggedInUser.role === 'admin') {
       setView(ViewState.ADMIN_DASHBOARD);
+    } else if (loggedInUser.role === 'support') {
+      setView(ViewState.SUPPORT_DASHBOARD);
     } else {
       // Check if user has a profile
       getProfile(loggedInUser.id).then(profile => {
@@ -211,6 +231,20 @@ const App: React.FC = () => {
     setBrandProfile(profileData);
   };
 
+  const handleUserUpdate = async (updatedUser: User) => {
+    // In a real app, this would be an API call
+    const users = getFromStorage<User>(STORAGE_KEYS.USERS);
+    const index = users.findIndex(u => u.id === updatedUser.id);
+    if (index !== -1) {
+      users[index] = updatedUser;
+      saveToStorage(STORAGE_KEYS.USERS, users);
+      setUser(updatedUser);
+      // Update session if it's the current user
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
+      alert("Account details updated successfully.");
+    }
+  };
+
   // Safe navigation guard for logged in users
   const isLoggedIn = user !== null;
 
@@ -235,12 +269,29 @@ const App: React.FC = () => {
                   )}
                   
                   {user?.role !== 'admin' && (
-                    <button 
-                      onClick={() => setView(ViewState.SETTINGS)}
-                      className={`p-2 rounded-full transition ${view === ViewState.SETTINGS ? 'bg-slate-100 dark:bg-slate-800 text-emerald-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                      <SettingsIcon className="w-5 h-5" />
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => setView(ViewState.INSIGHTS)}
+                        className={`p-2 rounded-full transition ${view === ViewState.INSIGHTS ? 'bg-slate-100 dark:bg-slate-800 text-emerald-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                        title="Insights"
+                      >
+                        <BarChart3 className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => setView(ViewState.BILLING)}
+                        className={`p-2 rounded-full transition ${view === ViewState.BILLING ? 'bg-slate-100 dark:bg-slate-800 text-emerald-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                        title="Billing"
+                      >
+                        <CreditCard className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => setView(ViewState.SETTINGS)}
+                        className={`p-2 rounded-full transition ${view === ViewState.SETTINGS ? 'bg-slate-100 dark:bg-slate-800 text-emerald-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                        title="Settings"
+                      >
+                        <SettingsIcon className="w-5 h-5" />
+                      </button>
+                    </>
                   )}
 
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
@@ -292,7 +343,13 @@ const App: React.FC = () => {
               case ViewState.CALENDAR:
                 return (user && brandProfile) ? <ContentCalendar profile={brandProfile} userId={user.id} /> : <div>Loading...</div>;
               case ViewState.SETTINGS:
-                return (brandProfile) ? <Settings profile={brandProfile} onProfileUpdate={handleProfileUpdate} darkMode={darkMode} toggleDarkMode={() => setDarkMode(!darkMode)} onClose={() => setView(ViewState.CALENDAR)} /> : <div>Loading...</div>;
+                return (brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => setDarkMode(!darkMode)} onClose={() => setView(ViewState.CALENDAR)} /> : <div>Loading...</div>;
+              case ViewState.INSIGHTS:
+                return <InsightsDashboard />;
+              case ViewState.BILLING:
+                return <Billing />;
+              case ViewState.SUPPORT_DASHBOARD:
+                return <SupportDashboard />;
               case ViewState.ADMIN_DASHBOARD:
                 return (user && user.role === 'admin') ? <AdminDashboard /> : <div className="text-center p-10">Access Denied</div>;
               default:
@@ -302,8 +359,10 @@ const App: React.FC = () => {
         </div>
       </main>
       
+      {isLoggedIn && user?.role === 'user' && <SupportWidget />}
+      
       {/* Footer */}
-      {(view === ViewState.LANDING || view === ViewState.CALENDAR) && (
+      {(view === ViewState.LANDING) && (
         <footer className="bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 py-8 mt-auto">
           <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-center md:text-left">

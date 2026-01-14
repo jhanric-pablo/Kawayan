@@ -63,7 +63,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       } else {
         // Login
         const users = JSON.parse(localStorage.getItem('kawayan_users') || '[]');
-        const user = users.find((u: any) => u.email === email && (u.passwordHash === `client_${password}` || u.passwordHash === 'admin123'));
+        const user = users.find((u: any) => u.email === email && (u.passwordHash === `client_${password}` || u.passwordHash === 'admin123' || u.passwordHash === 'support123'));
         
         if (user) {
           console.log('Login successful:', user.email);

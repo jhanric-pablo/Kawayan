@@ -1,30 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { BrandProfile } from '../types';
-import { Save, User, MessageCircle, Target, Briefcase, Moon, Sun, Monitor, ArrowLeft } from 'lucide-react';
+import { BrandProfile, User } from '../types';
+import { Save, User as UserIcon, MessageCircle, Target, Briefcase, Moon, Sun, Monitor, ArrowLeft, Lock, CreditCard, AlertTriangle, CheckCircle } from 'lucide-react';
+import { paymentService, Wallet } from '../services/paymentService';
 
 interface Props {
   profile: BrandProfile;
+  user: User | null;
   onProfileUpdate: (p: BrandProfile) => void;
+  onUserUpdate: (u: User) => void;
   darkMode: boolean;
   toggleDarkMode: () => void;
   onClose?: () => void;
 }
 
-const Settings: React.FC<Props> = ({ profile, onProfileUpdate, darkMode, toggleDarkMode, onClose }) => {
+const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdate, darkMode, toggleDarkMode, onClose }) => {
   const [formData, setFormData] = useState<BrandProfile>(profile);
+  
+  // Account State
+  const [accountForm, setAccountForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Billing State
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'billing'>('profile');
 
   useEffect(() => {
     setFormData(profile);
   }, [profile]);
 
+  useEffect(() => {
+    if (activeTab === 'billing') {
+      paymentService.getWalletData().then(setWallet);
+    }
+  }, [activeTab]);
+
   const handleChange = (field: keyof BrandProfile, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setSaved(false);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await onProfileUpdate(formData);
@@ -33,6 +54,49 @@ const Settings: React.FC<Props> = ({ profile, onProfileUpdate, darkMode, toggleD
     } catch (error) {
       console.error("Failed to save settings:", error);
       alert("Failed to save settings. Please try again.");
+    }
+  };
+
+  const handleUpdatePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!user) return;
+
+    if (accountForm.newPassword.length < 6) {
+      setError("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (accountForm.newPassword !== accountForm.confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+
+    // Simulate password check (In real app, this goes to backend)
+    // Here we just check if current password field is not empty as a basic check
+    if (!accountForm.currentPassword) {
+      setError("Please enter your current password.");
+      return;
+    }
+
+    // Mock Update
+    const updatedUser = { 
+      ...user, 
+      passwordHash: `client_${accountForm.newPassword}` // Update mock hash
+    };
+    
+    onUserUpdate(updatedUser);
+    setSaved(true);
+    setAccountForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleCancelSubscription = async () => {
+    if (window.confirm("Are you sure you want to cancel your Pro plan? You will lose access to premium features at the end of the billing cycle.")) {
+      await paymentService.cancelSubscription();
+      const updated = await paymentService.getWalletData();
+      setWallet(updated);
     }
   };
 
@@ -108,11 +172,11 @@ const Settings: React.FC<Props> = ({ profile, onProfileUpdate, darkMode, toggleD
         {/* Main Content Area */}
         <div className="md:col-span-2">
            {activeTab === 'profile' && (
-             <form onSubmit={handleSave} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6">
+             <form onSubmit={handleSaveProfile} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6">
                 
                 <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-700">
                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                      <User className="w-5 h-5"/>
+                      <UserIcon className="w-5 h-5"/>
                    </div>
                    <div>
                       <h3 className="text-lg font-bold text-slate-900 dark:text-white">Brand Identity</h3>
@@ -163,6 +227,45 @@ const Settings: React.FC<Props> = ({ profile, onProfileUpdate, darkMode, toggleD
                       />
                    </div>
 
+                   {/* Brand Colors & Contact */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                         <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Brand Colors (Hex)</label>
+                         <div className="flex gap-2">
+                           {[0,1,2].map(i => (
+                             <div key={i} className="flex items-center gap-1">
+                               <input 
+                                 type="color"
+                                 value={formData.brandColors?.[i] || '#000000'}
+                                 onChange={(e) => {
+                                   const newColors = [...(formData.brandColors || [])];
+                                   newColors[i] = e.target.value;
+                                   handleChange('brandColors', newColors as any);
+                                 }}
+                                 className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                               />
+                             </div>
+                           ))}
+                         </div>
+                      </div>
+                      <div className="space-y-2">
+                         <input 
+                           type="email" 
+                           value={formData.contactEmail || ''}
+                           onChange={(e) => handleChange('contactEmail', e.target.value)}
+                           placeholder="Contact Email"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                         />
+                         <input 
+                           type="tel" 
+                           value={formData.contactPhone || ''}
+                           onChange={(e) => handleChange('contactPhone', e.target.value)}
+                           placeholder="Contact Phone"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                         />
+                      </div>
+                   </div>
+
                    <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Content Themes (Topics)</label>
                       <textarea 
@@ -186,22 +289,135 @@ const Settings: React.FC<Props> = ({ profile, onProfileUpdate, darkMode, toggleD
            )}
 
            {activeTab === 'account' && (
-             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center justify-center h-64 text-center">
-                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
-                   <User className="w-8 h-8 text-slate-400" />
+             <form onSubmit={handleUpdatePassword} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-700">
+                   <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                      <Lock className="w-5 h-5"/>
+                   </div>
+                   <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">Security & Login</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Update your account credentials.</p>
+                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">Account Management</h3>
-                <p className="text-slate-500 dark:text-slate-400 mt-2">Update password and email settings coming soon.</p>
-             </div>
+
+                <div className="space-y-4">
+                   <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={user?.email || ''} 
+                        disabled
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                      />
+                      <p className="text-xs text-slate-400 mt-1">Email cannot be changed.</p>
+                   </div>
+
+                   <hr className="border-slate-100 dark:border-slate-700 my-4"/>
+
+                   <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Current Password</label>
+                      <input 
+                        type="password" 
+                        value={accountForm.currentPassword}
+                        onChange={(e) => setAccountForm({...accountForm, currentPassword: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+                      <input 
+                        type="password" 
+                        value={accountForm.newPassword}
+                        onChange={(e) => setAccountForm({...accountForm, newPassword: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Confirm New Password</label>
+                      <input 
+                        type="password" 
+                        value={accountForm.confirmPassword}
+                        onChange={(e) => setAccountForm({...accountForm, confirmPassword: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                   </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-sm rounded-lg flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4"/> {error}
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                   <button 
+                     type="submit"
+                     className={`px-6 py-2.5 rounded-lg font-bold text-white flex items-center gap-2 transition ${saved ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                   >
+                     {saved ? 'Updated!' : 'Update Password'} <Save className="w-4 h-4"/>
+                   </button>
+                </div>
+             </form>
            )}
 
-           {activeTab === 'billing' && (
-             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center justify-center h-64 text-center">
-                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
-                   <Briefcase className="w-8 h-8 text-slate-400" />
+           {activeTab === 'billing' && wallet && (
+             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6 animate-in fade-in">
+                <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-700">
+                   <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                      <CreditCard className="w-5 h-5"/>
+                   </div>
+                   <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">Subscription Status</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Manage your plan and billing details.</p>
+                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">Billing & Plans</h3>
-                <p className="text-slate-500 dark:text-slate-400 mt-2">Subscription management coming soon.</p>
+
+                <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
+                   <div className="flex justify-between items-start">
+                      <div>
+                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Current Plan</p>
+                         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                           {wallet.subscription} 
+                           {wallet.subscription === 'PRO' && <span className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 text-xs px-2 py-1 rounded-full font-bold">ACTIVE</span>}
+                         </h2>
+                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                           {wallet.subscription === 'FREE' ? 'Upgrade to Pro for more features.' : 'Next billing date: Feb 14, 2026'}
+                         </p>
+                      </div>
+                      <div className="text-right">
+                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Wallet Balance</p>
+                         <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">₱{wallet.balance.toFixed(2)}</p>
+                      </div>
+                   </div>
+
+                   {wallet.subscription === 'PRO' && (
+                     <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                       <h4 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Plan Benefits</h4>
+                       <ul className="space-y-2 mb-6">
+                         <li className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><CheckCircle className="w-4 h-4 text-emerald-500"/> 16 Auto-Generated Posts</li>
+                         <li className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><CheckCircle className="w-4 h-4 text-emerald-500"/> Advanced Analytics</li>
+                         <li className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><CheckCircle className="w-4 h-4 text-emerald-500"/> Priority Support</li>
+                       </ul>
+                       <button 
+                         onClick={handleCancelSubscription}
+                         className="text-rose-600 hover:text-rose-700 text-sm font-medium hover:underline"
+                       >
+                         Cancel Subscription
+                       </button>
+                     </div>
+                   )}
+                </div>
+
+                <div className="flex justify-end gap-3">
+                   {wallet.subscription === 'FREE' && (
+                     <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition">
+                       Upgrade to Pro
+                     </button>
+                   )}
+                   <button className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                     View Invoices
+                   </button>
+                </div>
              </div>
            )}
         </div>

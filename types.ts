@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   passwordHash: string; // In a real app, never store plain text. We'll mock this.
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'support';
   businessName?: string;
 }
 
@@ -14,6 +14,10 @@ export interface BrandProfile {
   targetAudience: string;
   brandVoice: string; 
   keyThemes: string;
+  // New fields
+  brandColors?: string[]; // Array of HEX codes
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export interface ContentIdea {
@@ -21,6 +25,13 @@ export interface ContentIdea {
   title: string;
   topic: string;
   format: 'Image' | 'Carousel' | 'Text' | 'Video';
+}
+
+export interface PostVersion {
+  caption: string;
+  imagePrompt: string;
+  viralityScore?: number;
+  createdAt: string;
 }
 
 export interface GeneratedPost {
@@ -35,6 +46,21 @@ export interface GeneratedPost {
   viralityScore?: number;
   viralityReason?: string;
   format?: string;
+  // New fields for governance
+  regenCount: number;
+  history: PostVersion[]; // Store previous versions
+}
+
+export interface Ticket {
+  id: string;
+  ticketNum: number;
+  userId: string;
+  userEmail: string;
+  subject: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Open' | 'Pending' | 'Resolved';
+  createdAt: string;
+  messages: {sender: 'user'|'agent', text: string, timestamp: string}[];
 }
 
 export enum ViewState {
@@ -45,6 +71,9 @@ export enum ViewState {
   SURVEY = 'SURVEY',
   CALENDAR = 'CALENDAR',
   SETTINGS = 'SETTINGS',
+  INSIGHTS = 'INSIGHTS', // New view
+  BILLING = 'BILLING',   // New view
+  SUPPORT_DASHBOARD = 'SUPPORT_DASHBOARD',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD'
 }
 

@@ -223,23 +223,88 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     setGeneratingPost(true);
     try {
       const result = await generatePostCaptionAndImagePrompt(profile, idea.topic);
-      const newPost: GeneratedPost = {
-        id: Date.now().toString(),
-        userId,
-        date: new Date(currentDate.getFullYear(), currentDate.getMonth(), idea.day).toISOString().split('T')[0],
-        topic: idea.topic,
+      
+      const newPostVersion = {
         caption: result.caption,
         imagePrompt: result.imagePrompt,
         viralityScore: result.viralityScore,
-        viralityReason: result.viralityReason,
-        status: 'Draft',
-        format: idea.format
+        createdAt: new Date().toISOString()
       };
-      setGeneratedContent(newPost);
+
+      setGeneratedContent(prev => {
+        if (prev && prev.id) {
+           // Regeneration Logic
+           if (prev.regenCount >= 2) {
+             alert("Regeneration Limit Reached (Max 2). Please use the current version.");
+             return prev;
+           }
+           
+           return {
+             ...prev,
+             caption: result.caption,
+             imagePrompt: result.imagePrompt,
+             viralityScore: result.viralityScore,
+             viralityReason: result.viralityReason,
+             regenCount: prev.regenCount + 1,
+             history: [...(prev.history || []), newPostVersion]
+           };
+        } else {
+           // New Post
+           return {
+            id: Date.now().toString(),
+            userId,
+            date: new Date(currentDate.getFullYear(), currentDate.getMonth(), idea.day).toISOString().split('T')[0],
+            topic: idea.topic,
+            caption: result.caption,
+            imagePrompt: result.imagePrompt,
+            viralityScore: result.viralityScore,
+            viralityReason: result.viralityReason,
+            status: 'Draft',
+            format: idea.format,
+            regenCount: 0,
+            history: []
+          };
+        }
+      });
     } catch (e) {
       alert("Failed to generate content. Please try again.");
     } finally {
       setGeneratingPost(false);
+    }
+  };
+
+  const handleBatchGenerate = async () => {
+    if (!ideas.length) return;
+    setLoadingPlan(true); // Reuse loading state
+    
+    // Simulate batch generation for all ideas
+    // In a real app, this would be a single API call
+    for (const idea of ideas) {
+       // Skip if post exists
+       const exists = posts.find(p => {
+          const d = new Date(p.date);
+          return d.getDate() === idea.day && d.getMonth() === currentDate.getMonth();
+       });
+       if (exists) continue;
+
+       await handleGeneratePost(idea);
+       // Small delay to prevent rate limits in simulation
+       await new Promise(r => setTimeout(r, 500));
+    }
+    setLoadingPlan(false);
+    alert("Batch Generation Complete!");
+  };
+
+  const handleAddOn = (day: number) => {
+    // Simulate Xendit payment flow
+    const confirm = window.confirm("Purchase 'Add-on' post for ₱150? (Via Xendit)");
+    if (confirm) {
+       const topic = prompt("Enter topic for this extra post:");
+       if (topic) {
+         const newIdea: ContentIdea = { day, title: "Add-on Post", topic, format: 'Image' };
+         setIdeas(prev => [...prev, newIdea]);
+         handleGeneratePost(newIdea);
+       }
     }
   };
 
@@ -326,8 +391,16 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           ) : null}
 
           {!post && !idea && (
-             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <Plus className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+             <div 
+               className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
+               onClick={(e) => {
+                 e.stopPropagation();
+                 handleAddOn(day);
+               }}
+             >
+                <div className="bg-emerald-50 dark:bg-emerald-900/30 p-1.5 rounded-full text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition">
+                  <Plus className="w-4 h-4" />
+                </div>
              </div>
           )}
         </div>
@@ -404,7 +477,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                 className="text-xs flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-white font-bold hover:bg-slate-50 dark:hover:bg-slate-600 px-3 py-2 rounded-lg transition shadow-sm"
               >
                 {loadingPlan ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
-                Auto-Plan Month
+                Auto-Plan
+              </button>
+              <button 
+                onClick={handleBatchGenerate}
+                disabled={loadingPlan || ideas.length === 0}
+                className="text-xs flex items-center gap-2 bg-indigo-600 border border-indigo-600 text-white font-bold hover:bg-indigo-700 px-3 py-2 rounded-lg transition shadow-sm"
+              >
+                {loadingPlan ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                Batch Create
               </button>
           </div>
 
@@ -534,6 +615,25 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                               "{generatedContent.viralityReason}"
                             </p>
                          </div>
+
+                         {/* Version History (Blurred) */}
+                         {generatedContent.history && generatedContent.history.length > 0 && (
+                           <div className="mb-6">
+                             <p className="text-xs font-bold text-slate-400 uppercase mb-2">Previous Versions</p>
+                             <div className="space-y-2">
+                               {generatedContent.history.map((h, i) => (
+                                 <div key={i} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg relative overflow-hidden group">
+                                    <div className="blur-[3px] opacity-50 select-none text-xs text-slate-800 dark:text-slate-300">
+                                      {h.caption.substring(0, 50)}...
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/10 dark:bg-black/10 opacity-0 group-hover:opacity-100 transition">
+                                       <span className="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">Archived</span>
+                                    </div>
+                                 </div>
+                               ))}
+                             </div>
+                           </div>
+                         )}
                          
                          <div className="mb-6 p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
                             <p className="font-bold mb-1 uppercase text-[10px]">Image Prompt Used:</p>
@@ -618,16 +718,21 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                    <Save className="w-4 h-4"/> Save Draft
                  </button>
                  <button 
-                   disabled={!generatedContent}
-                   className="flex-1 py-3 rounded-xl bg-slate-900 dark:bg-emerald-600 text-white font-semibold hover:bg-slate-800 dark:hover:bg-emerald-700 transition text-sm shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                   disabled={!generatedContent || generatedContent.status === 'Scheduled'}
+                   className={`flex-1 py-3 rounded-xl font-semibold transition text-sm shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                     generatedContent?.status === 'Scheduled' 
+                       ? 'bg-emerald-100 text-emerald-800 cursor-default'
+                       : 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 dark:hover:bg-emerald-700'
+                   }`}
                    onClick={() => {
                      if(generatedContent) {
                        setGeneratedContent({...generatedContent, status: 'Scheduled'});
                        handleSavePost();
+                       alert("Post Scheduled Successfully! 🚀");
                      }
                    }}
                  >
-                   Schedule
+                   {generatedContent?.status === 'Scheduled' ? 'Scheduled' : 'Schedule'}
                  </button>
               </div>
             </div>

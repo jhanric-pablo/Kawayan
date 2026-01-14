@@ -318,3 +318,55 @@ export const getTrendingTopicsPH = async (industry?: string): Promise<string[]> 
     return ValidationService.createFallbackTrendingTopics();
   }
 };
+
+export const getRealTrendingTopics = async (): Promise<string[]> => {
+  try {
+    const response = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://trends.google.com/trends/trendingsearches/daily/rss?geo=PH');
+    const data = await response.json();
+    
+    if (data.status === 'ok' && data.items) {
+      return data.items.slice(0, 7).map((item: any) => item.title);
+    }
+    throw new Error('Failed to fetch RSS');
+  } catch (error) {
+    console.warn("RSS fetch failed, falling back to AI trends", error);
+    return getTrendingTopicsPH(); // Fallback to AI
+  }
+};
+
+export const chatWithSupportBot = async (message: string, history: {sender: 'user'|'bot', text: string}[]): Promise<string> => {
+  if (!apiKey) return "I'm having trouble connecting to my brain. Please try again later.";
+
+  const systemPrompt = `
+    You are the friendly and helpful Support Agent for Kawayan AI, a social media management platform for Philippine MSMEs.
+    
+    Your knowledge base:
+    - Kawayan AI helps businesses generate 'Taglish' content, schedule posts, and track insights.
+    - Features: Content Calendar, Batch Generation (up to 16 posts/month for Pro), AI Image Generation, Analytics.
+    - Pricing: Free Trial (8 posts), Pro (₱499/mo, 16 posts), Add-ons (₱150/post).
+    - Payment: We support GCash, Maya, and Cards via Xendit.
+    - User Issues: If they have technical problems, ask for details or tell them you've created a ticket.
+    
+    Tone: Professional but warm, Filipino-friendly (you can use occasional 'po' or 'opo' but keep it English/Taglish).
+    Keep responses concise (under 3 sentences).
+  `;
+
+  try {
+    const chatSession = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        ...history.map(h => ({
+          role: h.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: h.text }]
+        })),
+        { role: 'user', parts: [{ text: message }] }
+      ]
+    });
+    
+    return chatSession.response.text() || "I didn't catch that. Could you rephrase?";
+  } catch (error) {
+    console.error("Chat error:", error);
+    return "Sorry, I'm experiencing high traffic. Please try again or email support@kawayan.ph";
+  }
+};
