@@ -229,7 +229,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                         type="text" 
                         value={formData.businessName}
                         onChange={(e) => handleChange('businessName', e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
                       />
                    </div>
 
@@ -240,7 +240,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                            type="text" 
                            value={formData.industry}
                            onChange={(e) => handleChange('industry', e.target.value)}
-                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
                          />
                       </div>
                       <div>
@@ -249,7 +249,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                            type="text" 
                            value={formData.targetAudience}
                            onChange={(e) => handleChange('targetAudience', e.target.value)}
-                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
                          />
                       </div>
                    </div>
@@ -260,7 +260,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                         type="text" 
                         value={formData.brandVoice}
                         onChange={(e) => handleChange('brandVoice', e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
                         placeholder="e.g. Fun, Professional, Friendly"
                       />
                    </div>
@@ -292,14 +292,14 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                            value={formData.contactEmail || ''}
                            onChange={(e) => handleChange('contactEmail', e.target.value)}
                            placeholder="Contact Email"
-                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                          />
                          <input 
                            type="tel" 
                            value={formData.contactPhone || ''}
                            onChange={(e) => handleChange('contactPhone', e.target.value)}
                            placeholder="Contact Phone"
-                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                           className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                          />
                       </div>
                    </div>
@@ -310,7 +310,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                         value={formData.keyThemes}
                         onChange={(e) => handleChange('keyThemes', e.target.value)}
                         rows={4}
-                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition resize-none"
+                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition resize-none"
                       />
                    </div>
                 </div>
