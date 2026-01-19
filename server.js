@@ -1,9 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { DatabaseService } from './services/databaseService';
-import { JWTService } from './services/jwtService';
-import { logger } from './utils/logger';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { DatabaseService } from './services/databaseService.ts';
+import { JWTService } from './services/jwtService.ts';
+import { logger } from './utils/logger.ts';
+
+// ESM fix for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -14,6 +20,9 @@ const port = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Initialize Database Service
 const dbService = new DatabaseService();
@@ -400,18 +409,45 @@ app.post('/api/wallet/cancel', authenticateToken, async (req, res) => {
 });
 
 // Admin
+
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+
   try {
+
     const stats = await dbService.getAdminStats();
+
     res.json(stats);
+
   } catch (error) {
+
     logger.error('Admin stats error', { error: error.message });
+
     res.status(500).json({ error: 'Failed to fetch stats' });
+
   }
+
 });
 
+
+
+// The "catchall" handler: for any request that doesn't
+
+// match one above, send back React's index.html file.
+
+app.get('*', (req, res) => {
+
+  res.sendFile(path.join(__dirname, 'dist/index.html'));
+
+});
+
+
+
 // Start Server
+
 app.listen(port, () => {
+
   logger.info(`Server running on port ${port}`);
+
   console.log(`Server running on http://localhost:${port}`);
+
 });
