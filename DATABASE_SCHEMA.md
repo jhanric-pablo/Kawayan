@@ -57,22 +57,24 @@ Represents a specific piece of social media content created by the AI.
 | `createdAt` | `string` | Timestamp |
 
 ## 4. Wallet
-Manages the user's financial balance and subscription state. Linked 1:1 with `User`.
+Manages the user's financial balance and subscription state. Linked 1:1 with `User` (SQL Table: `wallets`).
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
+| `user_id` | `string` | Primary Key & Foreign Key to User |
 | `balance` | `number` | Current prepaid credits (PHP) |
-| `currency` | `string` | e.g., "PHP" |
+| `currency` | `string` | Default: "PHP" |
 | `subscription` | `'FREE' \| 'PRO' \| 'ENTERPRISE'` | Current active plan |
-| `transactions` | `Transaction[]` | History of payments |
+| `updated_at` | `datetime` | Last modification timestamp |
 
 ## 5. Transaction
-A specific financial record within a Wallet.
+A specific financial record linked to a Wallet (SQL Table: `transactions`).
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `id` | `string` | Unique Transaction ID |
-| `date` | `string` | ISO Timestamp |
+| `id` | `string` | Unique Transaction ID (PK) |
+| `user_id` | `string` | Foreign Key to Wallet |
+| `date` | `datetime` | ISO Timestamp |
 | `description` | `string` | e.g., "Wallet Top-up" |
 | `amount` | `number` | Value in PHP |
 | `status` | `'PENDING' \| 'COMPLETED' \| 'FAILED'` | Payment status |

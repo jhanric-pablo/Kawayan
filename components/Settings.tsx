@@ -100,6 +100,44 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
     }
   };
 
+  const handleUpgrade = async () => {
+    if (!wallet) return;
+    const cost = 499;
+    if (wallet.balance < cost) {
+      alert("Insufficient balance. Please top up in the Billing section.");
+      return;
+    }
+
+    if (window.confirm(`Upgrade to PRO for ₱${cost}/mo?`)) {
+      try {
+        await paymentService.purchaseSubscription('PRO', cost);
+        const updated = await paymentService.getWalletData();
+        setWallet(updated);
+        alert("Upgrade Successful! Welcome to Pro.");
+      } catch (e: any) {
+        alert(e.message);
+      }
+    }
+  };
+
+  const handleDownloadInvoices = () => {
+    if (!wallet || wallet.transactions.length === 0) {
+      alert("No transactions found.");
+      return;
+    }
+    const headers = "Date,ID,Description,Status,Amount\n";
+    const rows = wallet.transactions.map(t => 
+      `${new Date(t.date).toLocaleDateString()},${t.id},"${t.description}",${t.status},${t.type === 'CREDIT' ? '+' : '-'}₱${t.amount}`
+    ).join("\n");
+    
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Kawayan_Invoices_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -154,13 +192,13 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Choose your interface theme.</p>
               <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg">
                  <button 
-                   onClick={() => !darkMode && toggleDarkMode()} 
+                   onClick={() => darkMode && toggleDarkMode()} 
                    className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition ${!darkMode ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-300'}`}
                  >
                    <Sun className="w-4 h-4"/> Light
                  </button>
                  <button 
-                   onClick={() => darkMode && toggleDarkMode()}
+                   onClick={() => !darkMode && toggleDarkMode()}
                    className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition ${darkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                    <Moon className="w-4 h-4"/> Dark
@@ -410,11 +448,17 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
 
                 <div className="flex justify-end gap-3">
                    {wallet.subscription === 'FREE' && (
-                     <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition">
+                     <button 
+                       onClick={handleUpgrade}
+                       className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition"
+                     >
                        Upgrade to Pro
                      </button>
                    )}
-                   <button className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                   <button 
+                     onClick={handleDownloadInvoices}
+                     className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                   >
                      View Invoices
                    </button>
                 </div>

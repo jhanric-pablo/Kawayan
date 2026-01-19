@@ -35,40 +35,44 @@ VITE_GEMINI_API_KEY="your_actual_api_key_here"
 
 ---
 
-## 3. Social Media API (Graph API Simulation)
+## 3. Social Media API (Real OAuth Flow)
 
-Since connecting to the real Facebook/Instagram Graph API requires a verified Business App and strict Review permissions, we utilize a **Deterministic Simulation Layer**.
+Kawayan AI uses real OAuth 2.0 redirection to connect accounts.
 
-### **How it Works**
-1.  **Connect (`connectAccount`):**
-    *   Simulates the OAuth 2.0 handshake latency (1.5s).
-    *   Generates a mock `access_token` and stores the `connectedAt` timestamp.
-2.  **Fetch Data (`getInsights`):**
-    *   **Logic:** Instead of returning random numbers every time (which looks fake), we generate data seeded by your unique `connectedAt` timestamp.
-    *   **Result:** Your "followers" count will stay consistent across reloads but differ from other users, mimicking a real database record.
+### **Features & Endpoints**
+| Platform | Auth Endpoint | Redirect URI Pattern |
+| :--- | :--- | :--- |
+| **Facebook** | `facebook.com/v12.0/dialog/oauth` | `/auth/callback/facebook` |
+| **Instagram** | `facebook.com/v12.0/dialog/oauth` | `/auth/callback/instagram` |
+| **TikTok** | `tiktok.com/auth/authorize` | `/auth/callback/tiktok` |
 
-### **Real-World Equivalent**
-If moving to production, replace `socialService.ts` calls with:
-*   **Facebook:** `GET /v18.0/{page-id}/insights`
-*   **Instagram:** `GET /v18.0/{ig-user-id}/media`
+### **Setup**
+Configure your Developer App IDs in `.env`:
+```env
+VITE_FACEBOOK_APP_ID="your_id"
+VITE_INSTAGRAM_APP_ID="your_id"
+VITE_TIKTOK_CLIENT_KEY="your_key"
+```
 
 ---
 
-## 4. Payment Gateway (Xendit Simulation)
+## 4. Payment Gateway (Xendit Automated)
 
-We simulate the flow of the Xendit Payment Gateway for PH-based transactions (GCash, Maya).
+We use the real Xendit Invoice API to process payments.
 
 ### **Workflow**
-1.  **Initiate (`initiateTopUp`):**
-    *   Creates a pending transaction record.
-    *   Returns a `referenceId` (e.g., `txn_1736...`).
-    *   *Real World:* Would call `POST https://api.xendit.co/v2/invoices`.
+1.  **Initiate (`create-invoice`):**
+    *   Backend calls `POST https://api.xendit.co/v2/invoices` using `XENDIT_SECRET_KEY`.
+    *   Creates a `PENDING` record in the SQL `transactions` table.
 2.  **User Action:**
-    *   User confirms the "Redirect" (browser alert).
-3.  **Webhook/Confirm (`confirmPayment`):**
-    *   Updates the local Wallet ledger.
-    *   Adds a `CREDIT` transaction to history.
-    *   Updates the immutable `balance` state.
+    *   User is redirected to Xendit's secure checkout URL.
+3.  **Webhook Handler:**
+    *   Endpoint: `POST /api/webhooks/xendit`
+    *   Xendit sends a signed callback when payment is successful.
+    *   System verifies the `x-callback-token` and automatically upgrades the transaction status to `COMPLETED`, instantly updating the user's wallet balance.
+
+### **Security**
+Basic Auth is used for outgoing API calls, and Token Verification is used for incoming webhooks.
 
 ---
 

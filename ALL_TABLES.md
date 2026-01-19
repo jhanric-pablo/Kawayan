@@ -54,30 +54,31 @@ Stores content created by the AI.
 
 ---
 
-## 4. Wallet Table
+## 4. Wallet Table (`wallets`)
 Manages financial credits and subscription state.
 
 | Field Name | Data Type | Description |
 | :--- | :--- | :--- |
-| `userId` | `string` | Foreign Key -> User.id (Implicit 1:1). |
-| `balance` | `number` | Current prepaid balance in PHP. |
-| `currency` | `string` | Default 'PHP'. |
-| `subscription` | `enum` | `'FREE'`, `'PRO'`, `'ENTERPRISE'`. |
-| `transactions` | `json` | Array of `Transaction` objects. |
+| `user_id` | `TEXT` | Primary Key. Foreign Key -> User.id. |
+| `balance` | `REAL` | Current prepaid balance in PHP. |
+| `currency` | `TEXT` | Default 'PHP'. |
+| `subscription` | `TEXT` | `'FREE'`, `'PRO'`, `'ENTERPRISE'`. |
+| `updated_at` | `DATETIME` | Automatic timestamp. |
 
 ---
 
-## 5. Transaction Table (Sub-entity)
+## 5. Transaction Table (`transactions`)
 Records financial movements.
 
 | Field Name | Data Type | Description |
 | :--- | :--- | :--- |
-| `id` | `string` | Transaction Reference ID. |
-| `date` | `string` | ISO Timestamp. |
-| `description` | `string` | Transaction label. |
-| `amount` | `number` | Value in PHP. |
-| `status` | `enum` | `'PENDING'`, `'COMPLETED'`, `'FAILED'`. |
-| `type` | `enum` | `'CREDIT'` (Deposit), `'DEBIT'` (Payment). |
+| `id` | `TEXT` | Primary Key. Transaction Reference ID. |
+| `user_id` | `TEXT` | Foreign Key -> wallets.user_id. |
+| `date` | `DATETIME` | ISO Timestamp (Default: CURRENT_TIMESTAMP). |
+| `description` | `TEXT` | Transaction label. |
+| `amount` | `REAL` | Value in PHP. |
+| `status` | `TEXT` | `'PENDING'`, `'COMPLETED'`, `'FAILED'`. |
+| `type` | `TEXT` | `'CREDIT'` (Deposit), `'DEBIT'` (Payment). |
 
 ---
 

@@ -44,6 +44,9 @@ To access the platform's administrative features:
 ## 🛠 Technologies
 
 *   **Frontend:** React + TypeScript + Tailwind CSS
+*   **Backend:** Node.js (Express) + Better-SQLite3
+*   **Database:** Local SQLite (`kawayan.db`) with relational schema and triggers.
 *   **AI:** Google GenAI SDK (Gemini 2.5 Flash)
+*   **Payments:** Xendit Automated API + Webhook integration
+*   **Security:** JWT (JSON Web Tokens) for session management and API protection
 *   **Visuals:** Lucide Icons + Recharts
-*   **Storage:** Local Storage for persistent user data and sessions
