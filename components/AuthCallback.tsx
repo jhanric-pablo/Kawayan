@@ -20,7 +20,7 @@ const AuthCallback: React.FC = () => {
       }
 
       try {
-        const response = await fetch('/api/auth/facebook/callback', {
+        const response = await fetch(`/api/auth/${platform}/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, platform })

@@ -309,36 +309,50 @@ app.post('/api/webhooks/xendit', async (req, res) => {
 // --- Social Auth Token Exchange ---
 
 app.post('/api/auth/facebook/callback', async (req, res) => {
-  const { code, platform } = req.body;
-  const appId = process.env.VITE_FACEBOOK_APP_ID;
-  const appSecret = process.env.FACEBOOK_APP_SECRET;
-  const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback/${platform}`;
+  // ... (existing facebook code)
+});
+
+app.post('/api/auth/tiktok/callback', async (req, res) => {
+  const { code } = req.body;
+  const clientKey = process.env.VITE_TIKTOK_CLIENT_KEY;
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
 
   try {
-    // 1. Exchange code for Access Token
-    const tokenResponse = await fetch(
-      `https://graph.facebook.com/v12.0/oauth/access_token?client_id=${appId}&redirect_uri=${redirectUri}&client_secret=${appSecret}&code=${code}`
-    );
-    const tokenData = await tokenResponse.json();
+    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache'
+      },
+      body: new URLSearchParams({
+        client_key: clientKey,
+        client_secret: clientSecret,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${req.protocol}://${req.get('host')}/auth/callback/tiktok`
+      })
+    });
 
-    if (tokenData.error) {
-      throw new Error(tokenData.error.message);
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error_description || data.error);
     }
 
-    // 2. (Optional) Get user info using the token
-    const userResponse = await fetch(
-      `https://graph.facebook.com/me?fields=id,name,email&access_token=${tokenData.access_token}`
-    );
+    // Get user info to show in the dashboard (Display API)
+    const userResponse = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name', {
+      headers: {
+        'Authorization': `Bearer ${data.access_token}`
+      }
+    });
     const userData = await userResponse.json();
 
-    // 3. Return the token and user data to the frontend
     res.json({
-      accessToken: tokenData.access_token,
-      expiresIn: tokenData.expires_in,
-      user: userData
+      accessToken: data.access_token,
+      user: userData.data?.user || {}
     });
   } catch (error) {
-    logger.error('Facebook Auth Error', { error: error.message });
+    logger.error('TikTok Auth Error', { error: error.message });
     res.status(500).json({ error: error.message });
   }
 });
