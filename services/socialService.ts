@@ -49,7 +49,23 @@ class SocialMediaService {
         alert(`OAUTH SETUP REQUIRED: Please configure VITE_TIKTOK_CLIENT_KEY in .env`);
         return;
       }
-      authUrl = `https://www.tiktok.com/auth/authorize?client_key=${clientKey}&scope=user.info.basic,video.list&redirect_uri=${redirectUri}&response_type=code`;
+      
+      // Ensure redirectUri is clean and matches the dashboard exactly
+      const cleanRedirectUri = `${window.location.origin}/auth/callback/tiktok`.replace(/\/$/, '');
+      const encodedRedirectUri = encodeURIComponent(cleanRedirectUri);
+      
+      console.info('TikTok Auth - Clean Redirect URI:', cleanRedirectUri);
+      
+      // Construction using standard V2 parameters
+      const params = new URLSearchParams({
+        client_key: clientKey,
+        scope: 'user.info.basic',
+        redirect_uri: cleanRedirectUri, // URLSearchParams handles encoding
+        state: Math.random().toString(36).substring(7),
+        response_type: 'code'
+      });
+
+      authUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
     }
 
     window.location.href = authUrl;

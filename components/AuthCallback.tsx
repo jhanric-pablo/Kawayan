@@ -20,10 +20,11 @@ const AuthCallback: React.FC = () => {
       }
 
       try {
+        const redirectUri = `${window.location.origin}/auth/callback/${platform}`;
         const response = await fetch(`/api/auth/${platform}/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, platform })
+          body: JSON.stringify({ code, platform, redirectUri })
         });
 
         const data = await response.json();

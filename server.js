@@ -313,8 +313,8 @@ app.post('/api/auth/facebook/callback', async (req, res) => {
 });
 
 app.post('/api/auth/tiktok/callback', async (req, res) => {
-  const { code } = req.body;
-  const clientKey = process.env.VITE_TIKTOK_CLIENT_KEY;
+  const { code, redirectUri } = req.body;
+  const clientKey = process.env.TIKTOK_CLIENT_KEY || process.env.VITE_TIKTOK_CLIENT_KEY;
   const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
 
   try {
@@ -329,7 +329,7 @@ app.post('/api/auth/tiktok/callback', async (req, res) => {
         client_secret: clientSecret,
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: `${req.protocol}://${req.get('host')}/auth/callback/tiktok`
+        redirect_uri: redirectUri
       })
     });
 

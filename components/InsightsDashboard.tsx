@@ -40,6 +40,10 @@ const InsightsDashboard: React.FC = () => {
       const ig = await socialService.getInsights('instagram');
       if (ig) data.push(ig);
     }
+    if (status.tiktok) {
+      const tt = await socialService.getInsights('tiktok');
+      if (tt) data.push(tt);
+    }
     setPlatformData(data);
 
     // Internal Post Data
@@ -84,7 +88,7 @@ const InsightsDashboard: React.FC = () => {
     setLoading(false);
   };
 
-  const handleConnect = async (platform: 'facebook' | 'instagram') => {
+  const handleConnect = async (platform: 'facebook' | 'instagram' | 'tiktok') => {
     try {
       await socialService.connectAccount(platform);
       // The user is redirected, so we don't need to manually update state here.
@@ -132,7 +136,7 @@ const InsightsDashboard: React.FC = () => {
             To view real insights, you need to connect your social media accounts. We use the official Graph API to fetch your data securely.
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <button 
             onClick={() => handleConnect('facebook')}
             className="flex items-center gap-2 bg-[#1877F2] text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-xl hover:-translate-y-1"
@@ -144,6 +148,12 @@ const InsightsDashboard: React.FC = () => {
             className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg hover:shadow-xl hover:-translate-y-1"
           >
             Connect Instagram
+          </button>
+          <button 
+            onClick={() => handleConnect('tiktok')}
+            className="flex items-center gap-2 bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-900 transition shadow-lg hover:shadow-xl hover:-translate-y-1"
+          >
+            Connect TikTok
           </button>
         </div>
         <p className="text-xs text-slate-400 mt-4 flex items-center gap-1">
