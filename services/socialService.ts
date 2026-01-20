@@ -9,7 +9,10 @@ export interface SocialMetric {
 export interface SocialPlatformData {
   platform: 'facebook' | 'instagram' | 'tiktok';
   connected: boolean;
+  username?: string; // Added username
   followers: number;
+  following?: number;
+  likes?: number;
   engagement: number;
   reach: SocialMetric[]; // Time series data
 }
@@ -74,7 +77,7 @@ class SocialMediaService {
     return true;
   }
 
-  // 3. Fetch Insights (Real Scraped Data via Backend Proxy)
+  // 3. Fetch Insights (Check Cache -> Then Backend Proxy)
   async getInsights(platform: 'facebook' | 'instagram' | 'tiktok'): Promise<SocialPlatformData | null> {
     const connections = this.getConnections();
     
@@ -83,50 +86,68 @@ class SocialMediaService {
     }
 
     const username = connections[platform].platformUser.name;
-    let stats = { followers: 0, engagement: 0, isReal: false };
+    const cachedStats = connections[platform].lastStats;
+
+    // Return cached stats if available (persisted from Extension update)
+    if (cachedStats) {
+       return {
+         platform,
+         connected: true,
+         username: username,
+         ...cachedStats,
+         reach: [] 
+       };
+    }
+
+    // No cache? Try backend scraper once
+    let stats = { followers: 0, engagement: 0, isReal: false, following: 0, likes: 0 };
 
     try {
-      // Call our own backend scraper
       const response = await fetch(`/api/social/stats/${platform}/${username}`);
       const contentType = response.headers.get('content-type');
       
       if (response.ok && contentType && contentType.includes('application/json')) {
         stats = await response.json();
-      } else {
-        console.warn(`Stats API failed (Status: ${response.status}, Type: ${contentType}), falling back to local simulation`);
+        
+        // If scraper succeeded, save it to cache immediately so next load is fast
+        if (stats.followers > 0) {
+           this.updateStats(platform, stats);
+        }
       }
     } catch (e) {
       console.error('Error fetching real stats:', e);
     }
 
-    // If backend failed (followers is null/0), return error or empty state
-    // We do NOT use deterministic seed fallback anymore per user request.
-    if (!stats.followers || stats.followers === 0) {
-      return {
-        platform,
-        connected: true,
-        followers: 0,
-        engagement: 0,
-        reach: [],
-        error: "Failed to fetch stats"
-      };
-    }
-
-    const finalFollowers = stats.followers;
-    const finalEngagement = stats.engagement;
-
+    // Even if backend fails, return the object with username so UI doesn't break
     return {
       platform,
       connected: true,
-      followers: finalFollowers,
-      engagement: finalEngagement,
-      reach: Array.from({length: 7}, (_, i) => ({
-        date: new Date(Date.now() - (6-i) * 86400000).toLocaleDateString(),
-        // Since we don't have reach history, we can either leave it 0 or project based on current followers
-        // We will project it simply as a visualization (not fake "history", but a projection)
-        value: Math.floor(finalFollowers * (finalEngagement/100 || 0.05))
-      }))
+      username: username, // Critical for UI "Update" button
+      followers: stats.followers || 0,
+      following: stats.following,
+      likes: stats.likes,
+      engagement: stats.engagement || 0,
+      reach: [],
+      error: (stats.followers > 0) ? undefined : "No data yet"
     };
+  }
+
+  // 5. Update Stats (Called by Dashboard when Extension scrapes data)
+  updateStats(platform: string, stats: any) {
+    const connections = this.getConnections();
+    if (connections[platform]) {
+      // Keep existing data, overwrite with new stats fields
+      connections[platform].lastStats = {
+        followers: stats.followers,
+        following: stats.following,
+        likes: stats.likes,
+        posts: stats.posts,
+        engagement: stats.engagement,
+        reach: stats.reach
+      };
+      connections[platform].lastStatsAt = new Date().toISOString();
+      this.saveConnections(connections);
+    }
   }
 
   // 4. Get All Connected Status

@@ -37,7 +37,11 @@
     },
     {
       "matches": ["https://www.instagram.com/*"],
-      "js": ["content_instagram.js"]
+      "js": ["content_instagram.js", "content_instagram_insights.js"]
+    },
+    {
+      "matches": ["https://www.tiktok.com/*"],
+      "js": ["content_tiktok_insights.js"]
     }
   ]
 }
