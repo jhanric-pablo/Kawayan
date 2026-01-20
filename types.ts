@@ -50,6 +50,8 @@ export interface GeneratedPost {
   // New fields for governance
   regenCount: number;
   history: PostVersion[]; // Store previous versions
+  externalLink?: string;
+  publishedAt?: string;
 }
 
 export interface Ticket {

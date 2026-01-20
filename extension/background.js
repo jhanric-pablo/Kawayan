@@ -32,7 +32,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     let url = '';
     if (request.platform === 'facebook') {
-      url = 'https://business.facebook.com/latest/insights/overview/';
+      url = 'https://business.facebook.com/latest/insights/overview/?business_id=712593713218711&asset_id=721534924910770';
     } else if (request.platform === 'instagram') {
       if (!request.username) { console.error("Username required for IG scrape"); return; }
       url = `https://www.instagram.com/${request.username}/?kawayan_action=scrape`;
@@ -92,5 +92,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       });
     });
+  }
+
+  // 4. Post Success Confirmation (From Content Script)
+  if (request.type === 'KAWAYAN_POST_SUCCESS') {
+    console.log("Post Success confirmed:", request.data);
+    
+    // Broadcast to Dashboard
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        if (tab.url && (tab.url.includes('localhost') || tab.url.includes('github.dev'))) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'KAWAYAN_POST_SUCCESS_BG',
+            data: request.data
+          });
+        }
+      });
+    });
+  }
+
+  // 5. Close Tab Request
+  if (request.type === 'KAWAYAN_CLOSE_TAB') {
+    if (sender.tab && sender.tab.id) {
+      chrome.tabs.remove(sender.tab.id);
+    }
   }
 });

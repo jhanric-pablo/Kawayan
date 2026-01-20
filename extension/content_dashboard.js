@@ -27,5 +27,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             // Forward to React App
             window.postMessage({ type: 'KAWAYAN_STATS_UPDATED_CLIENT', data: request.data }, '*');
         }
+
+        if (request.type === 'KAWAYAN_POST_SUCCESS_BG') {
+            console.log("Content script received post success:", request.data);
+            // Forward to React App
+            window.postMessage({ type: 'KAWAYAN_POST_SUCCESS_CLIENT', data: request.data }, '*');
+        }
     });
 }

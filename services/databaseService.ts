@@ -249,7 +249,8 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         db.prepare(`
           UPDATE generated_posts 
           SET date = ?, topic = ?, caption = ?, image_prompt = ?, image_url = ?, 
-              status = ?, virality_score = ?, virality_reason = ?, format = ?
+              status = ?, virality_score = ?, virality_reason = ?, format = ?,
+              external_link = ?, published_at = ?
           WHERE id = ?
         `).run(
           post.date,
@@ -261,13 +262,15 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
           post.viralityScore || null,
           post.viralityReason || null,
           post.format || null,
+          post.externalLink || null,
+          post.publishedAt || null,
           post.id
         );
       } else {
         // Insert new post
         db.prepare(`
-          INSERT INTO generated_posts (id, user_id, date, topic, caption, image_prompt, image_url, status, virality_score, virality_reason, format)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO generated_posts (id, user_id, date, topic, caption, image_prompt, image_url, status, virality_score, virality_reason, format, external_link, published_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           post.id,
           post.userId,
@@ -279,7 +282,9 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
           post.status,
           post.viralityScore || null,
           post.viralityReason || null,
-          post.format || null
+          post.format || null,
+          post.externalLink || null,
+          post.publishedAt || null
         );
       }
     } catch (error) {
@@ -305,6 +310,8 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         viralityScore: row.virality_score,
         viralityReason: row.virality_reason,
         format: row.format,
+        externalLink: row.external_link,
+        publishedAt: row.published_at,
         regenCount: 0,
         history: []
       }));

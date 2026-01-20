@@ -63,11 +63,25 @@ export class DatabaseConfig {
         virality_score INTEGER CHECK (virality_score >= 0 AND virality_score <= 100),
         virality_reason TEXT,
         format TEXT,
+        external_link TEXT,
+        published_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+
+    // Migration: Add columns if they don't exist
+    const tableInfo = this.db.prepare("PRAGMA table_info(generated_posts)").all() as any[];
+    const hasExternalLink = tableInfo.some(col => col.name === 'external_link');
+    const hasPublishedAt = tableInfo.some(col => col.name === 'published_at');
+
+    if (!hasExternalLink) {
+      this.db.exec("ALTER TABLE generated_posts ADD COLUMN external_link TEXT");
+    }
+    if (!hasPublishedAt) {
+      this.db.exec("ALTER TABLE generated_posts ADD COLUMN published_at DATETIME");
+    }
     
     // Sessions table
     this.db.exec(`

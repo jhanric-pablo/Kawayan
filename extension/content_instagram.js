@@ -26,8 +26,10 @@ chrome.storage.local.get(['pendingPost'], (result) => {
              const fullText = post.caption;
              document.execCommand('insertText', false, fullText);
              
-             box.innerHTML = `<b>Kawayan AI</b><br/>Caption Filled!`;
-             chrome.storage.local.remove('pendingPost');
+             box.innerHTML = `<b>Kawayan AI</b><br/>Caption Filled! Click Share.`;
+             // chrome.storage.local.remove('pendingPost');
+
+             monitorInstaSuccess(post, box);
         }
       }
     }, 1000);
@@ -35,3 +37,30 @@ chrome.storage.local.get(['pendingPost'], (result) => {
     setTimeout(() => clearInterval(checkInterval), 120000); // Wait longer for Insta (user workflow is slower)
   }
 });
+
+function monitorInstaSuccess(post, box) {
+  const observer = new MutationObserver((mutations) => {
+    const bodyText = document.body.innerText;
+    if (bodyText.includes("Your post has been shared") || bodyText.includes("Post shared")) {
+      observer.disconnect();
+      box.style.background = "#34d399";
+      box.innerHTML = `<b>Kawayan AI</b><br/>✅ Shared! Saving...`;
+
+      const postData = {
+        postId: post.id,
+        platform: 'instagram',
+        status: 'Published',
+        link: window.location.href
+      };
+
+      chrome.runtime.sendMessage({ type: 'KAWAYAN_POST_SUCCESS', data: postData });
+      chrome.storage.local.remove('pendingPost');
+
+      setTimeout(() => {
+        chrome.runtime.sendMessage({ type: 'KAWAYAN_CLOSE_TAB' });
+      }, 3000);
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+}

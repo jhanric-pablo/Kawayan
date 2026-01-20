@@ -92,14 +92,16 @@ chrome.storage.local.get(['pendingPost'], (result) => {
           
           if (success) {
             editor.setAttribute('data-kawayan-injected', 'true');
-            updateStatus("✨ Caption Auto-Filled! Please review.", '#34d399');
+            updateStatus("✨ Caption Auto-Filled! Click Post to finish.", '#34d399');
             
             // Highlight it visually
             editor.style.outline = "2px solid #10b981";
             setTimeout(() => editor.style.outline = "none", 2000);
             
             clearInterval(injectorInterval);
-            chrome.storage.local.remove('pendingPost');
+            // chrome.storage.local.remove('pendingPost'); // Keep it to monitor success
+            
+            monitorTikTokSuccess(post);
           } else {
             console.warn("execCommand returned false");
             // Retry next tick?
@@ -123,3 +125,36 @@ chrome.storage.local.get(['pendingPost'], (result) => {
     }, 1000);
   }
 });
+
+function monitorTikTokSuccess(post) {
+  console.log("Kawayan: Monitoring for TikTok post success...");
+  
+  const observer = new MutationObserver((mutations) => {
+    const bodyText = document.body.innerText;
+    // TikTok success indicators
+    if (bodyText.includes("Your video is being processed") || 
+        bodyText.includes("Post uploaded") || 
+        bodyText.includes("Manage your posts") ||
+        window.location.href.includes("post-success")) {
+      
+      observer.disconnect();
+      updateStatus("✅ Post Successful! Saving...", '#34d399');
+
+      const postData = {
+        postId: post.id,
+        platform: 'tiktok',
+        status: 'Published',
+        link: window.location.href
+      };
+
+      chrome.runtime.sendMessage({ type: 'KAWAYAN_POST_SUCCESS', data: postData });
+      chrome.storage.local.remove('pendingPost');
+
+      setTimeout(() => {
+        chrome.runtime.sendMessage({ type: 'KAWAYAN_CLOSE_TAB' });
+      }, 3000);
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+}

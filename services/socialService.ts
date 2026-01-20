@@ -13,8 +13,14 @@ export interface SocialPlatformData {
   followers: number;
   following?: number;
   likes?: number;
+  posts?: number;
+  views?: number;
+  interactions?: number;
+  visits?: number;
+  netFollows?: number;
   engagement: number;
-  reach: SocialMetric[]; // Time series data
+  reach: number; // Single value from scraper
+  reachData?: SocialMetric[]; // Time series data
 }
 
 // Simulates a real API Service
@@ -95,7 +101,6 @@ class SocialMediaService {
          connected: true,
          username: username,
          ...cachedStats,
-         reach: [] 
        };
     }
 
@@ -126,8 +131,12 @@ class SocialMediaService {
       followers: stats.followers || 0,
       following: stats.following,
       likes: stats.likes,
+      views: (stats as any).views || 0,
+      interactions: (stats as any).interactions || 0,
+      visits: (stats as any).visits || 0,
+      netFollows: (stats as any).netFollows || 0,
       engagement: stats.engagement || 0,
-      reach: [],
+      reach: 0,
       error: (stats.followers > 0) ? undefined : "No data yet"
     };
   }
@@ -142,6 +151,10 @@ class SocialMediaService {
         following: stats.following,
         likes: stats.likes,
         posts: stats.posts,
+        views: stats.views,
+        interactions: stats.interactions,
+        visits: stats.visits,
+        netFollows: stats.netFollows,
         engagement: stats.engagement,
         reach: stats.reach
       };

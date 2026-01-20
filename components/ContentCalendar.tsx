@@ -322,6 +322,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     window.postMessage({
       type: 'KAWAYAN_POST_REQUEST',
       data: {
+        id: generatedContent.id, // Pass ID for tracking
         title: generatedContent.topic, // Pass topic as title
         caption: generatedContent.caption,
         imageUrl: generatedContent.imageUrl,
@@ -331,6 +332,47 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     
     setShowPostModal(false);
   };
+
+  // Listen for Post Success from Extension
+  useEffect(() => {
+    const handleExtensionMessage = async (event: MessageEvent) => {
+      if (event.data.type === 'KAWAYAN_POST_SUCCESS_CLIENT') {
+        const { postId, platform, link } = event.data.data;
+        console.log("Received post success from extension:", postId, platform, link);
+        
+        // Find the post in local state
+        const postIndex = posts.findIndex(p => p.id === postId);
+        if (postIndex !== -1) {
+          const updatedPost = { 
+            ...posts[postIndex], 
+            status: 'Published' as const,
+            publishedAt: new Date().toISOString(),
+            externalLink: link 
+          };
+          
+          // Update State
+          const newPosts = [...posts];
+          newPosts[postIndex] = updatedPost;
+          setPosts(newPosts);
+          
+          if (generatedContent && generatedContent.id === postId) {
+            setGeneratedContent(updatedPost);
+          }
+
+          // Update DB
+          try {
+            await dbService.savePost(updatedPost);
+            console.log("Post status updated to Published in DB");
+          } catch (e) {
+            console.error("Failed to update post status in DB", e);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleExtensionMessage);
+    return () => window.removeEventListener('message', handleExtensionMessage);
+  }, [posts, generatedContent, dbService]);
 
   // --- Calendar Grid Helpers ---
   const getDaysInMonth = (date: Date) => {
@@ -370,7 +412,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           
           {post ? (
              <div className="mt-1 p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 text-[10px] text-emerald-800 dark:text-emerald-300 font-medium truncate shadow-sm">
-                {post.status === 'Scheduled' && <Check className="w-3 h-3 inline mr-1"/>}
+                {(post.status === 'Scheduled' || post.status === 'Published') && <Check className="w-3 h-3 inline mr-1"/>}
                 {post.topic}
              </div>
           ) : idea ? (

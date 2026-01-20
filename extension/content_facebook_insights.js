@@ -3,6 +3,7 @@ console.log("Kawayan Insights Scraper Active");
 
 // Helper to show overlay
 function showScrapingOverlay() {
+  if (document.getElementById('kawayan-scraping-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'kawayan-scraping-overlay';
   overlay.style.position = 'fixed';
@@ -20,8 +21,8 @@ function showScrapingOverlay() {
   overlay.style.fontFamily = 'system-ui, sans-serif';
 
   overlay.innerHTML = `
-    <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">Checking Data...</div>
-    <div style="font-size: 16px; color: #aaa;">Please wait while we fetch your insights.</div>
+    <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">🎋 Kawayan AI: Syncing Data...</div>
+    <div id="kawayan-step" style="font-size: 16px; color: #aaa;">Scanning Meta Business Suite...</div>
     <div class="kawayan-spinner" style="margin-top: 30px; width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #10b981; border-radius: 50%;"></div>
     <style>
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -32,43 +33,51 @@ function showScrapingOverlay() {
   document.body.appendChild(overlay);
 }
 
+function updateOverlayStep(text) {
+  const el = document.getElementById('kawayan-step');
+  if (el) el.innerText = text;
+}
+
 // Scrape logic
 async function scrapeInsights() {
-  // Wait for elements to load. This is tricky with SPA/React apps like FB.
-  // We'll look for specific metric containers.
-  
-  // Disclaimer: FB Business Suite DOM is heavily obfuscated and changes. 
-  // This is a heuristic attempt based on typical "Reach" or "Followers" labels.
-  
-  // Let's try to find text like "Facebook Page reach" or "Instagram Reach" and the numbers near it.
-  
   let attempts = 0;
-  const maxAttempts = 10;
+  const maxAttempts = 15;
   
   const checkData = setInterval(() => {
     attempts++;
-    console.log(`Scanning for insights (Attempt ${attempts})...`);
+    updateOverlayStep(`Extracting metrics (Attempt ${attempts}/${maxAttempts})...`);
     
-    // Fallback: Just grab the whole text and use Regex if specific selectors fail
+    // Heuristic: Meta Business Suite uses specific labels and then the value.
     const bodyText = document.body.innerText;
     
-    // Look for Reach
-    // Pattern: "Reach" ... number
-    const reachMatch = bodyText.match(/Reach[\s\S]{1,50}?([\d,]+[KMB]?)/i);
-    const followersMatch = bodyText.match(/Followers[\s\S]{1,50}?([\d,]+[KMB]?)/i) || 
-                           bodyText.match(/Likes[\s\S]{1,50}?([\d,]+[KMB]?)/i); // FB Page Likes often proxy for followers
-                           
-    if (reachMatch || followersMatch || attempts >= maxAttempts) {
+    // Extract metrics using multiple possible patterns
+    const followers = extractMetric(bodyText, ["Followers", "Facebook Page followers", "Page followers"]);
+    const views = extractMetric(bodyText, ["Views", "Video views", "Page views"]);
+    const viewers = extractMetric(bodyText, ["Viewers"]);
+    const interactions = extractMetric(bodyText, ["Interactions", "Content interactions"]);
+    const visits = extractMetric(bodyText, ["Visits", "Facebook visits"]);
+    const follows = extractMetric(bodyText, ["Follows"]);
+    const unfollows = extractMetric(bodyText, ["Unfollows"]);
+    const netFollows = extractMetric(bodyText, ["Net follows"]);
+    
+    // Check if we found data or reached max attempts
+    if (views > 0 || visits > 0 || followers > 0 || attempts >= maxAttempts) {
       clearInterval(checkData);
       
       const stats = {
-        platform: 'facebook', // Defaulting to FB, could infer from URL
-        followers: followersMatch ? parseSocialNumber(followersMatch[1]) : 0,
-        reach: reachMatch ? parseSocialNumber(reachMatch[1]) : 0,
-        engagement: 0 // Hard to scrape aggregate engagement easily, setting 0
+        platform: 'facebook',
+        followers: followers,
+        views: views,
+        viewers: viewers,
+        interactions: interactions,
+        visits: visits,
+        follows: follows,
+        unfollows: unfollows,
+        netFollows: netFollows,
+        scrapedAt: new Date().toISOString()
       };
       
-      console.log("Scraped Stats:", stats);
+      console.log("Kawayan: Scraped Stats:", stats);
       
       // Send back to background
       chrome.runtime.sendMessage({
@@ -76,17 +85,59 @@ async function scrapeInsights() {
         data: stats
       });
       
-      // Update overlay
       const overlay = document.getElementById('kawayan-scraping-overlay');
       if (overlay) {
         overlay.innerHTML = `
-          <div style="font-size: 24px; font-weight: bold; color: #10b981;">Done!</div>
-          <div style="margin-top: 10px;">Closing tab...</div>
+          <div style="font-size: 24px; font-weight: bold; color: #10b981;">✅ Sync Complete!</div>
+          <div style="margin-top: 10px; color: #fff;">${followers.toLocaleString()} Followers, ${reach.toLocaleString()} Reach</div>
+          <div style="margin-top: 5px; color: #aaa; font-size: 14px;">Closing tab and returning to dashboard...</div>
         `;
       }
     }
-  }, 2000); // Check every 2 seconds
+  }, 2000);
 }
+
+function extractMetric(text, labels) {
+  for (const label of labels) {
+    // Regex explanation: Look for the label, followed by some whitespace/newlines, 
+    // maybe a small amount of intermediate text, then a number (possibly with K/M/B or commas)
+    // We use a more flexible regex to handle the complex layout of MBS
+    const regex = new RegExp(`${label}[\\s\\S]{1,100}?([\\d,.]+[KMB]?)`, 'i');
+    const match = text.match(regex);
+    if (match) {
+      const val = parseSocialNumber(match[1]);
+      if (val > 0) return val;
+    }
+  }
+  return 0;
+}
+
+function parseSocialNumber(str) {
+  if (!str) return 0;
+  // Clean string: remove commas, convert to upper for K/M/B
+  str = str.toUpperCase().replace(/,/g, '');
+  
+  // Handle cases where there might be multiple decimal points from messy scraping
+  const parts = str.match(/([\d.]+)([KMB]?)/);
+  if (!parts) return 0;
+  
+  let num = parseFloat(parts[1]);
+  const suffix = parts[2];
+  
+  if (suffix === 'K') num *= 1000;
+  else if (suffix === 'M') num *= 1000000;
+  else if (suffix === 'B') num *= 1000000000;
+  
+  return Math.floor(num);
+}
+
+// Initial Trigger
+if (window.location.href.includes('business.facebook.com/latest/insights')) {
+  showScrapingOverlay();
+  // Wait for React to hydrate
+  setTimeout(scrapeInsights, 3000);
+}
+
 
 function parseSocialNumber(str) {
   if (!str) return 0;
