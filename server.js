@@ -310,9 +310,6 @@ app.post('/api/wallet/cancel-transaction', authenticateToken, async (req, res) =
 app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
   const user = req.user;
   try {
-    // 1. Get user's pending transaction
-    // Using direct DB access for this logic logic to keep service clean of Xendit-specific parsing if possible,
-    // but ideally this should be in service. For now, inline is faster for this fix.
     const db = dbService['dbConfig'].getDatabase();
     const pendingTxn = db.prepare("SELECT * FROM transactions WHERE user_id = ? AND status = 'PENDING'").get(user.userId);
 
@@ -320,14 +317,12 @@ app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
       return res.json({ status: 'NO_PENDING', message: "No pending transaction found." });
     }
 
-    // 2. Extract external_id from description
     const match = pendingTxn.description.match(/Xendit Invoice: (invoice_.*)/);
     if (!match) {
        return res.json({ status: 'PENDING', message: "Pending transaction is not verifiable via Xendit." });
     }
     const externalId = match[1];
 
-    // 3. Query Xendit
     const xenditSecret = process.env.XENDIT_SECRET_KEY;
     const response = await fetch(`https://api.xendit.co/v2/invoices?external_id=${externalId}`, {
         headers: {
@@ -341,67 +336,12 @@ app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
     
     const data = await response.json();
 
-    // Xendit returns an array for get-by-external-id
     if (data && data.length > 0) {
         const invoice = data[0];
         if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
             await dbService.approveTransaction(pendingTxn.id);
             return res.json({ status: 'COMPLETED', message: 'Payment verified and balance updated.' });
         } else if (invoice.status === 'EXPIRED') {
-             // Mark as failed
-             db.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = ?").run(pendingTxn.id);
-             return res.json({ status: 'FAILED', message: 'Payment expired.' });
-        }
-    }
-
-    res.json({ status: 'PENDING', message: 'Payment not yet confirmed by provider.' });
-
-  } catch (error) {
-    logger.error('Verify payment error', { error: error.message });
-    res.status(500).json({ error: error.message });
-  }
-});
-  const user = req.user;
-  try {
-    // 1. Get user's pending transaction
-    // Using direct DB access for this logic logic to keep service clean of Xendit-specific parsing if possible,
-    // but ideally this should be in service. For now, inline is faster for this fix.
-    const db = dbService['dbConfig'].getDatabase();
-    const pendingTxn = db.prepare("SELECT * FROM transactions WHERE user_id = ? AND status = 'PENDING'").get(user.userId);
-
-    if (!pendingTxn) {
-      return res.json({ status: 'NO_PENDING', message: "No pending transaction found." });
-    }
-
-    // 2. Extract external_id from description
-    const match = pendingTxn.description.match(/Xendit Invoice: (invoice_.*)/);
-    if (!match) {
-       return res.json({ status: 'PENDING', message: "Pending transaction is not verifiable via Xendit." });
-    }
-    const externalId = match[1];
-
-    // 3. Query Xendit
-    const xenditSecret = process.env.XENDIT_SECRET_KEY;
-    const response = await fetch(`https://api.xendit.co/v2/invoices?external_id=${externalId}`, {
-        headers: {
-            'Authorization': 'Basic ' + Buffer.from(xenditSecret + ':').toString('base64')
-        }
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to reach payment provider');
-    }
-    
-    const data = await response.json();
-
-    // Xendit returns an array for get-by-external-id
-    if (data && data.length > 0) {
-        const invoice = data[0];
-        if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
-            await dbService.approveTransaction(pendingTxn.id);
-            return res.json({ status: 'COMPLETED', message: 'Payment verified and balance updated.' });
-        } else if (invoice.status === 'EXPIRED') {
-             // Mark as failed
              db.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = ?").run(pendingTxn.id);
              return res.json({ status: 'FAILED', message: 'Payment expired.' });
         }
