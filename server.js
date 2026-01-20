@@ -145,6 +145,11 @@ app.put('/api/auth/theme', authenticateToken, async (req, res) => {
 app.post('/api/profiles', authenticateToken, async (req, res) => {
   const profile = req.body;
   const user = req.user;
+  
+  console.log('--- PROFILE SAVE REQUEST ---');
+  console.log('User ID from Token:', user.userId);
+  console.log('Profile Data Received:', JSON.stringify(profile, null, 2));
+  
   if (profile.userId !== user.userId && user.role !== 'admin') {
     return res.status(403).json({ error: 'Unauthorized' });
   }
@@ -154,7 +159,7 @@ app.post('/api/profiles', authenticateToken, async (req, res) => {
     res.json({ message: 'Profile saved successfully' });
   } catch (error) {
     logger.error('Save profile error', { error: error.message });
-    res.status(500).json({ error: 'Failed to save profile' });
+    res.status(500).json({ error: error.message });
   }
 });
 

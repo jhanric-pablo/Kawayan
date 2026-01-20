@@ -111,8 +111,19 @@ const App: React.FC = () => {
   };
 
   const handleProfileUpdate = async (profileData: BrandProfile) => {
-    await dbService.saveProfile(profileData);
-    setBrandProfile(profileData);
+    try {
+      await dbService.saveProfile(profileData);
+      // Re-fetch from DB to ensure we have exactly what was saved
+      if (user) {
+        const updated = await dbService.getProfile(user.id);
+        if (updated) {
+          setBrandProfile(updated);
+          console.log('Profile state updated from DB after save');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync profile update:', e);
+    }
   };
 
   const handleUserUpdate = async (updatedUser: User) => {

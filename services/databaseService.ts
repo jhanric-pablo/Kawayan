@@ -184,7 +184,8 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         // Update existing profile
         db.prepare(`
           UPDATE brand_profiles 
-          SET business_name = ?, industry = ?, target_audience = ?, brand_voice = ?, key_themes = ?
+          SET business_name = ?, industry = ?, target_audience = ?, brand_voice = ?, key_themes = ?,
+              brand_colors = ?, contact_email = ?, contact_phone = ?
           WHERE user_id = ?
         `).run(
           profile.businessName,
@@ -192,13 +193,16 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
           profile.targetAudience,
           profile.brandVoice,
           profile.keyThemes,
+          JSON.stringify(profile.brandColors || []),
+          profile.contactEmail || null,
+          profile.contactPhone || null,
           profile.userId
         );
       } else {
         // Insert new profile
         db.prepare(`
-          INSERT INTO brand_profiles (id, user_id, business_name, industry, target_audience, brand_voice, key_themes)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO brand_profiles (id, user_id, business_name, industry, target_audience, brand_voice, key_themes, brand_colors, contact_email, contact_phone)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           profile.id || Date.now().toString(),
           profile.userId,
@@ -206,7 +210,10 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
           profile.industry,
           profile.targetAudience,
           profile.brandVoice,
-          profile.keyThemes
+          profile.keyThemes,
+          JSON.stringify(profile.brandColors || []),
+          profile.contactEmail || null,
+          profile.contactPhone || null
         );
       }
     } catch (error) {
@@ -229,7 +236,10 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         industry: row.industry,
         targetAudience: row.target_audience,
         brandVoice: row.brand_voice,
-        keyThemes: row.key_themes
+        keyThemes: row.key_themes,
+        brandColors: row.brand_colors ? JSON.parse(row.brand_colors) : [],
+        contactEmail: row.contact_email,
+        contactPhone: row.contact_phone
       };
     } catch (error) {
       console.error('Error getting profile:', error);

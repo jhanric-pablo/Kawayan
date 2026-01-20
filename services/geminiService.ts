@@ -202,9 +202,12 @@ export const generatePostCaptionAndImagePrompt = async (
     Task: Write a social media post for this topic: "${sanitizedTopic}".
     Business: ${ValidationService.sanitizeInput(profile.businessName)} (${ValidationService.sanitizeInput(profile.industry)}).
     Voice: ${ValidationService.sanitizeInput(profile.brandVoice)}.
+    Target Audience: ${ValidationService.sanitizeInput(profile.targetAudience)}.
+    Brand Colors: ${profile.brandColors?.join(', ') || 'N/A'}.
+    Contact: ${profile.contactEmail || ''} ${profile.contactPhone || ''}.
 
-    1. Caption: Natural, conversational Taglish. Include emojis and 3-5 hashtags.
-    2. Image Prompt: Detailed English prompt for an image generator. High aesthetic.
+    1. Caption: Natural, conversational Taglish. Include emojis and 3-5 hashtags. Mention contact info if relevant.
+    2. Image Prompt: Detailed English prompt for an image generator. Use the brand's color palette (${profile.brandColors?.join(', ') || 'aesthetic colors'}) where appropriate. High aesthetic.
     3. Virality Analysis: Rate from 0-100 how engaging/viral this post might be for Filipinos and explain why in one short sentence.
   `;
 

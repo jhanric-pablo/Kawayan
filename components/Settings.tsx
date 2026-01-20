@@ -14,7 +14,12 @@ interface Props {
 }
 
 const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdate, darkMode, toggleDarkMode, onClose }) => {
-  const [formData, setFormData] = useState<BrandProfile>(profile);
+  const [formData, setFormData] = useState<BrandProfile>({
+    ...profile,
+    brandColors: profile.brandColors && profile.brandColors.length > 0 
+      ? profile.brandColors 
+      : ['#10b981', '#3b82f6', '#f59e0b'] // Default brand colors if empty
+  });
   
   // Account State
   const [accountForm, setAccountForm] = useState({
@@ -31,7 +36,12 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
   const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'billing'>('profile');
 
   useEffect(() => {
-    setFormData(profile);
+    setFormData({
+      ...profile,
+      brandColors: profile.brandColors && profile.brandColors.length > 0 
+        ? profile.brandColors 
+        : ['#10b981', '#3b82f6', '#f59e0b']
+    });
   }, [profile]);
 
   useEffect(() => {
@@ -40,7 +50,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
     }
   }, [activeTab]);
 
-  const handleChange = (field: keyof BrandProfile, value: string) => {
+  const handleChange = (field: keyof BrandProfile, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setSaved(false);
   };
@@ -270,20 +280,26 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                       <div>
                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Brand Colors (Hex)</label>
                          <div className="flex gap-2">
-                           {[0,1,2].map(i => (
-                             <div key={i} className="flex items-center gap-1">
-                               <input 
-                                 type="color"
-                                 value={formData.brandColors?.[i] || '#000000'}
-                                 onChange={(e) => {
-                                   const newColors = [...(formData.brandColors || [])];
-                                   newColors[i] = e.target.value;
-                                   handleChange('brandColors', newColors as any);
-                                 }}
-                                 className="w-8 h-8 rounded cursor-pointer border-0 p-0"
-                               />
-                             </div>
-                           ))}
+                           {[0,1,2].map(i => {
+                             // Ensure we have a valid color string for this index
+                             const currentColor = (formData.brandColors && formData.brandColors[i]) || '#10b981';
+                             return (
+                               <div key={i} className="flex items-center gap-1">
+                                 <input 
+                                   type="color"
+                                   value={currentColor}
+                                   onChange={(e) => {
+                                     const newColors = [...(formData.brandColors || ['#10b981', '#3b82f6', '#f59e0b'])];
+                                     // Fill slots if they don't exist
+                                     while (newColors.length <= i) newColors.push('#000000');
+                                     newColors[i] = e.target.value;
+                                     handleChange('brandColors', newColors);
+                                   }}
+                                   className="w-8 h-8 rounded cursor-pointer border-0 p-0 overflow-hidden"
+                                 />
+                               </div>
+                             );
+                           })}
                          </div>
                       </div>
                       <div className="space-y-2">

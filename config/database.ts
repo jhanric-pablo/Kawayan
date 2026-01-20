@@ -43,11 +43,30 @@ export class DatabaseConfig {
         target_audience TEXT NOT NULL,
         brand_voice TEXT NOT NULL,
         key_themes TEXT NOT NULL,
+        brand_colors TEXT,
+        contact_email TEXT,
+        contact_phone TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+
+    // Migration for brand_profiles
+    const profileInfo = this.db.prepare("PRAGMA table_info(brand_profiles)").all() as any[];
+    if (!profileInfo.some(col => col.name === 'brand_colors')) {
+      console.log('Migration: Adding brand_colors to brand_profiles');
+      this.db.exec("ALTER TABLE brand_profiles ADD COLUMN brand_colors TEXT");
+    }
+    if (!profileInfo.some(col => col.name === 'contact_email')) {
+      console.log('Migration: Adding contact_email to brand_profiles');
+      this.db.exec("ALTER TABLE brand_profiles ADD COLUMN contact_email TEXT");
+    }
+    if (!profileInfo.some(col => col.name === 'contact_phone')) {
+      console.log('Migration: Adding contact_phone to brand_profiles');
+      this.db.exec("ALTER TABLE brand_profiles ADD COLUMN contact_phone TEXT");
+    }
+
     
     // Generated posts table
     this.db.exec(`

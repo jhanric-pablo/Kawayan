@@ -15,7 +15,6 @@ export interface BrandProfile {
   targetAudience: string;
   brandVoice: string; 
   keyThemes: string;
-  // New fields
   brandColors?: string[]; // Array of HEX codes
   contactEmail?: string;
   contactPhone?: string;
