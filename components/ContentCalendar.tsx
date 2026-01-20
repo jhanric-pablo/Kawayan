@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
 import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, getTrendingTopicsPH } from '../services/geminiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
+import { paymentService } from '../services/paymentService';
 import { 
   Loader2, Plus, Wand2, Image as ImageIcon, RefreshCcw, Flame, 
   ThumbsUp, MessageCircle, Share2, MoreHorizontal, LayoutList, LayoutGrid, 
@@ -236,15 +237,30 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     alert("Batch Generation Complete!");
   };
 
-  const handleAddOn = (day: number) => {
-    // Simulate Xendit payment flow
-    const confirm = window.confirm("Purchase 'Add-on' post for ₱150? (Via Xendit)");
+  const handleAddOn = async (day: number) => {
+    const cost = 150;
+    const topic = prompt("Enter topic for this extra post:");
+    if (!topic) return;
+
+    const confirm = window.confirm(`Purchase 'Add-on' post for ₱${cost}? This will be deducted from your wallet balance.`);
     if (confirm) {
-       const topic = prompt("Enter topic for this extra post:");
-       if (topic) {
+       try {
+         await paymentService.makePayment(cost, `Add-on Post: ${topic}`);
+         
          const newIdea: ContentIdea = { day, title: "Add-on Post", topic, format: 'Image' };
-         setIdeas(prev => [...prev, newIdea]);
+         const updatedIdeas = [...ideas, newIdea];
+         setIdeas(updatedIdeas);
+         
+         // Save plan update to DB
+         const monthName = currentDate.toLocaleString('default', { month: 'long' });
+         await dbService.savePlan(userId, monthName, updatedIdeas);
+         
+         // Start AI generation
          handleGeneratePost(newIdea);
+         alert("Purchase Successful! AI is drafting your post...");
+         
+       } catch (e: any) {
+         alert(e.message || "Payment failed. Please ensure you have enough balance in your wallet.");
        }
     }
   };

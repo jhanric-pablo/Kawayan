@@ -179,13 +179,6 @@ const SupportWidget: React.FC = () => {
           className="group relative flex items-center justify-center w-14 h-14 bg-slate-900 dark:bg-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
         >
           {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
-          
-          {!isOpen && (
-            <span className="absolute right-0 top-0 -mr-1 -mt-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
-          )}
         </button>
       </div>
     </>

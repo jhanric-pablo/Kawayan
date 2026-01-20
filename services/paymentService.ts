@@ -3,7 +3,7 @@ export interface Transaction {
   date: string;
   description: string;
   amount: number;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   type: 'CREDIT' | 'DEBIT';
 }
 
@@ -121,6 +121,28 @@ class PaymentService {
     });
 
     return response.ok;
+  }
+
+  async makePayment(amount: number, description: string): Promise<boolean> {
+    const userId = this.getUserId();
+    if (!userId) throw new Error("Not authenticated");
+
+    const response = await fetch('/api/wallet/purchase', {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({
+        userId,
+        amount,
+        description
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Payment failed");
+    }
+
+    return true;
   }
 
   async cancelTransaction(transactionId: string): Promise<Wallet> {

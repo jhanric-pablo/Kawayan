@@ -155,11 +155,40 @@ export class DatabaseConfig {
         date DATETIME DEFAULT CURRENT_TIMESTAMP,
         description TEXT NOT NULL,
         amount REAL NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED')),
+        status TEXT NOT NULL CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED')),
         type TEXT NOT NULL CHECK (type IN ('CREDIT', 'DEBIT')),
         FOREIGN KEY (user_id) REFERENCES wallets(user_id) ON DELETE CASCADE
       )
     `);
+
+    // Migration for transactions status
+    const txnTableInfo = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='transactions'").get() as { sql: string };
+    if (txnTableInfo && !txnTableInfo.sql.includes('CANCELLED')) {
+      console.log('Migration: Updating transactions status constraint to include CANCELLED');
+      this.db.transaction(() => {
+        // 1. Rename old table
+        this.db.exec("ALTER TABLE transactions RENAME TO transactions_old");
+        // 2. Create new table with correct constraint
+        this.db.exec(`
+          CREATE TABLE transactions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED')),
+            type TEXT NOT NULL CHECK (type IN ('CREDIT', 'DEBIT')),
+            FOREIGN KEY (user_id) REFERENCES wallets(user_id) ON DELETE CASCADE
+          )
+        `);
+        // 3. Copy data
+        this.db.exec("INSERT INTO transactions SELECT * FROM transactions_old");
+        // 4. Drop old table
+        this.db.exec("DROP TABLE transactions_old");
+        // 5. Recreate index
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)");
+      })();
+    }
 
     // Tickets table
     this.db.exec(`

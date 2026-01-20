@@ -479,7 +479,7 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
   async cancelTransaction(transactionId: string, userId: string): Promise<void> {
     const db = this.dbConfig.getDatabase();
     try {
-      const result = db.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = ? AND user_id = ? AND status = 'PENDING'").run(transactionId, userId);
+      const result = db.prepare("UPDATE transactions SET status = 'CANCELLED' WHERE id = ? AND user_id = ? AND status = 'PENDING'").run(transactionId, userId);
       if (result.changes === 0) {
         throw new Error("Transaction not found or not pending");
       }

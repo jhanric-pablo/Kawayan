@@ -273,7 +273,12 @@ const Billing: React.FC = () => {
                   <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{txn.description}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${txn.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : txn.status === 'PENDING' ? 'bg-orange-100 text-orange-700' : 'bg-rose-100 text-rose-700'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                        txn.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 
+                        txn.status === 'PENDING' ? 'bg-orange-100 text-orange-700' : 
+                        txn.status === 'CANCELLED' ? 'bg-slate-100 text-slate-700' :
+                        'bg-rose-100 text-rose-700'
+                      }`}>
                         {txn.status}
                       </span>
                       {txn.status === 'PENDING' && (
