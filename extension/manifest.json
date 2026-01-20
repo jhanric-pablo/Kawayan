@@ -33,7 +33,7 @@
     },
     {
       "matches": ["https://business.facebook.com/*", "https://www.facebook.com/*"],
-      "js": ["content_facebook.js"]
+      "js": ["content_facebook.js", "content_facebook_insights.js"]
     },
     {
       "matches": ["https://www.instagram.com/*"],

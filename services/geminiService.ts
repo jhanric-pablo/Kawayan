@@ -4,7 +4,15 @@ import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
 
 const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+
+// Mock AI client if key is missing to prevent SDK crash
+const ai = apiKey 
+  ? new GoogleGenAI({ apiKey }) 
+  : { 
+      models: { 
+        generateContent: async () => { throw new Error("Gemini API Key is missing"); } 
+      } 
+    };
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -56,6 +64,39 @@ Always ensure the tone matches the brand's voice.
 When asked for JSON, return ONLY valid JSON.
 `;
 
+const MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro'];
+
+// Helper to generate content with model fallback
+const generateWithFallback = async (params: any) => {
+  let lastError;
+  for (const model of MODELS) {
+    try {
+      // Create a specific config for this attempt
+      const attemptConfig = {
+        ...params,
+        model: model 
+      };
+      
+      console.log(`Attempting AI generation with model: ${model}`);
+      
+      // Use the retry logic for *this specific model* (network glitches)
+      // If it's a 429/Quota, we might want to skip retry and go to next model immediately,
+      // but simple backoff covers both.
+      return await retryWithBackoff(async () => {
+        return await ai.models.generateContent(attemptConfig);
+      }, 2, `AI Gen (${model})`); // Reduced retries per model to speed up fallback
+
+    } catch (error: any) {
+      console.warn(`Model ${model} failed:`, error.message);
+      lastError = error;
+      
+      // If it's a content safety block, switching models might not help, but for Quota/Overload it will.
+      // Continue to next model
+    }
+  }
+  throw new AIServiceError("All AI models failed", lastError);
+};
+
 export const generateContentPlan = async (profile: BrandProfile, month: string): Promise<ContentIdea[]> => {
   const action = 'generateContentPlan';
   
@@ -100,17 +141,14 @@ export const generateContentPlan = async (profile: BrandProfile, month: string):
   };
 
   try {
-    const response = await retryWithBackoff(async () => {
-      return await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: TAGLISH_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: schema
-        }
-      });
-    }, MAX_RETRIES, 'Content plan generation');
+    const response = await generateWithFallback({
+      contents: prompt,
+      config: {
+        systemInstruction: TAGLISH_SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: schema
+      }
+    });
 
     // Parse and validate response
     let parsedData;
@@ -182,17 +220,14 @@ export const generatePostCaptionAndImagePrompt = async (
   };
 
   try {
-    const response = await retryWithBackoff(async () => {
-      return await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: TAGLISH_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: schema
-        }
-      });
-    }, MAX_RETRIES, 'Post caption generation');
+    const response = await generateWithFallback({
+      contents: prompt,
+      config: {
+        systemInstruction: TAGLISH_SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: schema
+      }
+    });
 
     // Parse and validate response
     let parsedData;
@@ -219,49 +254,39 @@ export const generatePostCaptionAndImagePrompt = async (
 };
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string | null> => {
-  if (!apiKey) {
-    console.warn("API Key missing, cannot generate image");
-    return null;
-  }
-
+  // "Nanobanana" / Pollinations.ai implementation for unlimited free images
   const sanitizedPrompt = ValidationService.sanitizeInput(prompt);
-  if (sanitizedPrompt.length < 5) {
-    console.warn("Invalid image prompt, too short");
-    return null;
-  }
+  if (sanitizedPrompt.length < 2) return null;
 
   try {
-    const response = await retryWithBackoff(async () => {
-      return await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: [
-          { text: sanitizedPrompt }
-        ],
-        config: {
-          // Default configs for flash-image
-        }
-      });
-    }, MAX_RETRIES, 'Image generation');
-
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.data) {
+    console.log("Generating image via Pollinations (Unlimited)...");
+    const encodedPrompt = encodeURIComponent(sanitizedPrompt);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1080&nologo=true&seed=${Math.floor(Math.random() * 10000)}`;
+    
+    // Verify reachability (optional, but good for error handling)
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Pollinations API unavailable');
+    
+    return imageUrl; // Return the URL directly
+  } catch (error) {
+    console.error("Pollinations image generation failed:", error);
+    
+    // Fallback to Gemini if Pollinations fails (rare)
+    if (apiKey) {
+      try {
+        console.log("Falling back to Gemini Flash Image...");
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: [{ text: sanitizedPrompt }]
+        });
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        if (part?.inlineData?.data) {
           return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
+      } catch (geminiError) {
+        console.error("Gemini image fallback failed:", geminiError);
       }
     }
-    
-    console.warn("No image data found in AI response");
-    return null;
-    
-  } catch (error) {
-    console.error("Error generating image:", error);
-    
-    if (error instanceof AIServiceError) {
-      console.error("AI Service Error Details:", error.originalError);
-    }
-    
     return null; 
   }
 };
@@ -284,16 +309,13 @@ export const getTrendingTopicsPH = async (industry?: string): Promise<string[]> 
   };
 
   try {
-    const response = await retryWithBackoff(async () => {
-      return await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema
-        }
-      });
-    }, MAX_RETRIES, 'Trending topics generation');
+    const response = await generateWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema
+      }
+    });
 
     // Parse and validate response
     let parsedData;

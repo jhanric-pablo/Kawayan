@@ -470,6 +470,145 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
 
 
 
+// --- Social Media Scraper Helper ---
+async function scrapeSocialStats(platform, username) {
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
+  ];
+  
+  const headers = {
+    'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9'
+  };
+
+  try {
+    if (platform === 'instagram') {
+      // 1. Imginn (Public Viewer)
+      try {
+        const response = await fetch(`https://imginn.com/${username}/`, { headers });
+        if (response.ok) {
+          const html = await response.text();
+          const followersMatch = html.match(/<span class="followers">([0-9.,kKmM]+)<\/span>/i) ||
+                                 html.match(/Followers\s*<[^>]+>\s*([0-9.,kKmM]+)/i);
+          if (followersMatch) {
+            return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'imginn' };
+          }
+        }
+      } catch (e) { logger.warn(`Imginn failed: ${e.message}`); }
+
+      // 2. GreatFon/InstaNavigation Fallback
+      const response2 = await fetch(`https://greatfon.com/v/${username}`, { headers });
+      if (response2.ok) {
+        const html = await response2.text();
+        const followersMatch = html.match(/Followers\s*<[^>]+>\s*([0-9.,kKmM]+)/i) ||
+                               html.match(/<li[^>]*>\s*([0-9.,kKmM]+)\s*<span>Followers<\/span>/i);
+        if (followersMatch) {
+          return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'greatfon' };
+        }
+      }
+
+    } else if (platform === 'tiktok') {
+      const cleanUser = username.startsWith('@') ? username.substring(1) : username;
+      
+      // 1. TikWM Public API (JSON)
+      try {
+        const response = await fetch(`https://www.tikwm.com/api/user/info?unique_id=${cleanUser}`, { headers });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.code === 0 && data.data && data.data.user) {
+             return {
+               followers: data.data.user.follower_count,
+               likes: data.data.user.total_favorited,
+               isReal: true,
+               source: 'tikwm-api'
+             };
+          }
+        }
+      } catch (e) { logger.warn(`TikWM failed: ${e.message}`); }
+
+      // 2. Countik API (often open)
+      try {
+        const response2 = await fetch(`https://countik.com/api/user/${cleanUser}`, { headers });
+        if (response2.ok) {
+           const data = await response2.json();
+           if (data && data.followerCount) {
+             return {
+               followers: parseSocialNumber(data.followerCount),
+               likes: parseSocialNumber(data.heartCount),
+               isReal: true,
+               source: 'countik-api'
+             };
+           }
+        }
+      } catch (e) { logger.warn(`Countik failed: ${e.message}`); }
+
+      // 3. Urlebird Fallback
+      const response3 = await fetch(`https://urlebird.com/user/@${cleanUser}/`, { headers });
+      if (response3.ok) {
+         const html = await response3.text();
+         const followersMatch = html.match(/>\s*([0-9.,kKmM]+)\s*<\/b>\s*Followers/i);
+         if (followersMatch) {
+            return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'urlebird' };
+         }
+      }
+
+    } else if (platform === 'facebook') {
+       // FB Public Page Scraping
+       const response = await fetch(`https://www.facebook.com/${username}`, { headers });
+       if (response.ok) {
+         const html = await response.text();
+         const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) ||
+                           html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+                           
+         if (metaMatch) {
+           const content = metaMatch[1];
+           const followersMatch = content.match(/([0-9.,kKmM]+)\s+followers/i);
+           const likesMatch = content.match(/([0-9.,kKmM]+)\s+likes/i);
+           
+           if (followersMatch) {
+             return {
+               followers: parseSocialNumber(followersMatch[1]),
+               likes: parseSocialNumber(likesMatch ? likesMatch[1] : '0'),
+               isReal: true,
+               source: 'facebook-meta'
+             };
+           }
+         }
+       }
+    }
+    
+    throw new Error('All scraping methods failed');
+
+  } catch (error) {
+    logger.warn(`Scraping failed for ${platform}/${username}: ${error.message}`);
+    // Return error state - no fake data
+    return {
+      error: error.message,
+      isReal: false,
+      followers: null,
+      engagement: null
+    };
+  }
+}
+
+function parseSocialNumber(str) {
+  if (!str) return 0;
+  str = str.toUpperCase().replace(/,/g, '');
+  if (str.includes('K')) return parseFloat(str) * 1000;
+  if (str.includes('M')) return parseFloat(str) * 1000000;
+  if (str.includes('B')) return parseFloat(str) * 1000000000;
+  return parseFloat(str);
+}
+
+// Route for stats
+app.get('/api/social/stats/:platform/:username', async (req, res) => {
+  const { platform, username } = req.params;
+  const data = await scrapeSocialStats(platform, username);
+  res.json(data);
+});
+
 // The "catchall" handler: for any request that doesn't
 
 
