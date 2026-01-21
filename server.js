@@ -41,6 +41,15 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('message', (data) => {
+    // data: { roomId, text, sender }
+    io.to(data.roomId).emit('message', {
+      text: data.text,
+      sender: data.sender,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   socket.on('disconnect', () => {
     socket.broadcast.emit('user-disconnected', socket.id);
   });
@@ -750,6 +759,17 @@ app.put('/api/support/tickets/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('Update ticket error', { error: error.message });
     res.status(500).json({ error: 'Failed to update ticket' });
+  }
+});
+
+app.post('/api/support/tickets/resolve-user', authenticateToken, async (req, res) => {
+  const { userId } = req.body;
+  try {
+    await dbService.resolveTicketByUserId(userId);
+    res.json({ message: 'User tickets resolved' });
+  } catch (error) {
+    logger.error('Resolve user tickets error', { error: error.message });
+    res.status(500).json({ error: 'Failed to resolve tickets' });
   }
 });
 

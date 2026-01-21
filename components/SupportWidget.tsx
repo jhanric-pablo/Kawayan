@@ -225,7 +225,7 @@ const SupportWidget: React.FC = () => {
                  <button type="submit" className="w-full py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700">Submit Ticket</button>
               </form>
             ) : (
-              <form onSubmit={handleStartCall} className="flex-1 p-4 space-y-4 bg-white dark:bg-slate-800">
+              <form onSubmit={handleStartCall} className="flex-1 p-4 space-y-4 bg-white dark:bg-slate-800 overflow-y-auto">
                  <div className="text-center py-4">
                     <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><Phone className="w-8 h-8 text-emerald-600" /></div>
                     <h4 className="font-bold text-slate-900 dark:text-white">Request Live Support</h4>

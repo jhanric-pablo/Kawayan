@@ -670,6 +670,16 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
     }
   }
 
+  async resolveTicketByUserId(userId: string): Promise<void> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      db.prepare("UPDATE tickets SET status = 'Resolved', updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND status != 'Resolved'").run(userId);
+    } catch (error) {
+      console.error('Error resolving user tickets:', error);
+      throw error;
+    }
+  }
+
   // --- Active Calls ---
   async registerCall(userId: string, userEmail: string, roomName: string, reason?: string): Promise<void> {
     const db = this.dbConfig.getDatabase();

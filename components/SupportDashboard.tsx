@@ -12,19 +12,17 @@ const SupportDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [reply, setReply] = useState('');
   const [isSending, setIsTyping] = useState(false);
-  const [activeCallRoom, setActiveCallRoom] = useState<{room: string, reason?: string} | null>(null);
+  const [activeCallRoom, setActiveCallRoom] = useState<{room: string, reason?: string, userId?: string} | null>(null);
 
   useEffect(() => {
     loadTickets();
     loadCalls();
 
-    // Poll for calls every 5 seconds
     const callInterval = setInterval(loadCalls, 5000);
     return () => clearInterval(callInterval);
   }, [filter]);
 
   useEffect(() => {
-    // Play alert sound if a new call arrives
     if (activeCalls.length > 0) {
        console.log("ALERT: New incoming call in queue!");
     }
@@ -50,8 +48,8 @@ const SupportDashboard: React.FC = () => {
     } catch (e) { console.error("Failed to load calls", e); }
   };
 
-  const handleJoinCall = (roomName: string, reason?: string) => {
-    setActiveCallRoom({ room: roomName, reason });
+  const handleJoinCall = (roomName: string, reason?: string, userId?: string) => {
+    setActiveCallRoom({ room: roomName, reason, userId });
   };
 
   const handleResolve = async (id: string) => {
