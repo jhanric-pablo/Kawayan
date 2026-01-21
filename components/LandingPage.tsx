@@ -36,17 +36,19 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const smoothUpdate = (time: number) => {
-      // 1. Liquid-Smooth Scroll (Moderate Damping)
-      const scrollEasing = 0.1; 
+      // 1. Liquid-Smooth Scroll (Responsive Damping)
+      const scrollEasing = 0.08; 
       currentScrollY.current += (targetScrollY.current - currentScrollY.current) * scrollEasing;
       
-      const rect = container.getBoundingClientRect();
-      const scrollRange = window.innerHeight * 2; // Mimic the previous scroll depth for scrubbing
-      const progress = Math.min(1, Math.max(0, -rect.top / scrollRange));
+      const containerTop = container.offsetTop;
+      const scrollRange = window.innerHeight * 2; // More responsive range
+      const progress = Math.min(1, Math.max(0, (currentScrollY.current - containerTop) / scrollRange));
 
       // 2. Performance Hack: Direct DOM Manipulation
-      const opacity = Math.max(0, 1 - (progress * 1.2)); 
-      const scale = 1 - (progress * 0.05);
+      // Balanced easing for responsiveness + smoothness
+      const easedProgress = progress * (2 - progress); 
+      const opacity = Math.max(0, 1 - (easedProgress * 1.5)); 
+      const scale = 1 - (easedProgress * 0.05);
       
       if (contentRef.current) {
         contentRef.current.style.opacity = opacity.toString();
@@ -67,12 +69,13 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         targetTimeRef.current = video.duration * progress;
       }
 
-      const videoEasing = 0.08; 
+      const videoEasing = 0.12; // Snappier video tracking
       currentTimeRef.current += (targetTimeRef.current - currentTimeRef.current) * videoEasing;
 
       if (video && !isNaN(video.duration)) {
         const diff = Math.abs(video.currentTime - currentTimeRef.current);
-        if (!video.seeking && diff > 0.002) {
+        // Ultra-high precision for "more frames" feel
+        if (!video.seeking && diff > 0.0005) {
           video.currentTime = currentTimeRef.current;
         }
       }
