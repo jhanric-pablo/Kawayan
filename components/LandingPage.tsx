@@ -201,14 +201,10 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                   </button>
                   
                   <button 
-                    onClick={toggleAutoPlay}
-                    className={`px-8 py-4 backdrop-blur-md border border-white/30 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto ${isAutoPlaying ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.5)]' : 'bg-white/10 hover:bg-white/20'}`}
+                    onClick={() => onNavigate(ViewState.DEMO)}
+                    className="px-8 py-4 backdrop-blur-md border border-white/30 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto bg-white/10 hover:bg-white/20"
                   >
-                    {isAutoPlaying ? (
-                      <>Stop Cinematic</>
-                    ) : (
-                      <><Play className="w-5 h-5 fill-current" /> Cinematic Mode</>
-                    )}
+                    <Play className="w-5 h-5 fill-current" /> Demo Mode
                   </button>
                 </div>
               </div>

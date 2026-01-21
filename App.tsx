@@ -11,6 +11,7 @@ import SupportWidget from './components/SupportWidget';
 import InsightsDashboard from './components/InsightsDashboard';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
+import DemoPage from './components/DemoPage';
 import UniversalDatabaseService from './services/universalDatabaseService';
 import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
 
@@ -266,6 +267,8 @@ const App: React.FC = () => {
                     return <Billing />;
                   case ViewState.SUPPORT_DASHBOARD:
                     return <SupportDashboard />;
+                  case ViewState.DEMO:
+                    return <DemoPage onNavigate={setView} />;
                   case ViewState.ADMIN_DASHBOARD:
                     return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} /> : <div className="text-center p-10">Access Denied</div>;
                   default:
