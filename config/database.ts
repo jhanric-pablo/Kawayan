@@ -232,6 +232,7 @@ export class DatabaseConfig {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         user_email TEXT NOT NULL,
+        call_id TEXT,
         reason TEXT,
         started_at DATETIME NOT NULL,
         ended_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -240,6 +241,12 @@ export class DatabaseConfig {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+
+    // Migration for call_history call_id
+    const historyTableInfo = this.db.prepare("PRAGMA table_info(call_history)").all() as any[];
+    if (!historyTableInfo.some(col => col.name === 'call_id')) {
+      this.db.exec("ALTER TABLE call_history ADD COLUMN call_id TEXT");
+    }
 
     // Social Connections table
     this.db.exec(`

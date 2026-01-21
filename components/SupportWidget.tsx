@@ -20,19 +20,13 @@ const SupportWidget: React.FC = () => {
     { sender: 'bot', text: 'Hi! I am the Kawayan AI Support Bot. How can I help you today?' }
   ]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
-  const [userIdSuffix, setUserIdSuffix] = useState<string>('');
+  const [sessionCallId, setSessionCallId] = useState<string>('');
 
   useEffect(() => {
-    const fetchSession = () => {
-      const session = JSON.parse(localStorage.getItem('kawayan_session') || '{}');
-      if (session.id) {
-        setUserIdSuffix(session.id.substring(session.id.length - 4));
-      }
-    };
-    fetchSession();
-    window.addEventListener('storage', fetchSession);
-    return () => window.removeEventListener('storage', fetchSession);
-  }, []);
+    // Generate a fresh random 4-digit ID for this session
+    const randomId = Math.floor(1000 + Math.random() * 9000).toString();
+    setSessionCallId(randomId);
+  }, [isOpen]);
 
   // Poll for ticket updates
   useEffect(() => {
@@ -135,7 +129,7 @@ const SupportWidget: React.FC = () => {
 
   return (
     <>
-      {isCalling && <CallOverlay onEndCall={() => setIsCalling(false)} reason={callReason} />}
+      {isCalling && <CallOverlay onEndCall={() => setIsCalling(false)} reason={callReason} roomId={`KawayanSupport-${sessionCallId}`} />}
       
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-4">
         {isOpen && (
@@ -149,8 +143,8 @@ const SupportWidget: React.FC = () => {
                   <span className="font-bold text-xs truncate">
                     {mode === 'chat' ? 'Kawayan Support' : mode === 'ticket' ? 'Submit Ticket' : 'Submit Request'}
                   </span>
-                  {userIdSuffix && (
-                    <span className="text-[11px] font-black text-emerald-400">CALL ID: {userIdSuffix}</span>
+                  {sessionCallId && (
+                    <span className="text-[11px] font-black text-emerald-400">CALL ID: {sessionCallId}</span>
                   )}
                 </div>
               </div>

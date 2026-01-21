@@ -154,7 +154,8 @@ const SupportDashboard: React.FC = () => {
   const processedHistory = useMemo(() => {
     let result = callHistory.filter(c => 
       c.user_email.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (c.reason && c.reason.toLowerCase().includes(searchQuery.toLowerCase()))
+      (c.reason && c.reason.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (c.call_id && c.call_id.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return result.sort((a, b) => {
@@ -264,7 +265,7 @@ const SupportDashboard: React.FC = () => {
                               <p className="text-[10px] text-slate-500 line-clamp-1 italic mb-2">"{call.reason || 'No reason provided'}"</p>
                               <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-tighter">
                                  <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">Duration: {formatDuration(call.duration_seconds)}</span>
-                                 <span className="text-slate-400">ID: {call.user_id.substring(call.user_id.length-4)}</span>
+                                 <span className="text-slate-400">ID: {call.call_id || 'N/A'}</span>
                               </div>
                            </div>
                         ))
@@ -324,17 +325,16 @@ const SupportDashboard: React.FC = () => {
                     <p className="text-[10px] text-slate-400 italic">No active call requests.</p>
                   ) : (
                     activeCalls.map(call => (
-                      <div key={call.user_id} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[10px] font-bold text-slate-300 truncate">{call.user_email}</span>
-                              <span className="text-[9px] text-slate-500">ID: {call.user_id.substring(call.user_id.length - 4)}</span>
-                            </div>
-                            <span className="text-[9px] text-emerald-400 font-mono shrink-0">
-                              {Math.max(0, Math.floor((Date.now() - new Date(call.started_at).getTime()) / 60000))}m wait
-                            </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-2 bg-black/20 p-1.5 rounded-lg border border-white/5 italic">
+                                               <div key={call.user_id} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700 flex flex-col gap-2">
+                                                  <div className="flex justify-between items-start">
+                                                     <div className="flex flex-col min-w-0">
+                                                        <span className="text-[10px] font-bold text-slate-300 truncate">{call.user_email}</span>
+                                                        <span className="text-[9px] text-slate-500 font-bold">ID: {call.room_name.split('-')[1]}</span>
+                                                     </div>
+                                                     <span className="text-[9px] text-emerald-400 font-mono shrink-0">
+                                                        {Math.max(0, Math.floor((Date.now() - new Date(call.started_at).getTime()) / 60000))}m wait
+                                                     </span>
+                                                  </div>                        <p className="text-[10px] text-slate-400 line-clamp-2 bg-black/20 p-1.5 rounded-lg border border-white/5 italic">
                             "{call.reason || 'No specific reason provided'}"
                         </p>
                         <button 
@@ -441,12 +441,30 @@ const SupportDashboard: React.FC = () => {
                      <h3 className="text-xl font-bold text-slate-800 dark:text-white">Select a Ticket</h3>
                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Start assisting your users.</p>
                   </div>
-               </div>
-            )}
-         </div>
-      </div>
-    </div>
-  );
+                                   </div>
+                                 )}
+               
+                                 <div className="pt-2 mt-4 border-t border-slate-800">
+                                   <p className="text-[9px] text-slate-500 uppercase font-bold mb-2 tracking-widest">Manual Join</p>
+                                   <div className="flex gap-2">
+                                      <input 
+                                       id="manualCallId" 
+                                       type="text" 
+                                       placeholder="Enter ID" 
+                                       className="w-full bg-slate-800 border-none rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:ring-1 focus:ring-emerald-500" 
+                                      />
+                                      <button 
+                                         onClick={() => {
+                                            const id = (document.getElementById('manualCallId') as HTMLInputElement).value;
+                                            if (id) handleJoinCall(`KawayanSupport-${id}`);
+                                         }}
+                                         className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-[10px] font-bold transition"
+                                      >Join</button>
+                                   </div>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>  );
 };
 
 export default SupportDashboard;

@@ -51,6 +51,14 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('cam-state', (data) => {
+    socket.to(data.roomId).emit('cam-state', data.active);
+  });
+
+  socket.on('screen-state', (data) => {
+    socket.to(data.roomId).emit('screen-state', data.active);
+  });
+
   socket.on('disconnect', () => {
     if (socket.data.roomId) {
       socket.to(socket.data.roomId).emit('peer-left');

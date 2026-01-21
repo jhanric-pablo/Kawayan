@@ -706,11 +706,12 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         const endedAt = new Date().toISOString();
         const startedAt = new Date(call.started_at).getTime();
         const duration = Math.floor((Date.now() - startedAt) / 1000);
+        const callId = call.room_name.split('-')[1] || null;
         
         db.prepare(`
-          INSERT INTO call_history (id, user_id, user_email, reason, started_at, duration_seconds, agent_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(Date.now().toString(), userId, call.user_email, call.reason, call.started_at, duration, agentId || null);
+          INSERT INTO call_history (id, user_id, user_email, call_id, reason, started_at, duration_seconds, agent_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(Date.now().toString(), userId, call.user_email, callId, call.reason, call.started_at, duration, agentId || null);
       }
 
       db.prepare('DELETE FROM active_calls WHERE user_id = ?').run(userId);
