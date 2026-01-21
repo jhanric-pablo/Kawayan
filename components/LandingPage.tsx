@@ -20,7 +20,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const requestRef = useRef<number>(0);
 
   // --- Optimized Liquid Scroll & Scrub Logic ---
@@ -30,9 +29,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
     if (!video || !container) return;
 
     const handleScroll = () => {
-      if (!isAutoPlaying) {
-        targetScrollY.current = window.scrollY;
-      }
+      targetScrollY.current = window.scrollY;
     };
 
     const smoothUpdate = (time: number) => {
@@ -57,7 +54,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       }
       
       if (overlayRef.current) {
-        overlayRef.current.style.opacity = (0.4 + (1 - opacity) * 0.6).toString();
+        overlayRef.current.style.opacity = (0.7 + (1 - opacity) * 0.3).toString();
       }
 
       if (indicatorRef.current) {
@@ -90,18 +87,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       window.removeEventListener('scroll', handleScroll);
       cancelAnimationFrame(requestRef.current);
     };
-  }, [videoLoaded, isAutoPlaying, mousePos.x, mousePos.y]);
-
-  const toggleAutoPlay = () => {
-    if (!isAutoPlaying) {
-      const start = containerRef.current?.offsetTop || 0;
-      targetScrollY.current = start;
-      window.scrollTo({ top: start, behavior: 'smooth' });
-      setTimeout(() => setIsAutoPlaying(true), 600);
-    } else {
-      setIsAutoPlaying(false);
-    }
-  };
+  }, [videoLoaded, mousePos.x, mousePos.y]);
 
   // --- Parallax Logic ---
   const handleParallaxMove = (e: React.MouseEvent) => {
@@ -150,7 +136,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           {/* Overlay Darkening with Progressive Fade */}
           <div 
             ref={overlayRef}
-            className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 -z-10 transition-opacity duration-700"
+            className="absolute inset-0 bg-black/70 dark:bg-black/85 -z-10 transition-opacity duration-700"
           ></div>
 
           {/* Bottom Fade Transition */}
@@ -161,7 +147,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             ref={indicatorRef}
             className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-white/50 animate-bounce transition-opacity duration-500"
           >
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{isAutoPlaying ? 'Cinematic Mode Active' : 'Scroll to Advance'}</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Scroll to Advance</span>
             <div className="w-px h-8 bg-gradient-to-b from-emerald-500 to-transparent"></div>
           </div>
 
@@ -175,7 +161,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
               >
                 <h1 
                   className="text-6xl sm:text-7xl lg:text-8xl font-black text-white tracking-tight mb-8 leading-[0.95]"
-                  style={{ filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.4))' }}
+                  style={{ filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.9))' }}
                 >
                   Social Media <br /> 
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400">
@@ -185,7 +171,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                 
                 <p 
                   className="text-xl text-white max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed font-bold"
-                  style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.3))' }}
+                  style={{ filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.9))' }}
                 >
                   Kawayan AI uses advanced local LLMs to generate viral "Taglish" captions, trendy visuals, and schedules for Philippine MSMEs.
                 </p>
@@ -202,7 +188,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                   
                   <button 
                     onClick={() => onNavigate(ViewState.DEMO)}
-                    className="px-8 py-4 backdrop-blur-md border border-white/30 text-white rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto bg-white/10 hover:bg-white/20"
+                    className="px-8 py-4 bg-emerald-500 text-slate-900 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
                   >
                     <Play className="w-5 h-5 fill-current" /> Demo Mode
                   </button>
