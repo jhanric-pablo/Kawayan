@@ -34,6 +34,10 @@ const App: React.FC = () => {
         const currentUser = await dbService.getCurrentUserAsync();
         if (currentUser) {
           console.log('Found existing session for user:', currentUser.email);
+          // Set dark mode early to avoid flash
+          if (currentUser.theme === 'dark') {
+            setDarkMode(true);
+          }
           // Pass ViewState.BILLING if we are coming from a successful payment
           handleLogin(currentUser, isPaymentSuccess ? ViewState.BILLING : undefined);
         }
@@ -56,8 +60,6 @@ const App: React.FC = () => {
     };
 
     initApp();
-    // Default to Light Mode (Removed auto-detection)
-    setDarkMode(false);
   }, []);
 
   // Update HTML class for dark mode
