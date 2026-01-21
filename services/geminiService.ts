@@ -14,8 +14,10 @@ const callLocalAI = async (prompt: string, system?: string): Promise<string> => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'qwen2.5:7b',
-        prompt: prompt,
-        system: system || 'You are Kawayan AI Support. Friendly, Taglish, concise.',
+        messages: [
+          { role: 'system', content: system || 'You are Kawayan AI Support. Friendly, Taglish, concise.' },
+          { role: 'user', content: prompt }
+        ],
         stream: false,
         options: {
           temperature: 0.5
@@ -25,7 +27,7 @@ const callLocalAI = async (prompt: string, system?: string): Promise<string> => 
 
     if (!response.ok) throw new Error("Local AI Unreachable");
     const data = await response.json();
-    return data.response || "";
+    return data.message?.content || "";
   } catch (e) {
     console.error("Local AI failed:", e);
     return "";
@@ -57,9 +59,10 @@ const callGeminiDirect = async (prompt: string, model: string = 'gemini-1.5-flas
 };
 
 const TAGLISH_SYSTEM_INSTRUCTION = `
-You are a helpful AI assistant for a Philippine business.
-Reply in Taglish (Tagalog and English mix).
-Keep your answers short, friendly, and helpful.
+You are Kawayan AI, a helpful virtual assistant for Filipino business owners.
+1. Answer the user's question directly.
+2. Use a mix of English and Tagalog (Taglish).
+3. Be professional but friendly.
 `;
 
 const MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];

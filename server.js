@@ -983,7 +983,7 @@ app.get('/api/social/stats/:platform/:username', async (req, res) => {
 // --- Local AI Proxy ---
 app.post('/api/ai/local', async (req, res) => {
   try {
-    const response = await fetch('http://127.0.0.1:11434/api/generate', {
+    const response = await fetch('http://127.0.0.1:11434/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
