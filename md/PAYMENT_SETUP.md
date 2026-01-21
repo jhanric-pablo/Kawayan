@@ -6,6 +6,18 @@ The system is now integrated with **Xendit** for fully automated payments.
 
 ## 1. How it works (Automated)
 
+```mermaid
+flowchart LR
+    A[User Inputs Amount] --> B[Backend calls Xendit API]
+    B --> C[Xendit returns Invoice URL]
+    C --> D[User redirected to Xendit Page]
+    D --> E{Payment Success?}
+    E -- Yes --> F[Xendit sends Webhook]
+    F --> G[Backend verifies & updates Balance]
+    G --> H[User Wallet reflects Credits]
+    E -- No --> I[Invoice Expires/Cancelled]
+```
+
 1.  **User Side:** The user enters an amount in the Billing dashboard.
 2.  **Invoice Creation:** The backend calls Xendit API to create a unique invoice.
 3.  **Redirect:** The user is redirected to Xendit's secure checkout page (supports GCash, Maya, QRIS, Cards).

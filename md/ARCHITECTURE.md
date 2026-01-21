@@ -5,6 +5,45 @@
 ## Overview
 Kawayan AI is built as a hybrid application that bridges modern AI capabilities with local data persistence for Philippine SMEs.
 
+```mermaid
+graph TD
+    subgraph Frontend [Frontend - React/Vite]
+        UI[User Interface]
+        DB_Wrapper[Universal DB Service]
+    end
+
+    subgraph Backend [Backend - Node/Express]
+        API[Express API]
+        Scraper[Social Scraper Logic]
+        Auth[JWT Auth]
+    end
+
+    subgraph Data_Storage [Data Storage]
+        SQLite[(SQLite DB)]
+        LS[(Local Storage - Browser)]
+    end
+
+    subgraph AI_Engines [AI Engines]
+        Gemini[Google Gemini - Cloud]
+        Ollama[Ollama Qwen - Local]
+    end
+
+    subgraph External_APIs [External Integrations]
+        Xendit[Xendit Payment Gateway]
+        TikTok[TikTok Graph API]
+    end
+
+    UI --> DB_Wrapper
+    DB_Wrapper --> LS
+    DB_Wrapper --> API
+    API --> SQLite
+    API --> Gemini
+    Gemini -- Fallback --> Ollama
+    API --> Xendit
+    API --> TikTok
+    UI <--> Scraper
+```
+
 ## Tech Stack
 - **Frontend**: React (TypeScript) + Vite
 - **Styling**: Tailwind CSS

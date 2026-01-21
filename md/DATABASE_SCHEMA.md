@@ -2,7 +2,57 @@
 
 [**⬅ Back: Architecture**](./ARCHITECTURE.md) | [**Next: Developer Guide ➔**](./DEVELOPER_GUIDE.md)
 
-This document outlines the data structures (entities) used in the application's local database service. These entities represent the "Tables" in our architecture.
+This document outlines the data structures (entities) used in the application's local database service.
+
+```mermaid
+erDiagram
+    USERS ||--|| BRAND_PROFILES : "manages"
+    USERS ||--o{ GENERATED_POSTS : "creates"
+    USERS ||--|| WALLETS : "owns"
+    WALLETS ||--o{ TRANSACTIONS : "records"
+    USERS ||--o{ TICKETS : "submits"
+    USERS ||--o{ AUDIT_LOGS : "triggers"
+    USERS ||--o{ SOCIAL_CONNECTIONS : "links"
+
+    USERS {
+        string id PK
+        string email
+        string passwordHash
+        string role
+        string businessName
+        string theme
+    }
+
+    BRAND_PROFILES {
+        string id PK
+        string userId FK
+        string industry
+        string brandVoice
+        string keyThemes
+    }
+
+    GENERATED_POSTS {
+        string id PK
+        string userId FK
+        string date
+        string status
+        number viralityScore
+    }
+
+    WALLETS {
+        string user_id PK
+        number balance
+        string subscription
+    }
+
+    TRANSACTIONS {
+        string id PK
+        string user_id FK
+        number amount
+        string status
+        string type
+    }
+```
 
 ## 1. User
 Represents a registered account holder, administrator, or support staff.
