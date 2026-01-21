@@ -610,7 +610,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
 
 app.get('/api/admin/logs', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 100;
+    const limit = parseInt(req.query.limit) || 100;
     const logs = await dbService.getAuditLogs(limit);
     res.json(logs);
   } catch (error) {
