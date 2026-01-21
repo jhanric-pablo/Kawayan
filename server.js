@@ -980,6 +980,23 @@ app.get('/api/social/stats/:platform/:username', async (req, res) => {
 
 
 
+// --- Local AI Proxy ---
+app.post('/api/ai/local', async (req, res) => {
+  try {
+    const response = await fetch('http://127.0.0.1:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    
+    if (!response.ok) throw new Error("Local AI Server Offline");
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(503).json({ error: "Local AI currently unavailable" });
+  }
+});
+
 // API 404 Handler - Must be before the React catch-all
 
 

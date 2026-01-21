@@ -16,9 +16,7 @@ const SupportWidget: React.FC = () => {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketPriority, setTicketPriority] = useState('Medium');
 
-  const [chatHistory, setChatHistory] = useState<{sender: 'user'|'bot'|'system'|'agent', text: string, timestamp?: string}[]>([
-    { sender: 'bot', text: 'Hi! I am the Kawayan AI Support Bot. How can I help you today?' }
-  ]);
+  const [chatHistory, setChatHistory] = useState<{sender: 'user'|'bot'|'system'|'agent', text: string, timestamp?: string}[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [sessionCallId, setSessionCallId] = useState<string>('');
 
@@ -133,7 +131,7 @@ const SupportWidget: React.FC = () => {
       
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-4">
         {isOpen && (
-          <div className="bg-white dark:bg-slate-800 w-80 h-96 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="bg-white dark:bg-slate-800 w-80 h-[500px] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
             <div className="bg-slate-900 dark:bg-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
               <div className="flex items-center gap-2 overflow-hidden">
                 {(mode === 'ticket' || mode === 'call') && (
@@ -143,7 +141,7 @@ const SupportWidget: React.FC = () => {
                   <span className="font-bold text-xs truncate">
                     {mode === 'chat' ? 'Kawayan Support' : mode === 'ticket' ? 'Submit Ticket' : 'Submit Request'}
                   </span>
-                  {sessionCallId && (
+                  {isCalling && sessionCallId && (
                     <span className="text-[11px] font-black text-emerald-400">CALL ID: {sessionCallId}</span>
                   )}
                 </div>
