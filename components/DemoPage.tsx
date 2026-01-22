@@ -10,32 +10,22 @@ const steps = [
   {
     title: "1. Tell us about your Brand",
     description: "Start by defining your industry, target audience, and brand voice. Kawayan AI learns your style to generate content that sounds exactly like you.",
-    video: "/video/video.mp4"
+    video: "https://github.com/AfgunIsGun/randompublicimagefreetouse/raw/refs/heads/main/0.mp4"
   },
   {
     title: "2. Native 'Taglish' Magic",
     description: "Our AI understands Pinoy culture. Generate captions that use the right amount of 'hugot', 'diskarte', and local slang to resonate with your audience.",
-    video: "/video/video.mp4"
+    video: "https://github.com/AfgunIsGun/randompublicimagefreetouse/raw/refs/heads/main/step3.mp4"
   },
   {
-    title: "3. Trending Visual Inspiration",
-    description: "Get AI-powered image prompts and visual ideas based on current Manila trends. Never worry about what to post again.",
-    video: "/video/video.mp4"
-  },
-  {
-    title: "4. Smart Content Calendar",
+    title: "3. Smart Content Calendar",
     description: "Plan your entire month in minutes. Drag and drop posts, schedule for peak Philippine engagement times, and stay consistent effortlessly.",
-    video: "/video/video.mp4"
+    video: "https://github.com/AfgunIsGun/randompublicimagefreetouse/raw/refs/heads/main/1.mp4"
   },
   {
-    title: "5. Real-time Analytics",
+    title: "4. Real-time Analytics",
     description: "Track your growth across Facebook, Instagram, and TikTok. See which 'Taglish' hooks are performing best and double down on what works.",
-    video: "/video/video.mp4"
-  },
-  {
-    title: "6. Scale your Business",
-    description: "Focus on running your business while Kawayan AI handles the daily social media grind. Join thousands of Pinoy MSMEs going viral.",
-    video: "/video/video.mp4"
+    video: "https://github.com/AfgunIsGun/randompublicimagefreetouse/raw/refs/heads/main/2.mp4"
   }
 ];
 
