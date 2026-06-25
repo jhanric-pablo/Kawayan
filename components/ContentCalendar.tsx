@@ -15,6 +15,7 @@ import {
   getBatchLimitForSubscription,
   isAtTierLimit,
   normalizeIdeasToBatchCount,
+  getScheduleDayRange,
   TIER_LIMIT_MESSAGE,
   TIER_LIMIT_TITLE,
 } from '../utils/tierLimits';
@@ -219,8 +220,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       const monthName = currentDate.toLocaleString('default', { month: 'long' });
       const savedPlan = await dbService.getPlan(userId, monthName);
       if (savedPlan) {
-        setIdeas(savedPlan);
-        if (savedPlan.length > 0) setShowBatchIdeas(true);
+        const range = getScheduleDayRange(currentDate);
+        const normalized = normalizeIdeasToBatchCount(
+          savedPlan,
+          Math.max(savedPlan.length, 1),
+          range
+        );
+        setIdeas(normalized);
+        if (normalized.length > 0) setShowBatchIdeas(true);
       } else {
         setIdeas([]);
       }
@@ -243,7 +250,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           topic: `${batchStrategy.trim()} — ${idea.topic}`,
         }));
       }
-      newIdeas = normalizeIdeasToBatchCount(newIdeas, batchPostCount);
+      newIdeas = normalizeIdeasToBatchCount(newIdeas, batchPostCount, getScheduleDayRange(currentDate));
       setIdeas(newIdeas);
       setShowBatchIdeas(true);
       await dbService.savePlan(userId, monthName, newIdeas);
@@ -355,8 +362,16 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   };
 
   const handleBatchGenerate = async () => {
-    const ideasToRun = normalizeIdeasToBatchCount(ideas, batchPostCount);
-    const pending = ideasToRun.filter((idea) => !postExistsForDay(idea.day));
+    const scheduleRange = getScheduleDayRange(currentDate);
+    const ideasToRun = normalizeIdeasToBatchCount(ideas, batchPostCount, scheduleRange);
+    const seenDays = new Set<number>();
+    const pending = ideasToRun.filter((idea) => {
+      if (idea.day < scheduleRange.minDay || idea.day > scheduleRange.maxDay) return false;
+      if (postExistsForDay(idea.day)) return false;
+      if (seenDays.has(idea.day)) return false;
+      seenDays.add(idea.day);
+      return true;
+    });
 
     if (!ideasToRun.length) {
       await dialog.alert({ message: 'Plan the month first to get content ideas.', title: 'No Ideas' });

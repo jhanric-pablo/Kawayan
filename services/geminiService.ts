@@ -73,7 +73,7 @@ export const generateContentPlan = async (
     - NO GENERIC CONTENT. Avoid phrases like "Start the month right" or "Check out our products".
     - BE SPECIFIC. Create content that only makes sense for THIS brand.
     - USE TAGLISH. The 'title' and 'topic' must be in natural, modern Taglish (mix of Tagalog/English) or Filipino.
-    - Spread 'day' values evenly across the month (1–28).
+    - Spread 'day' values evenly across the month (1–28), starting from today when planning the current month.
     - OUTPUT ONLY JSON. No explanation before or after.
     
     The output must be ONLY a valid JSON array of exactly ${itemCount} objects:
