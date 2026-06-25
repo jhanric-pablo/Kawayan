@@ -110,8 +110,7 @@ const ScheduleXCalendarView: React.FC<Props> = ({
       events: mapToScheduleXEvents(posts, ideas, currentDate),
       callbacks: {
         onClickDate(date: Temporal.PlainDate) {
-          if (date.month - 1 !== currentDateRef.current.getMonth()) return;
-          if (hasContentForDay(date.day)) {
+          if (date.month - 1 === currentDateRef.current.getMonth()) {
             onDayClickRef.current(date.day);
           }
         },

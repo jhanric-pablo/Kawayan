@@ -856,7 +856,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             </div>
           </div>
           <p className="text-[11px] font-medium text-[#618764] dark:text-[#9CB080]/80 max-w-sm text-right hidden sm:block">
-            Days with content open the preview panel · empty days use <span className="font-bold text-[#2B5748] dark:text-[#9CB080]">ADD</span> ($1.50)
+            Click any day to preview or generate · use <span className="font-bold text-[#2B5748] dark:text-[#9CB080]">ADD</span> on empty cells for $1.50 add-on
           </p>
         </div>
 
