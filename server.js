@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import multer from 'multer';
 import { DatabaseService } from './services/databaseService.ts';
 import { JWTService } from './services/jwtService.ts';
 import { logger } from './utils/logger.ts';
@@ -115,6 +117,28 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+// --- Multer File Upload (Business Verification Documents) ---
+const uploadDir = path.join(__dirname, 'uploads', 'verifications');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const verificationStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `verif_${Date.now()}${ext}`);
+  }
+});
+
+const uploadVerifDoc = multer({
+  storage: verificationStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG, or PDF files are accepted'));
+  }
+});
 
 // --- Routes ---
 
@@ -287,6 +311,13 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
     await dbService.savePost(post);
     res.json({ message: 'Post saved successfully' });
   } catch (error) {
+    if (error.code === 'TIER_LIMIT_REACHED') {
+      return res.status(403).json({
+        error: 'TIER_LIMIT_REACHED',
+        message: `Monthly post limit of ${error.limit} reached for your subscription tier.`,
+        limit: error.limit,
+      });
+    }
     logger.error('Save post error', { error: error.message });
     res.status(500).json({ error: 'Failed to save post' });
   }
@@ -706,6 +737,125 @@ app.post('/api/admin/subscription', authenticateToken, requireAdmin, async (req,
 });
 
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Business Verification Routes
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Serve uploaded verification documents (admin only)
+app.use('/uploads/verifications', authenticateToken, requireAdmin, express.static(uploadDir));
+
+// Submit verification document (user, called right after registration)
+app.post('/api/verification/submit', authenticateToken, uploadVerifDoc.single('document'), async (req, res) => {
+  try {
+    const { userId, businessAddress, businessPhone } = req.body;
+    const requestingUser = req.user;
+
+    // Only allow submitting for self (or admin)
+    if (requestingUser.userId !== userId && requestingUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No document uploaded' });
+    }
+
+    if (!businessAddress || !businessPhone) {
+      return res.status(400).json({ error: 'Business address and phone are required' });
+    }
+
+    await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, req.file.filename);
+    res.status(201).json({ message: 'Verification submitted', status: 'pending' });
+  } catch (error) {
+    logger.error('Verification submit error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get verification status for a user
+app.get('/api/verification/status/:userId', authenticateToken, async (req, res) => {
+  const { userId } = req.params;
+  const requestingUser = req.user;
+  if (requestingUser.userId !== userId && requestingUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+  try {
+    const verif = await dbService.getVerification(userId);
+    if (!verif) return res.json({ status: 'none' });
+    res.json(verif);
+  } catch (error) {
+    logger.error('Verification status error', { error: error.message });
+    res.status(500).json({ error: 'Failed to get verification status' });
+  }
+});
+
+// Re-upload document after rejection
+app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single('document'), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const requestingUser = req.user;
+    if (requestingUser.userId !== userId && requestingUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
+
+    await dbService.resubmitVerification(userId, req.file.originalname, req.file.filename);
+    res.json({ message: 'Resubmitted for review', status: 'pending' });
+  } catch (error) {
+    logger.error('Verification resubmit error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin — get all pending verifications
+app.get('/api/admin/verifications', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const list = await dbService.getAllVerifications();
+    res.json(list);
+  } catch (error) {
+    logger.error('Admin verifications list error', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch verifications' });
+  }
+});
+
+// Admin — approve
+app.post('/api/admin/verifications/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await dbService.approveVerification(id, req.user.userId);
+    res.json({ message: 'Verification approved' });
+  } catch (error) {
+    logger.error('Approve verification error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin — reject
+app.post('/api/admin/verifications/:id/reject', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  try {
+    await dbService.rejectVerification(id, req.user.userId, reason || '');
+    res.json({ message: 'Verification rejected' });
+  } catch (error) {
+    logger.error('Reject verification error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin — view document file (stream the file)
+app.get('/api/admin/verifications/:id/document', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const verif = await dbService.getVerificationById(req.params.id);
+    if (!verif) return res.status(404).json({ error: 'Not found' });
+    const filePath = path.join(uploadDir, verif.document_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+    res.sendFile(filePath);
+  } catch (error) {
+    logger.error('View document error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Audit Logger Middleware
 app.use((req, res, next) => {

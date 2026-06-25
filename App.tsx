@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ViewState, BrandProfile, User } from './types';
+import { ViewState, BrandProfile, User, VerificationStatus } from './types';
 import BrandSurvey from './components/BrandSurvey';
 import ContentCalendar from './components/ContentCalendar';
 import AdminDashboard from './components/AdminDashboard';
@@ -12,55 +12,97 @@ import InsightsDashboard from './components/InsightsDashboard';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
 import DemoPage from './components/DemoPage';
+import VerificationStatusScreen from './components/VerificationStatus';
+import AppHydrationLoader from './components/AppHydrationLoader';
+import { useOrganicDialog } from './components/OrganicDialog';
 import UniversalDatabaseService from './services/universalDatabaseService';
+import {
+  hasPersistedSession,
+  readStoredView,
+  writeStoredView,
+  clearStoredView,
+  readThemeFromSession,
+} from './utils/sessionView';
 import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>(ViewState.LANDING);
+  const dialog = useOrganicDialog();
+  const [isHydrating, setIsHydrating] = useState(() => hasPersistedSession());
+  const [view, setView] = useState<ViewState>(() => {
+    if (hasPersistedSession()) {
+      return readStoredView() ?? ViewState.CALENDAR;
+    }
+    return ViewState.LANDING;
+  });
   const [user, setUser] = useState<User | null>(null);
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => readThemeFromSession());
   const [dbService] = useState(() => new UniversalDatabaseService());
+  const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
+  const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
+
+  const navigateView = (next: ViewState) => {
+    setView(next);
+    writeStoredView(next);
+  };
 
   useEffect(() => {
     console.log('Initializing Kawayan AI App...');
 
     const initApp = async () => {
+      const shouldHydrate = hasPersistedSession();
+      if (shouldHydrate) setIsHydrating(true);
+
+      let restoredUser: User | null = null;
+
       try {
-        // Check URL params first to see if we need to override the landing view
         const urlParams = new URLSearchParams(window.location.search);
         const isPaymentSuccess = urlParams.get('success') === 'true';
 
-        // Check for existing session on load (Async priority for fresh DB data)
-        const currentUser = await dbService.getCurrentUserAsync();
+        let currentUser = await dbService.getCurrentUserAsync();
+        if (!currentUser) {
+          currentUser = dbService.getCurrentUser();
+        }
+
         if (currentUser) {
+          restoredUser = currentUser;
           console.log('Found existing session for user:', currentUser.email);
-          // Set dark mode early to avoid flash
           if (currentUser.theme === 'dark') {
             setDarkMode(true);
+          } else if (currentUser.theme === 'light') {
+            setDarkMode(false);
           }
-          // Pass ViewState.BILLING if we are coming from a successful payment
-          handleLogin(currentUser, isPaymentSuccess ? ViewState.BILLING : undefined);
+          const restoredView = readStoredView();
+          await handleLogin(
+            currentUser,
+            isPaymentSuccess ? ViewState.BILLING : restoredView ?? undefined
+          );
         }
-        
-        // Check URL path or hash for admin back door
+
         const path = window.location.pathname;
         const hash = window.location.hash;
-        
+
         if (hash === '#admin-portal' || path === '/admin-portal') {
-          setView(ViewState.ADMIN_LOGIN);
+          navigateView(ViewState.ADMIN_LOGIN);
         }
 
         if (isPaymentSuccess) {
           console.log('Detected successful payment redirect');
-          setView(ViewState.BILLING);
+          navigateView(ViewState.BILLING);
         }
       } catch (error) {
         console.error('Error initializing app:', error);
+      } finally {
+        if (!restoredUser) {
+          clearStoredView();
+          setView(ViewState.LANDING);
+        }
+        setIsHydrating(false);
       }
     };
 
     initApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update HTML class for dark mode
@@ -83,24 +125,38 @@ const App: React.FC = () => {
     }
     
     if (loggedInUser.role === 'admin') {
-      setView(ViewState.ADMIN_DASHBOARD);
+      navigateView(ViewState.ADMIN_DASHBOARD);
     } else if (loggedInUser.role === 'support') {
-      setView(ViewState.SUPPORT_DASHBOARD);
+      navigateView(initialView || readStoredView() || ViewState.SUPPORT_DASHBOARD);
     } else {
-      // Check if user has a profile
+      // Fetch verification status
+      try {
+        const verif = await dbService.getVerificationStatus(loggedInUser.id);
+        const vStatus: VerificationStatus = verif?.status ?? 'none';
+        setVerifStatus(vStatus);
+        setVerifRejectionReason(verif?.rejectionReason);
+
+        // Block access if not verified
+        if (vStatus !== 'verified') {
+          navigateView(ViewState.VERIFICATION);
+          return;
+        }
+      } catch (e) {
+        console.warn('Could not fetch verification status:', e);
+      }
+
+      // Verified — check if user has a brand profile
       try {
         const profile = await dbService.getProfile(loggedInUser.id);
         if (profile) {
           setBrandProfile(profile);
-          // Prioritize the requested initial view (e.g. BILLING after payment)
-          setView(initialView || ViewState.CALENDAR);
+          navigateView(initialView || readStoredView() || ViewState.CALENDAR);
         } else {
-          // No profile, go to survey
-          setView(ViewState.SURVEY);
+          navigateView(ViewState.SURVEY);
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
-        setView(ViewState.SURVEY);
+        navigateView(ViewState.SURVEY);
       }
     }
   };
@@ -109,9 +165,17 @@ const App: React.FC = () => {
     await dbService.logoutUser();
     setUser(null);
     setBrandProfile(null);
-    setView(ViewState.LANDING);
-    // Reset to default light mode on logout
+    setVerifStatus('none');
+    setVerifRejectionReason(undefined);
+    clearStoredView();
+    navigateView(ViewState.LANDING);
     setDarkMode(false);
+  };
+
+  // Called when a rejected user resubmits a new document
+  const handleVerifResubmit = () => {
+    setVerifStatus('pending');
+    setVerifRejectionReason(undefined);
   };
 
   const handleSurveyComplete = async (profileData: BrandProfile) => {
@@ -120,10 +184,10 @@ const App: React.FC = () => {
     try {
       await dbService.saveProfile(newProfile);
       setBrandProfile(newProfile);
-      setView(ViewState.CALENDAR);
+      navigateView(ViewState.CALENDAR);
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile. Please try again.');
+      await dialog.alert('Failed to save profile. Please try again.');
     }
   };
 
@@ -146,7 +210,7 @@ const App: React.FC = () => {
   const handleUserUpdate = async (updatedUser: User) => {
     // Note: Password update would need special handling in backend
     // For now we just alert as this is a prototype
-    alert("Profile updates are currently managed via account settings. Feature coming soon.");
+    await dialog.alert("Profile updates are currently managed via account settings. Feature coming soon.");
   };
 
   const updateTheme = async (newDarkMode: boolean) => {
@@ -165,28 +229,32 @@ const App: React.FC = () => {
   const isLoggedIn = user !== null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 transition-colors font-sans text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-[#273338] transition-colors font-sans text-[#273338] dark:text-white">
       {/* Navigation */}
-      <nav className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 sticky top-0 z-50 transition-all ${!isLoggedIn && view === ViewState.LANDING ? 'py-2' : ''}`}>
+      <nav className="bg-white/90 dark:bg-[#273338]/90 backdrop-blur-lg border-b border-[#273338]/10 dark:border-[#9CB080]/20 sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center cursor-pointer" onClick={() => setView(isLoggedIn ? ViewState.CALENDAR : ViewState.LANDING)}>
-               <img src="/logo.png" alt="Kawayan Logo" className="w-8 h-8 mr-2 rounded-lg shadow-sm" />
-               <span className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Kawayan<span className="text-emerald-500">.</span></span>
-               {user?.role === 'admin' && <span className="ml-2 px-2 py-0.5 bg-slate-800 text-white text-[10px] uppercase font-bold rounded">Admin</span>}
+          <div className="flex justify-between h-14">
+            {/* Brand */}
+            <div className="flex items-center cursor-pointer gap-2.5" onClick={() => navigateView(isLoggedIn ? ViewState.CALENDAR : ViewState.LANDING)}>
+               <img src="/logo.png" alt="Kawayan Logo" className="w-7 h-7 rounded-lg" />
+               <span className="font-display text-xl text-[#273338] dark:text-white">Kawayan<span className="text-[#2B5748] dark:text-[#9CB080]">.</span></span>
+               {user?.role === 'admin' && (
+                 <span className="ml-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold text-white" style={{ background: '#273338' }}>Admin</span>
+               )}
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-2">
               {isLoggedIn ? (
                 <>
                   {view === ViewState.CALENDAR && (
-                     <div className="hidden md:flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm mr-4">
+                     <div className="hidden md:flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-xs font-medium mr-2">
+                       <LayoutDashboard className="w-3.5 h-3.5" />
                        {user?.businessName}
                      </div>
                   )}
                   
                   {user?.role !== 'admin' && (
-                    <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
+                    <div className="flex items-center bg-[#273338]/5 dark:bg-[#2B5748]/40 p-1 rounded-2xl border border-[#273338]/10 dark:border-[#9CB080]/20">
                       {[
                         { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
                         { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
@@ -195,42 +263,43 @@ const App: React.FC = () => {
                       ].filter(item => item.roles.includes(user?.role || '')).map((item) => (
                         <button 
                           key={item.id}
-                          onClick={() => setView(item.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 font-bold text-xs uppercase tracking-wider ${
+                          onClick={() => navigateView(item.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-wider ${
                             view === item.id 
-                              ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' 
+                              ? 'bg-white dark:bg-[#2B5748]/50 shadow-sm' 
                               : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                           }`}
+                          style={view === item.id ? { color: '#2B5748' } : {}}
                         >
-                          <item.icon className="w-4 h-4" />
+                          <item.icon className="w-3.5 h-3.5" />
                           <span className={`${view === item.id ? 'inline' : 'hidden'} lg:inline`}>{item.label}</span>
                         </button>
                       ))}
                     </div>
                   )}
 
-                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                  <div className="h-5 w-px bg-[#2B5748]/20 dark:bg-[#2B5748]/50 mx-1"></div>
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-all duration-300 text-xs font-black uppercase tracking-widest"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-all text-[11px] font-bold uppercase tracking-widest"
                   >
-                    <LogOut className="w-4 h-4" /> <span>Logout</span>
+                    <LogOut className="w-3.5 h-3.5" /> <span>Out</span>
                   </button>
                 </>
               ) : (
                 view === ViewState.LANDING && (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => setView(ViewState.LOGIN)}
-                      className="text-slate-600 dark:text-slate-300 font-semibold hover:text-emerald-600 transition px-3 py-2 text-sm"
+                      onClick={() => navigateView(ViewState.LOGIN)}
+                      className="text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-800 dark:hover:text-white transition px-3 py-1.5 text-sm rounded-xl hover:bg-slate-100 dark:hover:bg-[#2B5748]/50"
                     >
                       Login
                     </button>
                     <button 
-                      onClick={() => setView(ViewState.SIGNUP)}
-                      className="bg-slate-900 dark:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-slate-800 dark:hover:bg-emerald-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+                      onClick={() => navigateView(ViewState.SIGNUP)}
+                      className="organic-btn-primary px-6 py-2 rounded-full font-bold text-sm transition hover:scale-105 active:scale-95 flex items-center gap-1.5"
                     >
-                      Sign Up <ArrowRight className="w-4 h-4" />
+                      Get Started <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )
@@ -242,25 +311,38 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className={`flex-grow ${view === ViewState.LOGIN || view === ViewState.SIGNUP || view === ViewState.ADMIN_LOGIN ? 'flex items-center justify-center' : ''}`}>
-        <div className={`w-full ${view === ViewState.LANDING ? '' : (view === ViewState.CALENDAR || view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' : 'w-full')}`}>
+        <div className={`w-full ${view === ViewState.LANDING ? '' : (view === ViewState.CALENDAR ? 'max-w-full mx-auto py-4 px-2 sm:px-4 lg:px-6' : (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' : 'w-full'))}`}>
+          {isHydrating ? (
+            <AppHydrationLoader />
+          ) : (
           <Routes>
             <Route path="*" element={
               (() => {
                 switch (view) {
                   case ViewState.LANDING:
-                    return <LandingPage onNavigate={setView} />;
+                    return <LandingPage onNavigate={navigateView} />;
                   case ViewState.LOGIN:
-                    return <Login onLogin={handleLogin} onNavigate={setView} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+                    return <Login onLogin={handleLogin} onNavigate={navigateView} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
                   case ViewState.SIGNUP:
-                    return <Login onLogin={handleLogin} onNavigate={setView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+                    return <Login onLogin={handleLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
                   case ViewState.ADMIN_LOGIN:
-                    return <Login onLogin={handleLogin} onNavigate={setView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+                    return <Login onLogin={handleLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+                  case ViewState.VERIFICATION:
+                    return (
+                      <VerificationStatusScreen
+                        status={verifStatus}
+                        rejectionReason={verifRejectionReason}
+                        businessName={user?.businessName}
+                        onLogout={handleLogout}
+                        onResubmit={handleVerifResubmit}
+                      />
+                    );
                   case ViewState.SURVEY:
                     return <BrandSurvey onComplete={handleSurveyComplete} />;
                   case ViewState.CALENDAR:
-                    return (user && brandProfile) ? <ContentCalendar profile={brandProfile} userId={user.id} /> : <div>Loading...</div>;
+                    return (user && brandProfile) ? <ContentCalendar profile={brandProfile} userId={user.id} /> : <AppHydrationLoader />;
                   case ViewState.SETTINGS:
-                    return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onClose={() => setView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <div>Loading...</div>;
+                    return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
                   case ViewState.INSIGHTS:
                     return <InsightsDashboard />;
                   case ViewState.BILLING:
@@ -268,15 +350,16 @@ const App: React.FC = () => {
                   case ViewState.SUPPORT_DASHBOARD:
                     return <SupportDashboard />;
                   case ViewState.DEMO:
-                    return <DemoPage onNavigate={setView} />;
+                    return <DemoPage onNavigate={navigateView} />;
                   case ViewState.ADMIN_DASHBOARD:
                     return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} /> : <div className="text-center p-10">Access Denied</div>;
                   default:
-                    return <LandingPage onNavigate={setView} />;
+                    return <LandingPage onNavigate={navigateView} />;
                 }
               })()
             } />
           </Routes>
+          )}
         </div>
       </main>
       
@@ -284,23 +367,24 @@ const App: React.FC = () => {
       
       {/* Footer */}
       {(view === ViewState.LANDING) && (
-        <footer className="bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 py-8 mt-auto">
+        <footer className="bg-white dark:bg-[#273338] border-t border-[#273338]/10 dark:border-[#9CB080]/20 py-8 mt-auto">
           <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-center md:text-left">
-              <span className="font-bold text-slate-800 dark:text-white">Kawayan AI</span>
-              <p className="text-slate-400 text-sm mt-1">&copy; 2025 Kawayan AI. Designed for Philippine SMEs.</p>
+            <div className="flex items-center gap-2 text-center md:text-left">
+              <span className="font-display text-base text-[#273338] dark:text-white">Kawayan<span className="text-[#2B5748] dark:text-[#9CB080]">.</span></span>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <p className="text-slate-400 text-xs">&copy; 2025 Kawayan AI. Built for Philippine SMEs.</p>
             </div>
             
-            <div className="flex gap-6 text-sm text-slate-500 dark:text-slate-400">
-               <a href="#" className="hover:text-emerald-600 transition">Privacy</a>
-               <a href="#" className="hover:text-emerald-600 transition">Terms</a>
-               <a href="#" className="hover:text-emerald-600 transition">Contact</a>
+            <div className="flex gap-6 text-xs text-slate-400 dark:text-slate-500">
+               <a href="#" className="hover:text-slate-700 dark:hover:text-slate-300 transition">Privacy</a>
+               <a href="#" className="hover:text-slate-700 dark:hover:text-slate-300 transition">Terms</a>
+               <a href="#" className="hover:text-slate-700 dark:hover:text-slate-300 transition">Contact</a>
             </div>
 
             {!user && view !== ViewState.ADMIN_LOGIN && (
                <button 
-                 onClick={() => setView(ViewState.ADMIN_LOGIN)} 
-                 className="text-xs text-slate-200 dark:text-slate-700 hover:text-slate-400 transition flex items-center gap-1"
+                 onClick={() => navigateView(ViewState.ADMIN_LOGIN)} 
+                 className="text-xs text-slate-200 dark:text-slate-800 hover:text-slate-400 transition flex items-center gap-1"
                >
                  <Lock className="w-3 h-3"/>
                </button>

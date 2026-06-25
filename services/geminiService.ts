@@ -1,6 +1,7 @@
 import { BrandProfile, ContentIdea } from "../types";
 import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
+import { normalizeIdeasToBatchCount } from "../utils/tierLimits";
 
 // --- UNSLOTH LLM API (BACKEND PROXIED) ---
 const callUnslothLLM = async (prompt: string): Promise<string> => {
@@ -51,7 +52,11 @@ const generateWithFallback = async (prompt: string) => {
   return await callUnslothLLM(prompt);
 };
 
-export const generateContentPlan = async (profile: BrandProfile, month: string): Promise<ContentIdea[]> => {
+export const generateContentPlan = async (
+  profile: BrandProfile,
+  month: string,
+  itemCount: number = 8
+): Promise<ContentIdea[]> => {
     const prompt = `
     Analyze the following brand profile:
     - Business Name: ${profile.businessName}
@@ -60,16 +65,18 @@ export const generateContentPlan = async (profile: BrandProfile, month: string):
     - Brand Voice: ${profile.brandVoice}
     - Key Themes: ${profile.keyThemes}
 
-    Based on this profile, create a 7-item social media content plan for the month of ${month}.
+    Based on this profile, create a ${itemCount}-item social media content plan for the month of ${month}.
+    You MUST return exactly ${itemCount} unique content ideas — no fewer, no more.
     The plan should be diverse and align with the brand's voice and goals.
     
     CRITICAL INSTRUCTIONS:
     - NO GENERIC CONTENT. Avoid phrases like "Start the month right" or "Check out our products".
     - BE SPECIFIC. Create content that only makes sense for THIS brand.
     - USE TAGLISH. The 'title' and 'topic' must be in natural, modern Taglish (mix of Tagalog/English) or Filipino.
+    - Spread 'day' values evenly across the month (1–28).
     - OUTPUT ONLY JSON. No explanation before or after.
     
-    The output must be ONLY a valid JSON array of objects:
+    The output must be ONLY a valid JSON array of exactly ${itemCount} objects:
     [{"day": number, "title": "string", "topic": "string", "format": "string"}]
   `;
   try {
@@ -77,10 +84,14 @@ export const generateContentPlan = async (profile: BrandProfile, month: string):
     const res = await generateWithFallback(prompt);
     const data = extractJson(res);
     logger.info("Received and parsed content plan:", data);
-    return ValidationService.validateContentIdeas(data);
+    const validated = ValidationService.validateContentIdeas(data);
+    return normalizeIdeasToBatchCount(validated, itemCount);
   } catch (e: any) {
     logger.error("Error generating content plan:", e.message);
-    return ValidationService.createFallbackContentIdeas(month);
+    return normalizeIdeasToBatchCount(
+      ValidationService.createFallbackContentIdeas(month, itemCount),
+      itemCount
+    );
   }
 };
 

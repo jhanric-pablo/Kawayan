@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kawayan AI - Philippine SME Marketing</title>
     <link rel="icon" type="image/png" href="/logo.png" />
-    <!-- Note: In a real production build, Tailwind should be installed via npm and processed with PostCSS. 
-         For this prototype environment, we use the CDN for rapid styling without a complex build step. -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Suppress Tailwind CDN warning
       console.warn = (function(orig) {
         return function() {
           if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].includes('cdn.tailwindcss.com should not be used in production')) return;
@@ -22,17 +19,53 @@
         theme: {
           extend: {
             colors: {
+              background: '#FFFFFF',
+              foreground: '#273338',
+              primary: '#2B5748',
+              'primary-foreground': '#FFFFFF',
+              secondary: '#618764',
+              accent: '#9CB080',
+              'accent-foreground': '#273338',
+              canvas: {
+                light: '#FFFFFF',
+                dark: '#273338',
+              },
               slate: {
-                850: '#151f2e', // Custom dark shade
-                900: '#0f172a',
+                50: '#FFFFFF',
+                100: '#F7F8F8',
+                200: 'rgba(39, 51, 56, 0.1)',
+                300: '#D4DAD8',
+                400: '#9CB080',
+                500: '#618764',
+                600: '#2B5748',
+                700: '#273338',
+                800: '#1F292D',
+                850: '#1A2226',
+                900: '#273338',
               },
               emerald: {
-                450: '#10b981' // Custom vibrant emerald
+                50: '#F4F7F4',
+                100: '#E8EFE8',
+                200: '#C5D9C8',
+                300: '#9CB080',
+                400: '#618764',
+                500: '#2B5748',
+                600: '#254A3D',
+                700: '#273338',
+                800: '#1F292D',
+                900: '#141C1F',
+                450: '#2B5748',
               }
+            },
+            fontFamily: {
+              display: ['Fraunces', 'serif'],
+              sans: ['Nunito', 'Quicksand', 'sans-serif'],
             },
             animation: {
               'float': 'float 6s ease-in-out infinite',
               'scroll': 'scroll 20s linear infinite',
+              'float-gentle': 'float-gentle 5s ease-in-out infinite',
+              'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
             },
             keyframes: {
               float: {
@@ -42,56 +75,209 @@
               scroll: {
                 '0%': { transform: 'translateX(0)' },
                 '100%': { transform: 'translateX(-100%)' },
-              }
+              },
+              'float-gentle': {
+                '0%, 100%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              'pulse-dot': {
+                '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+                '50%': { opacity: '0.4', transform: 'scale(0.75)' },
+              },
+            },
+            boxShadow: {
+              'accent': '0 8px 32px -8px rgba(43, 87, 72, 0.2)',
+              'accent-sm': '0 4px 20px -2px rgba(43, 87, 72, 0.15)',
+              'soft': '0 4px 20px -2px rgba(43, 87, 72, 0.15)',
+              'float': '0 12px 40px -8px rgba(39, 51, 56, 0.18), 0 4px 16px -4px rgba(43, 87, 72, 0.12)',
             }
           }
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Nunito:wght@300..800&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
     <style>
+      /* ── Wabi-Sabi Dual Theme: Crisp White Light / Deep Forest Dark ── */
+      :root {
+        --bg: #FFFFFF;
+        --fg: #273338;
+        --primary: #2B5748;
+        --primary-fg: #FFFFFF;
+        --secondary: #618764;
+        --accent: #9CB080;
+        --accent-fg: #273338;
+        --muted: rgba(39, 51, 56, 0.05);
+        --muted-fg: rgba(39, 51, 56, 0.65);
+        --border: rgba(39, 51, 56, 0.1);
+        --card: #FFFFFF;
+        --ring: #618764;
+        --destructive: #A85448;
+      }
+
+      .dark {
+        --bg: #273338;
+        --fg: #FFFFFF;
+        --primary: #9CB080;
+        --primary-fg: #273338;
+        --secondary: #618764;
+        --accent: #2B5748;
+        --accent-fg: #FFFFFF;
+        --muted: rgba(255, 255, 255, 0.05);
+        --muted-fg: rgba(255, 255, 255, 0.7);
+        --border: rgba(156, 176, 128, 0.2);
+        --card: rgba(43, 87, 72, 0.4);
+        --ring: #9CB080;
+      }
+
       body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
+        font-family: 'Nunito', 'Quicksand', sans-serif;
+        background-color: var(--bg);
+        color: var(--fg);
+        position: relative;
+        overflow-x: hidden;
       }
-      /* Custom scrollbar for cleaner look */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        opacity: 0.03;
+        pointer-events: none;
+        z-index: 9999;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        mix-blend-mode: multiply;
       }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
+
+      .dark body::before {
+        opacity: 0.05;
+        mix-blend-mode: screen;
       }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
+
+      .font-display {
+        font-family: 'Fraunces', serif;
+        font-weight: 700;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
+
+      .bg-gradient-accent { background: var(--primary); }
+      .text-gradient-accent {
+        background: linear-gradient(135deg, #2B5748, #618764);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
-      .dark body {
-        background-color: #0f172a;
+      .dark .text-gradient-accent {
+        background: linear-gradient(135deg, #9CB080, #618764);
+        -webkit-background-clip: text;
+        background-clip: text;
       }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #334155; 
+      .border-gradient-accent { border-color: var(--border); }
+
+      .shadow-accent { box-shadow: 0 12px 36px -8px rgba(43, 87, 72, 0.15); }
+      .shadow-accent-sm { box-shadow: 0 4px 20px -2px rgba(43, 87, 72, 0.12); }
+      .shadow-float {
+        box-shadow: 0 24px 48px -12px rgba(39, 51, 56, 0.12), 0 8px 24px -8px rgba(43, 87, 72, 0.08);
       }
-      
+      .dark .shadow-float {
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.35), 0 8px 24px -8px rgba(156, 176, 128, 0.08);
+      }
+      .shadow-soft {
+        box-shadow: 0 8px 32px -8px rgba(39, 51, 56, 0.08);
+      }
+      .dark .shadow-soft {
+        box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.25);
+      }
+
+      .dot-pattern {
+        background-image: radial-gradient(circle, rgba(43, 87, 72, 0.1) 1px, transparent 1px);
+        background-size: 24px 24px;
+      }
+      .dot-pattern-dark {
+        background-image: radial-gradient(circle, rgba(156, 176, 128, 0.08) 1px, transparent 1px);
+        background-size: 24px 24px;
+      }
+
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+      }
+      @keyframes float-gentle {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-8px) rotate(0.5deg); }
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% center; }
+        100% { background-position: 200% center; }
+      }
+      .animate-pulse-dot { animation: pulse-dot 2.5s ease-in-out infinite; }
+      .animate-float-gentle { animation: float-gentle 6s ease-in-out infinite; }
+      .animate-shimmer {
+        background: linear-gradient(90deg, transparent 0%, rgba(43, 87, 72, 0.06) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 3s ease-in-out infinite;
+      }
+
       .glass-card {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(39, 51, 56, 0.1);
       }
       .dark .glass-card {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(43, 87, 72, 0.4);
+        border: 1px solid rgba(156, 176, 128, 0.2);
+      }
+
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #9CB080; border-radius: 99px; }
+      ::-webkit-scrollbar-thumb:hover { background: #2B5748; }
+      .dark ::-webkit-scrollbar-thumb { background: #618764; }
+      .dark ::-webkit-scrollbar-thumb:hover { background: #9CB080; }
+
+      input:focus, textarea:focus, select:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(97, 135, 100, 0.35);
+        border-color: #618764 !important;
+      }
+      .dark input:focus, .dark textarea:focus, .dark select:focus {
+        box-shadow: 0 0 0 3px rgba(156, 176, 128, 0.3);
+        border-color: #9CB080 !important;
+      }
+
+      /* Dual-mode primary pill button */
+      .organic-btn-primary {
+        background-color: #2B5748;
+        color: #FFFFFF;
+        box-shadow: 0 4px 20px -2px rgba(43, 87, 72, 0.15);
+      }
+      .dark .organic-btn-primary {
+        background-color: #9CB080;
+        color: #273338;
+        box-shadow: 0 4px 20px -2px rgba(156, 176, 128, 0.2);
+      }
+
+      .organic-surface {
+        background-color: #FFFFFF;
+        border-color: rgba(39, 51, 56, 0.1);
+      }
+      .dark .organic-surface {
+        background-color: rgba(43, 87, 72, 0.4);
+        border-color: rgba(156, 176, 128, 0.2);
+      }
+
+      *, *::before, *::after {
+        transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+        transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition-duration: 350ms;
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script>
-      // Polyfill global for libraries that expect it (like simple-peer)
       if (typeof global === 'undefined') {
         window.global = window;
       }

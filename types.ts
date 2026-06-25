@@ -1,3 +1,19 @@
+export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'none';
+
+export interface BusinessVerification {
+  id: string;
+  userId: string;
+  businessAddress: string;
+  businessPhone: string;
+  documentName: string;
+  documentPath: string; // server-side file path
+  status: VerificationStatus;
+  rejectionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -7,6 +23,7 @@ export interface User {
   theme?: 'light' | 'dark';
   balance?: number;
   createdAt?: string;
+  verificationStatus?: VerificationStatus;
 }
 
 export interface BrandProfile {
@@ -72,11 +89,12 @@ export enum ViewState {
   LOGIN = 'LOGIN',
   SIGNUP = 'SIGNUP',
   ADMIN_LOGIN = 'ADMIN_LOGIN',
+  VERIFICATION = 'VERIFICATION',
   SURVEY = 'SURVEY',
   CALENDAR = 'CALENDAR',
   SETTINGS = 'SETTINGS',
-  INSIGHTS = 'INSIGHTS', // New view
-  BILLING = 'BILLING',   // New view
+  INSIGHTS = 'INSIGHTS',
+  BILLING = 'BILLING',
   SUPPORT_DASHBOARD = 'SUPPORT_DASHBOARD',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',
   DEMO = 'DEMO'

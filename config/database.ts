@@ -267,6 +267,25 @@ export class DatabaseConfig {
       )
     `);
 
+    // Business Verifications table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS business_verifications (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE,
+        business_address TEXT NOT NULL,
+        business_phone TEXT NOT NULL,
+        document_name TEXT NOT NULL,
+        document_path TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'rejected')),
+        rejection_reason TEXT,
+        reviewed_by TEXT,
+        reviewed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Audit Logs table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -294,6 +313,8 @@ export class DatabaseConfig {
       CREATE INDEX IF NOT EXISTS idx_social_connections_user_id ON social_connections(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_business_verifications_user_id ON business_verifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_business_verifications_status ON business_verifications(status);
     `);
     
     // Create triggers for updated_at timestamps
@@ -332,6 +353,12 @@ export class DatabaseConfig {
         AFTER UPDATE ON social_connections
         BEGIN
           UPDATE social_connections SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_business_verifications_timestamp
+        AFTER UPDATE ON business_verifications
+        BEGIN
+          UPDATE business_verifications SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
     `);
   }

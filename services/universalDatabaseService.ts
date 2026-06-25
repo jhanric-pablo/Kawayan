@@ -191,6 +191,28 @@ export class UniversalDatabaseService {
     return service.healthCheck();
   }
 
+  async getVerificationStatus(userId: string): Promise<any> {
+    const service = await this.getService();
+    if (service.getVerificationStatus) return service.getVerificationStatus(userId);
+    if (service.getVerification) return service.getVerification(userId) ?? { status: 'none' };
+    return { status: 'none' };
+  }
+
+  async getAllVerifications(): Promise<any[]> {
+    const service = await this.getService();
+    return service.getAllVerifications ? service.getAllVerifications() : [];
+  }
+
+  async approveVerification(id: string): Promise<void> {
+    const service = await this.getService();
+    return service.approveVerification(id);
+  }
+
+  async rejectVerification(id: string, reason: string): Promise<void> {
+    const service = await this.getService();
+    return service.rejectVerification(id, reason);
+  }
+
   async close(): Promise<void> {
     const service = await this.getService();
     if (service.close) {

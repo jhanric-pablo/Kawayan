@@ -185,6 +185,13 @@ export class ClientDatabaseService {
         body: JSON.stringify(post)
       });
 
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({}));
+        if (body.error === 'TIER_LIMIT_REACHED') {
+          throw new Error('TIER_LIMIT_REACHED');
+        }
+      }
+
       if (!response.ok) throw new Error('Failed to save post');
     } catch (error) {
       logger.error('Error saving post (api)', { postId: post.id, error });
@@ -359,6 +366,60 @@ export class ClientDatabaseService {
       if (!response.ok) throw new Error('Failed to update subscription');
     } catch (error) {
       logger.error('Error updating subscription (api)', { userId, error });
+      throw error;
+    }
+  }
+
+  // --- Business Verification ---
+  async getVerificationStatus(userId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/verification/status/${userId}`, {
+        headers: this.getHeaders()
+      });
+      if (!response.ok) return { status: 'none' };
+      return await response.json();
+    } catch (error) {
+      logger.error('Error getting verification status (api)', { userId, error });
+      return { status: 'none' };
+    }
+  }
+
+  async getAllVerifications(): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/verifications`, {
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch verifications');
+      return await response.json();
+    } catch (error) {
+      logger.error('Error getting verifications (api)', { error });
+      return [];
+    }
+  }
+
+  async approveVerification(id: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/verifications/${id}/approve`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to approve verification');
+    } catch (error) {
+      logger.error('Error approving verification (api)', { id, error });
+      throw error;
+    }
+  }
+
+  async rejectVerification(id: string, reason: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/verifications/${id}/reject`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ reason })
+      });
+      if (!response.ok) throw new Error('Failed to reject verification');
+    } catch (error) {
+      logger.error('Error rejecting verification (api)', { id, error });
       throw error;
     }
   }

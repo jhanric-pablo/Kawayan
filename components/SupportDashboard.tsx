@@ -245,12 +245,12 @@ const SupportDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
            <button 
              onClick={() => { loadTickets(); loadCalls(); loadCallHistory(); }}
-             className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-emerald-600 transition shadow-sm"
+             className="p-2 bg-white dark:bg-[#2B5748]/40 border border-slate-200 dark:border-[#9CB080]/20 rounded-xl text-slate-500 hover:text-emerald-600 transition shadow-sm"
              title="Refresh Data"
            >
              <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
            </button>
-           <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
+           <div className="flex gap-1 p-1 bg-[#273338]/5 dark:bg-[#2B5748]/40 rounded-2xl overflow-x-auto border border-[#273338]/10 dark:border-[#9CB080]/20">
               {[ 
                 { id: 'overview', label: 'Overview', icon: History },
                 { id: 'tickets', label: 'Tickets', icon: MessageSquare },
@@ -259,13 +259,14 @@ const SupportDashboard: React.FC = () => {
                 <button 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition whitespace-nowrap ${ 
+                  className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition whitespace-nowrap ${ 
                     activeTab === tab.id 
-                    ? 'bg-white dark:bg-emerald-600 text-slate-900 dark:text-white shadow-sm' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ? 'bg-white dark:bg-[#2B5748]/50 shadow-sm' 
+                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
+                  style={activeTab === tab.id ? { color: '#2B5748' } : {}}
                 >
-                  <tab.icon className="w-4 h-4" /> {tab.label}
+                  <tab.icon className="w-3.5 h-3.5" /> {tab.label}
                 </button>
               ))}
            </div>
@@ -274,12 +275,18 @@ const SupportDashboard: React.FC = () => {
 
       {activeTab === 'overview' && (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 overflow-y-auto pr-2 scrollbar-hide">
-          <div className="bg-emerald-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-600/20">
+          <div className="rounded-[2rem] p-8 text-white relative overflow-hidden" style={{ background: '#273338', boxShadow: '0 12px 40px -8px rgba(0,0,0,0.25)' }}>
+             <div className="absolute inset-0 dot-pattern-dark opacity-50 rounded-[2rem]"></div>
+             <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl opacity-15" style={{ background: "#2B5748", transform: 'translate(20%, -20%)' }}></div>
              <div className="relative z-10">
-                <h2 className="text-3xl font-black mb-2">Welcome back, {user?.email.split('@')[0]}!</h2>
-                <p className="text-emerald-100 font-medium">You have {stats.open} tickets waiting for your response.</p>
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold mb-3 px-3 py-1 rounded-full bg-[#2B5748]/20 border border-[#2B5748]/30 text-white">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2B5748] animate-pulse-dot inline-block"></span>
+                  Support Dashboard
+                </span>
+                <h2 className="font-display text-3xl text-white mb-2">Welcome back, {user?.email.split('@')[0]}!</h2>
+                <p className="text-slate-400 font-medium text-sm">You have <span className="font-bold text-[#2B5748]">{stats.open}</span> tickets waiting for your response.</p>
              </div>
-             <MessageSquare className="absolute -right-8 -bottom-8 w-48 h-48 text-white/10 rotate-12" />
+             <MessageSquare className="absolute -right-8 -bottom-8 w-44 h-44 text-white/5 rotate-12" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
@@ -291,7 +298,7 @@ const SupportDashboard: React.FC = () => {
               { label: 'Live Calls', value: stats.activeCalls, icon: PhoneCall, color: 'text-rose-600', bg: 'bg-rose-50' },
               { label: 'Critical', value: stats.critical, icon: AlertTriangle, color: 'text-rose-700', bg: 'bg-rose-100 animate-pulse' },
             ].map((s, i) => (
-              <div key={i} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+              <div key={i} className="bg-white dark:bg-[#2B5748]/40 p-6 rounded-2xl border border-slate-100 dark:border-[#9CB080]/20 shadow-sm">
                 <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-4`}>
                   <s.icon className={`w-5 h-5 ${s.color}`} />
                 </div>
@@ -302,7 +309,7 @@ const SupportDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm h-[320px] flex flex-col">
+            <div className="lg:col-span-8 bg-white dark:bg-[#2B5748]/40 p-6 rounded-2xl border border-slate-100 dark:border-[#9CB080]/20 shadow-sm h-[320px] flex flex-col">
               <h3 className="font-bold text-slate-800 dark:text-white mb-6">Support Activity</h3>
               <div className="flex-1 min-h-0">
                  <ResponsiveContainer width="100%" height="100%">
@@ -384,7 +391,7 @@ const SupportDashboard: React.FC = () => {
                                 {Math.max(0, Math.floor((Date.now() - new Date(call.started_at).getTime()) / 60000))}m wait
                              </span>
                           </div>
-                          <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase transition shadow-lg flex items-center justify-center gap-2">
+                          <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="w-full py-3 rounded-full text-xs font-black uppercase transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-white bg-[#2B5748]" style={{ boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.35)' }}>
                              <PhoneCall className="w-4 h-4" /> Connect Now
                           </button>
                        </div>
@@ -393,8 +400,8 @@ const SupportDashboard: React.FC = () => {
               </div>
            </div>
 
-           <div className="lg:col-span-8 flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/20">
+           <div className="lg:col-span-8 flex flex-col bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-xl overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-[#9CB080]/20 flex justify-between items-center bg-slate-50 dark:bg-[#273338]/20">
                  <div className="flex items-center gap-3">
                     <History className="w-5 h-5 text-slate-400" />
                     <h3 className="font-bold text-slate-800 dark:text-white">Recent Call Logs</h3>
@@ -402,7 +409,7 @@ const SupportDashboard: React.FC = () => {
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-hide">
                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                    <thead className="sticky top-0 bg-slate-50 dark:bg-[#273338] z-10 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-[#9CB080]/20">
                        <tr>
                           <th className="px-6 py-4">User</th>
                           <th className="px-6 py-4">Date</th>
@@ -415,11 +422,11 @@ const SupportDashboard: React.FC = () => {
                           <tr><td colSpan={4} className="py-20 text-center text-slate-400 text-sm italic px-10">No call history logs found.</td></tr>
                        ) : (
                           callHistory.map(call => (
-                             <tr key={call.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition group">
+                             <tr key={call.id} className="hover:bg-slate-50 dark:hover:bg-[#2B5748]/50/30 transition group">
                                 <td className="px-6 py-4 font-bold text-slate-900 dark:text-white text-xs">{call.user_email}</td>
                                 <td className="px-6 py-4 text-[11px] text-slate-500">{new Date(call.started_at).toLocaleString()}</td>
                                 <td className="px-6 py-4 text-center">
-                                   <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-600 dark:text-slate-300">
+                                   <span className="text-[10px] font-bold bg-slate-100 dark:bg-[#2B5748]/50 px-2 py-1 rounded text-slate-600 dark:text-slate-300">
                                       {formatDuration(call.duration_seconds)}
                                    </span>
                                 </td>
@@ -438,18 +445,18 @@ const SupportDashboard: React.FC = () => {
 
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden ${activeTab !== 'tickets' ? 'hidden' : ''}`}>
          <div className={`lg:col-span-4 flex flex-col gap-6 overflow-hidden ${selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden min-h-0">
-               <div className="p-4 border-b border-slate-100 dark:border-slate-700 space-y-4 bg-slate-50/50 dark:bg-slate-900/20">
+            <div className="flex-1 flex flex-col bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-sm overflow-hidden min-h-0">
+               <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 space-y-4 bg-slate-50/50 dark:bg-[#273338]/20">
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                      {(['All', 'Open', 'Resolved'] as const).map(f => (
-                       <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${filter === f ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-900 text-slate-500'}`}>
+                       <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${filter === f ? 'bg-[#2B5748] dark:bg-[#9CB080] text-white dark:text-[#273338]' : 'bg-[#273338]/5 dark:bg-[#273338] text-slate-400 hover:text-slate-600'}`} style={filter === f ? { boxShadow: '0 4px 12px -3px rgba(43, 87, 72,0.3)' } : {}}>
                          {f}
                        </button>
                      ))}
                   </div>
                   <div className="relative">
                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-emerald-500 rounded-xl text-sm outline-none transition-all" />
+                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-[#273338] border border-transparent focus:border-[#2B5748] rounded-xl text-sm outline-none transition-all" />
                   </div>
                </div>
 
@@ -462,7 +469,7 @@ const SupportDashboard: React.FC = () => {
                      <div className="py-20 text-center text-slate-400 text-sm italic px-10">No tickets found.</div>
                   ) : (
                      processedTickets.map(ticket => (
-                        <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} className={`p-4 cursor-pointer transition relative group ${selectedTicket?.id === ticket.id ? 'bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-l-emerald-500' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30 border-l-4 border-l-transparent'}`}>
+                        <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} className={`p-4 cursor-pointer transition relative group border-l-4 ${selectedTicket?.id === ticket.id ? 'bg-[#2B5748]/5 dark:bg-[#2B5748]/8' : 'hover:bg-[#273338]/5 dark:hover:bg-[#2B5748]/50/30 border-l-transparent'}`} style={selectedTicket?.id === ticket.id ? { borderLeftColor: '#2B5748' } : {}}>
                            <div className="flex justify-between items-start mb-1">
                               <span className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[150px]">{ticket.userEmail}</span>
                               <span className="text-[10px] text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
@@ -488,20 +495,20 @@ const SupportDashboard: React.FC = () => {
                   {activeCalls.length === 0 ? <p className="text-[10px] text-slate-400 italic">No active requests.</p> : activeCalls.map(call => (
                     <div key={call.user_id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
                        <span className="text-[10px] font-bold truncate max-w-[120px]">{call.user_email}</span>
-                       <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded text-[9px] font-black uppercase">Connect</button>
+                       <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="px-3 py-1 rounded-full text-[9px] font-black uppercase text-white hover:scale-105 transition-all bg-[#2B5748]">Connect</button>
                     </div>
                   ))}
                </div>
             </div>
          </div>
 
-         <div className={`lg:col-span-8 flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden min-h-0 ${!selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
+         <div className={`lg:col-span-8 flex flex-col bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-xl overflow-hidden min-h-0 ${!selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
             {selectedTicket ? (
                <div className="flex flex-1 overflow-hidden">
                   <div className="flex-1 flex flex-col min-w-0">
-                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-850 flex justify-between items-center shrink-0">
+                     <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#273338] flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-3">
-                           <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"><ArrowLeft className="w-5 h-5" /></button>
+                           <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1.5 hover:bg-slate-200 dark:hover:bg-[#2B5748]/50 rounded-lg transition"><ArrowLeft className="w-5 h-5" /></button>
                            <div>
                               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">{selectedTicket.subject} <span className="text-[10px] text-slate-400">#{selectedTicket.ticketNum}</span></h3>
                               <div className="flex items-center gap-3 text-[10px] text-slate-500">
@@ -515,7 +522,7 @@ const SupportDashboard: React.FC = () => {
                                  <div className={`w-2 h-2 rounded-full ${selectedTicket.status === 'Open' ? 'bg-emerald-500' : selectedTicket.status === 'Pending' ? 'bg-blue-500' : 'bg-slate-400'}`} />
                                  {selectedTicket.status} <ChevronDown className="w-3 h-3" />
                               </button>
-                              <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 rounded-xl shadow-xl py-1 z-50 opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all">
+                              <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-[#2B5748]/40 border border-slate-200 rounded-xl shadow-xl py-1 z-50 opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all">
                                  {(['Open', 'Pending', 'Resolved'] as const).map(s => (
                                     <button key={s} onClick={() => handleStatusUpdate(selectedTicket.id, s)} className="w-full text-left px-4 py-2 text-xs font-bold hover:bg-slate-50 text-slate-600 transition">{s}</button>
                                  ))}
@@ -524,10 +531,10 @@ const SupportDashboard: React.FC = () => {
                         </div>
                      </div>
 
-                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-slate-900/30 scrollbar-hide">
+                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-[#273338]/30 scrollbar-hide">
                         {selectedTicket.messages?.map((msg, idx) => (
                            <div key={idx} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${msg.sender === 'agent' ? 'bg-slate-900 dark:bg-emerald-600 text-white rounded-tr-none' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 rounded-tl-none'}`}>
+                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${msg.sender === 'agent' ? 'text-white rounded-tr-none' : 'bg-white dark:bg-[#2B5748]/50 text-slate-800 dark:text-white border border-[#273338]/10 dark:border-[#9CB080]/20 rounded-tl-none'}`} style={msg.sender === 'agent' ? { background: '#2B5748' } : {}}>
                                  {msg.text}
                               </div>
                            </div>
@@ -535,14 +542,14 @@ const SupportDashboard: React.FC = () => {
                      </div>
 
                      {selectedTicket.status !== 'Resolved' && (
-                        <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 shrink-0 space-y-3">
+                        <div className="p-4 bg-white dark:bg-[#2B5748]/40 border-t border-slate-100 dark:border-[#9CB080]/20 shrink-0 space-y-3">
                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                               {[{ label: 'Greeting', text: 'Mabuhay! How can I help you?' }, { label: 'Checking', text: 'Wait lang po, let me check.' }, { label: 'Resolved', text: 'Resolved na po!' }].map((qr, i) => (
-                                 <button key={i} onClick={() => setReply(qr.text)} className="px-2 py-1 bg-slate-100 dark:bg-slate-900 text-slate-500 rounded-md text-[10px] font-bold hover:bg-emerald-50 transition whitespace-nowrap">{qr.label}</button>
+                                 <button key={i} onClick={() => setReply(qr.text)} className="px-2 py-1 bg-slate-100 dark:bg-[#273338] text-slate-500 rounded-md text-[10px] font-bold hover:bg-emerald-50 transition whitespace-nowrap">{qr.label}</button>
                               ))}
                            </div>
                            <form onSubmit={handleSendReply} className="flex gap-3">
-                              <textarea rows={1} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type reply..." className="flex-1 bg-slate-100 dark:bg-slate-900 border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                              <textarea rows={1} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type reply..." className="flex-1 bg-slate-100 dark:bg-[#273338] border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
                               <button type="submit" disabled={isSending || !reply.trim()} className="bg-emerald-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm hover:bg-emerald-700 transition shadow-lg flex items-center gap-2 disabled:opacity-50">
                                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                  <span className="hidden sm:inline">Reply</span>
@@ -552,8 +559,8 @@ const SupportDashboard: React.FC = () => {
                      )}
                   </div>
 
-                  <div className="hidden xl:flex w-72 border-l border-slate-100 dark:border-slate-700 flex-col bg-slate-50 dark:bg-slate-900/10">
-                     <div className="p-6 border-b border-slate-100 dark:border-slate-700 text-center">
+                  <div className="hidden xl:flex w-72 border-l border-slate-100 dark:border-[#9CB080]/20 flex-col bg-slate-50 dark:bg-[#273338]/10">
+                     <div className="p-6 border-b border-slate-100 dark:border-[#9CB080]/20 text-center">
                         <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner"><UserIcon className="w-8 h-8" /></div>
                         <h4 className="font-bold text-slate-800 dark:text-white truncate">{userProfile?.businessName || 'Anonymous'}</h4>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{userProfile?.industry || 'General SME'}</p>
@@ -561,7 +568,7 @@ const SupportDashboard: React.FC = () => {
                      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
                         <div>
                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Wallet Info</h5>
-                           <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 shadow-sm">
+                           <div className="p-3 bg-white dark:bg-[#2B5748]/40 rounded-xl border border-slate-100 shadow-sm">
                               <p className="text-xs text-slate-500 mb-1">Current Balance</p>
                               <p className="text-lg font-black text-slate-800 dark:text-white">₱{userProfile?.wallet?.balance?.toLocaleString() || '0'}</p>
                            </div>
@@ -574,7 +581,7 @@ const SupportDashboard: React.FC = () => {
                </div>
             ) : (
                <div className="flex-1 flex flex-col items-center justify-center text-center p-10 space-y-4">
-                  <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center shadow-inner"><MessageSquare className="w-10 h-10 text-slate-300" /></div>
+                  <div className="w-20 h-20 bg-slate-100 dark:bg-[#2B5748]/50 rounded-full flex items-center justify-center shadow-inner"><MessageSquare className="w-10 h-10 text-slate-300" /></div>
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white">Select a Ticket</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Pick a user from the left to start the conversation.</p>
                </div>

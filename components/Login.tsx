@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { User, ViewState } from '../types';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
-import { LogIn, UserPlus, AlertCircle, LayoutDashboard, Sun, Moon } from 'lucide-react';
+import { LogIn, UserPlus, AlertCircle, LayoutDashboard, Sun, Moon, Upload, FileText, X } from 'lucide-react';
 
 interface Props {
   onLogin: (user: User) => void;
@@ -25,10 +25,30 @@ const Login: React.FC<Props> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessPhone, setBusinessPhone] = useState('');
+  const [document, setDocument] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [dbService] = useState(() => new UniversalDatabaseService());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Only JPG, PNG, or PDF files are accepted.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File must be smaller than 5MB.');
+      return;
+    }
+    setError('');
+    setDocument(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +60,6 @@ const Login: React.FC<Props> = ({
     const trimmedBusinessName = businessName.trim();
 
     try {
-      console.log('Login attempt:', { email: trimmedEmail, isSignUp, isAdminLogin });
-
       if (!trimmedEmail || !password) {
         setError("Email and password are required");
         setIsLoading(false);
@@ -49,7 +67,6 @@ const Login: React.FC<Props> = ({
       }
 
       if (isSignUp && !isAdminLogin) {
-        // Validate Password Strength
         const passwordValidation = ValidationService.validatePassword(password);
         if (!passwordValidation.isValid) {
           setValidationErrors(passwordValidation.errors);
@@ -63,153 +80,263 @@ const Login: React.FC<Props> = ({
           return;
         }
 
-        const newUser = await dbService.createUser(trimmedEmail, password, 'user', trimmedBusinessName);
-        
-        // If we get here, registration was successful (otherwise it would throw)
-        if (newUser) {
-          console.log('User created successfully:', newUser.email);
-          onLogin(newUser);
+        if (!businessAddress.trim()) {
+          setError("Business address is required");
+          setIsLoading(false);
+          return;
         }
+
+        if (!businessPhone.trim()) {
+          setError("Business phone / contact number is required");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!document) {
+          setError("Please upload a business registration document (Mayor's Permit, DTI, or SEC Registration).");
+          setIsLoading(false);
+          return;
+        }
+
+        // 1. Create the user account
+        const newUser = await dbService.createUser(trimmedEmail, password, 'user', trimmedBusinessName);
+
+        if (!newUser) {
+          setError("Registration failed. Please try again.");
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Submit verification document via FormData
+        const formData = new FormData();
+        formData.append('userId', newUser.id);
+        formData.append('businessAddress', businessAddress.trim());
+        formData.append('businessPhone', businessPhone.trim());
+        formData.append('document', document);
+
+        const token = localStorage.getItem('kawayan_jwt');
+        const verifRes = await fetch('/api/verification/submit', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+
+        if (!verifRes.ok) {
+          console.warn('Verification doc upload failed (non-fatal):', await verifRes.text());
+        }
+
+        onLogin({ ...newUser, verificationStatus: 'pending' });
       } else {
-        // Login
         const result = await dbService.loginUser(trimmedEmail, password);
-        
+
         if (result && result.user) {
-          console.log('Login successful:', result.user.email);
-          
           if (isAdminLogin && result.user.role !== 'admin') {
-             setError("Access denied. Admin only.");
-             await dbService.logoutUser();
+            setError("Access denied. Admin only.");
+            await dbService.logoutUser();
           } else {
-             onLogin(result.user);
+            onLogin(result.user);
           }
         }
       }
-    } catch (error: any) {
-      console.error('Login/Signup error:', error);
-      // Display the specific error message from the backend
-      setError(error.message || "An error occurred. Please try again.");
+    } catch (err: any) {
+      console.error('Login/Signup error:', err);
+      setError(err.message || "An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-slate-850 p-8 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 max-w-md w-full relative overflow-hidden transition-colors">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-8">
+      <div className="absolute w-[480px] h-[480px] rounded-full blur-[150px] opacity-[0.04] bg-[#2B5748] pointer-events-none"></div>
+
+      <div className="bg-white dark:bg-[#273338] rounded-[2rem] rounded-tl-[4rem] rounded-br-[4rem] border border-[#2B5748] dark:border-[#9CB080]/20 max-w-lg w-full relative overflow-hidden transition-all duration-500 hover:-translate-y-1" style={{ boxShadow: '0 16px 48px -12px rgba(43, 87, 72,0.1)' }}>
         
-        {/* Decor */}
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-600"></div>
+        <div className="h-1.5 w-full bg-[#2B5748]"></div>
 
-        {/* Theme Toggle */}
-        {toggleTheme && (
-          <button 
-            onClick={toggleTheme}
-            className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition z-10"
-            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-        )}
+        <div className="p-8">
+          {toggleTheme && (
+            <button 
+              onClick={toggleTheme}
+              className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-[#2B5748]/50 transition z-10"
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          )}
 
-        <div className="text-center mb-8">
-           <div className="inline-flex p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-full text-emerald-600 dark:text-emerald-400 mb-4">
-              {isAdminLogin ? <LayoutDashboard className="w-8 h-8"/> : <LogIn className="w-8 h-8" />}
-           </div>
-           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-             {isAdminLogin ? 'Admin Portal' : (isSignUp ? 'Create Account' : 'Welcome Back')}
-           </h1>
-           <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
-             {isAdminLogin ? 'Secure access for staff only.' : 'Manage your SME social media with AI.'}
-           </p>
-        </div>
+          <div className="text-center mb-8">
+            <div className="inline-flex p-3 rounded-full mb-4 bg-[#2B5748]/10">
+              <div style={{ color: '#2B5748' }}>
+                {isAdminLogin ? <LayoutDashboard className="w-7 h-7"/> : <LogIn className="w-7 h-7" />}
+              </div>
+            </div>
+            <h1 className="font-display text-2xl text-slate-800 dark:text-white">
+              {isAdminLogin ? 'Admin Portal' : (isSignUp ? 'Create Account' : 'Welcome Back')}
+            </h1>
+            <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">
+              {isAdminLogin ? 'Secure access for authorized staff only.' : 'Manage your SME social media with AI.'}
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && !isAdminLogin && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && !isAdminLogin && (
+              <>
+                {/* Business Name */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Business Name</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full px-5 py-3 rounded-full border border-[#2B5748] dark:border-[#9CB080]/20 bg-white/50 dark:bg-[#273338] text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-[#2B5748]/30"
+                    placeholder="e.g. Aling Nena's Lutong Bahay"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                  />
+                </div>
+
+                {/* Business Address */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Business Address</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full px-5 py-3 rounded-full border border-[#2B5748] dark:border-[#9CB080]/20 bg-white/50 dark:bg-[#273338] text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-[#2B5748]/30"
+                    placeholder="e.g. 123 Rizal St., Parañaque City"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                  />
+                </div>
+
+                {/* Business Phone */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Business Phone / Contact Number</label>
+                  <input 
+                    type="tel" 
+                    required 
+                    className="w-full px-5 py-3 rounded-full border border-[#2B5748] dark:border-[#9CB080]/20 bg-white/50 dark:bg-[#273338] text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-[#2B5748]/30"
+                    placeholder="e.g. 09XX-XXX-XXXX"
+                    value={businessPhone}
+                    onChange={(e) => setBusinessPhone(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+            
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Business Name</label>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Email Address</label>
               <input 
-                type="text" 
+                type="email" 
                 required 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
-                placeholder="e.g. Aling Nena's"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                className="w-full px-5 py-3 rounded-full border border-[#2B5748] dark:border-[#9CB080]/20 bg-white/50 dark:bg-[#273338] text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-[#2B5748]/30"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+              <input 
+                type="password" 
+                required 
+                className="w-full px-5 py-3 rounded-full border border-[#2B5748] dark:border-[#9CB080]/20 bg-white/50 dark:bg-[#273338] text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-[#2B5748]/30"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            {/* Document Upload — signup only */}
+            {isSignUp && !isAdminLogin && (
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  Business Registration Document <span className="text-rose-400">*</span>
+                </label>
+                <p className="text-[11px] text-slate-400 mb-2">Upload your Mayor's Permit, DTI, or SEC Registration (JPG, PNG, or PDF — max 5MB)</p>
+
+                {document ? (
+                  <div className="flex items-center gap-3 p-3 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20">
+                    <FileText className="w-5 h-5 shrink-0" style={{ color: '#2B5748' }} />
+                    <span className="text-sm text-slate-700 dark:text-slate-200 flex-1 truncate">{document.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                      className="p-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-800 transition"
+                    >
+                      <X className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-4 rounded-full border-2 border-dashed border-[#2B5748] dark:border-[#9CB080]/20 flex flex-col items-center gap-2 hover:border-[#2B5748] dark:hover:border-[#2B5748] transition-all group"
+                  >
+                    <Upload className="w-5 h-5 text-slate-300 group-hover:text-[#2B5748] transition-colors" />
+                    <span className="text-xs text-slate-400 group-hover:text-[#2B5748] transition-colors font-medium">Click to upload document</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
+            )}
+
+            {validationErrors.length > 0 && (
+              <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/30">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-bold mb-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Password Requirements:
+                </div>
+                <ul className="list-disc list-inside text-xs text-rose-500 dark:text-rose-300 space-y-0.5">
+                  {validationErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/30">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 rounded-full font-bold text-sm text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              style={isAdminLogin
+                ? { background: '#273338', boxShadow: '0 4px 16px -4px rgba(44,44,36,0.3)' }
+                : { background: '#2B5748', boxShadow: '0 4px 20px -4px rgba(43, 87, 72,0.35)' }
+              }
+            >
+              {isLoading ? 'Processing...' : (isSignUp && !isAdminLogin ? 'Create Account & Submit for Verification' : 'Sign In')}
+            </button>
+          </form>
+
+          {!isAdminLogin && (
+            <div className="mt-6 text-center">
+              <button 
+                onClick={() => { setIsSignUp(!isSignUp); setError(''); setValidationErrors([]); }}
+                className="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-medium flex items-center justify-center gap-2 mx-auto"
+              >
+                {isSignUp ? 'Already have an account? Sign in' : 'No account yet? Create one free'} 
+                {!isSignUp && <UserPlus className="w-4 h-4" />}
+              </button>
             </div>
           )}
           
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Email Address</label>
-            <input 
-              type="email" 
-              required 
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Password</label>
-            <input 
-              type="password" 
-              required 
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          {validationErrors.length > 0 && (
-            <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-900/30">
-              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-sm font-bold mb-1">
-                <AlertCircle className="w-4 h-4" /> Password Requirements:
-              </div>
-              <ul className="list-disc list-inside text-xs text-rose-500 dark:text-rose-300 space-y-1">
-                {validationErrors.map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-              </ul>
+          {isAdminLogin && (
+            <div className="mt-6 text-center">
+              <button onClick={() => onNavigate(ViewState.LOGIN)} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">← Back to User Login</button>
             </div>
           )}
-
-          {error && (
-            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-sm bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-900/30">
-              <AlertCircle className="w-4 h-4" /> {error}
-            </div>
-          )}
-
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-              isAdminLogin ? 'bg-slate-800 hover:bg-slate-900' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 dark:shadow-none'
-            }`}
-          >
-            {isLoading ? 'Processing...' : (isSignUp && !isAdminLogin ? 'Sign Up Free' : 'Login')}
-          </button>
-        </form>
-
-        {!isAdminLogin && (
-          <div className="mt-6 text-center">
-            <button 
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium flex items-center justify-center gap-2 mx-auto"
-            >
-              {isSignUp ? 'Already have an account? Login' : 'New here? Create an account'} 
-              {!isSignUp && <UserPlus className="w-4 h-4" />}
-            </button>
-          </div>
-        )}
-        
-        {isAdminLogin && (
-          <div className="mt-6 text-center">
-             <button onClick={() => onNavigate(ViewState.LOGIN)} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">Back to User Login</button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

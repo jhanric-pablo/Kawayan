@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle, Package, AlertTriangle, Plus, Loader2, Download, X, Smartphone, XCircle, RefreshCw } from 'lucide-react';
 import { paymentService, Wallet } from '../services/paymentService';
+import { useOrganicDialog } from './OrganicDialog';
 
 const Billing: React.FC = () => {
+  const dialog = useOrganicDialog();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
   const [topUpAmount, setTopUpAmount] = useState('');
@@ -46,10 +48,10 @@ const Billing: React.FC = () => {
     setProcessing(true);
     try {
       const result = await paymentService.verifyPayment();
-      alert(result.message);
+      await dialog.alert(result.message);
       await loadWallet();
     } catch (error: any) {
-      alert(error.message);
+      await dialog.alert(error.message);
     } finally {
       setProcessing(false);
     }
@@ -64,7 +66,7 @@ const Billing: React.FC = () => {
       // Redirect to Xendit Checkout
       window.location.href = checkoutUrl;
     } catch (error: any) {
-      alert(error.message || "Payment Initialization Failed.");
+      await dialog.alert(error.message || "Payment Initialization Failed.");
     } finally {
       setProcessing(false);
       setTopUpAmount('');
@@ -87,21 +89,22 @@ const Billing: React.FC = () => {
   };
 
   const handleCancelTransaction = async (id: string) => {
-    if (!confirm("Are you sure you want to cancel this pending transaction?")) return;
+    const confirmed = await dialog.confirm("Are you sure you want to cancel this pending transaction?");
+    if (!confirmed) return;
     setCancellingId(id);
     try {
       const updatedWallet = await paymentService.cancelTransaction(id);
       setWallet(updatedWallet);
     } catch (error: any) {
-      alert(error.message);
+      await dialog.alert(error.message);
     } finally {
       setCancellingId(null);
     }
   };
 
-  const handleSavePaymentMethod = () => {
+  const handleSavePaymentMethod = async () => {
     // In a real app, this would tokenise with Xendit
-    alert(`Payment Method Saved: ${newPaymentMethod.type} - ${newPaymentMethod.number}`);
+    await dialog.alert(`Payment Method Saved: ${newPaymentMethod.type} - ${newPaymentMethod.number}`);
     setShowPaymentModal(false);
   };
 
@@ -111,11 +114,11 @@ const Billing: React.FC = () => {
     if (plan === 'PRO') {
        const cost = 499;
        if ((wallet?.balance || 0) < cost) {
-         alert("Insufficient balance. Please top up first.");
+         await dialog.alert("Insufficient balance. Please top up first.");
          return;
        }
-       const confirm = window.confirm(`Upgrade to PRO for ₱499/mo? This will be deducted from your wallet.`);
-       if (confirm) {
+       const confirmed = await dialog.confirm(`Upgrade to PRO for ₱499/mo? This will be deducted from your wallet.`);
+       if (confirmed) {
          await paymentService.purchaseSubscription('PRO', cost);
          await loadWallet();
          setShowPlanModal(false);
@@ -130,7 +133,7 @@ const Billing: React.FC = () => {
   if (loading || !wallet) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        <div className="w-8 h-8 rounded-full border-2 border-[#2B5748] border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -141,7 +144,7 @@ const Billing: React.FC = () => {
       {/* Success Popup */}
       {showSuccessPopup && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700 text-center animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-[#2B5748]/40 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-[#9CB080]/20 text-center animate-in zoom-in-95 duration-300">
             <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
             </div>
@@ -149,7 +152,8 @@ const Billing: React.FC = () => {
             <p className="text-slate-500 dark:text-slate-400 mb-8">Your wallet balance has been updated successfully. You can now continue creating amazing content.</p>
             <button 
               onClick={() => setShowSuccessPopup(false)}
-              className="w-full bg-slate-900 dark:bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-emerald-700 transition transform active:scale-95 shadow-lg"
+                className="w-full text-white py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 bg-[#2B5748]"
+                style={{ boxShadow: '0 4px 20px -4px rgba(43, 87, 72,0.35)' }}
             >
               Great!
             </button>
@@ -160,7 +164,7 @@ const Billing: React.FC = () => {
       {/* Payment Method Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+           <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg dark:text-white">Update Payment Method</h3>
                 <button onClick={() => setShowPaymentModal(false)}><X className="w-5 h-5 text-slate-400"/></button>
@@ -171,7 +175,7 @@ const Billing: React.FC = () => {
                    <select 
                      value={newPaymentMethod.type}
                      onChange={(e) => setNewPaymentMethod({...newPaymentMethod, type: e.target.value})}
-                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#273338] dark:text-white"
                    >
                      <option value="GCASH">GCash</option>
                      <option value="MAYA">Maya</option>
@@ -185,10 +189,10 @@ const Billing: React.FC = () => {
                      placeholder="0917..." 
                      value={newPaymentMethod.number}
                      onChange={(e) => setNewPaymentMethod({...newPaymentMethod, number: e.target.value})}
-                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#273338] dark:text-white"
                    />
                  </div>
-                 <button onClick={handleSavePaymentMethod} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Save Method</button>
+                 <button onClick={handleSavePaymentMethod} className="w-full py-3 rounded-full font-bold text-sm text-white transition hover:scale-105 active:scale-95 bg-[#2B5748]" style={{ boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.3)' }}>Save Method</button>
               </div>
            </div>
         </div>
@@ -197,18 +201,18 @@ const Billing: React.FC = () => {
       {/* Plan Selection Modal */}
       {showPlanModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
+           <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg dark:text-white">Change Subscription Plan</h3>
                 <button onClick={() => setShowPlanModal(false)}><X className="w-5 h-5 text-slate-400"/></button>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'FREE' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`} onClick={() => handleSwitchPlan('FREE')}>
+                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'FREE' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-[#9CB080]/20'}`} onClick={() => handleSwitchPlan('FREE')}>
                     <h4 className="font-bold dark:text-white">Free Trial</h4>
                     <p className="text-sm text-slate-500">8 posts/mo</p>
                     <p className="font-bold mt-2">₱0</p>
                  </div>
-                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'PRO' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`} onClick={() => handleSwitchPlan('PRO')}>
+                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'PRO' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-[#9CB080]/20'}`} onClick={() => handleSwitchPlan('PRO')}>
                     <h4 className="font-bold dark:text-white">Pro Plan</h4>
                     <p className="text-sm text-slate-500">16 posts/mo + Analytics</p>
                     <p className="font-bold mt-2">₱499/mo</p>
@@ -228,12 +232,12 @@ const Billing: React.FC = () => {
       <div className="grid grid-cols-1 gap-6">
         {/* Wallet Balance Card */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
-           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500 rounded-full blur-[100px] opacity-20"></div>
+           <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20" style={{ background: "#2B5748" }}></div>
            
            <div className="relative z-10">
              <div className="flex justify-between items-start mb-8">
                <div>
-                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${wallet.subscription === 'PRO' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'}`}>
+                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${wallet.subscription === 'PRO' ? 'border' : 'bg-slate-700 text-slate-300'}`} style={wallet.subscription === 'PRO' ? { background: 'rgba(43, 87, 72,0.15)', color: '#2B5748', borderColor: 'rgba(43, 87, 72,0.3)' } : {}}>
                    {wallet.subscription} Plan
                  </span>
                  <h2 className="text-sm font-medium text-slate-400 mt-4 uppercase tracking-wider">Available Balance</h2>
@@ -250,13 +254,14 @@ const Billing: React.FC = () => {
                    value={topUpAmount}
                    onChange={(e) => setTopUpAmount(e.target.value)}
                    placeholder="0.00"
-                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-emerald-500 transition"
+                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-[#2B5748] transition"
                  />
                </div>
                <button 
                  onClick={handleTopUp}
                  disabled={processing || !topUpAmount}
-                 className="bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-emerald-600 transition shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="text-white px-6 py-2.5 rounded-full font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "#2B5748", boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.35)' }}
                >
                  {processing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
                  Top Up
@@ -267,8 +272,8 @@ const Billing: React.FC = () => {
       </div>
 
       {/* Transaction History */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+      <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#273338]/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 dark:text-white">Transaction History</h3>
           <button 
             onClick={downloadInvoice}
@@ -279,7 +284,7 @@ const Billing: React.FC = () => {
           </button>
         </div>
         <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 font-medium border-b border-slate-100 dark:border-slate-700">
+          <thead className="bg-slate-50 dark:bg-[#273338] text-slate-500 dark:text-slate-400 font-medium border-b border-slate-100 dark:border-[#9CB080]/20">
             <tr>
               <th className="px-6 py-4">Date</th>
               <th className="px-6 py-4">Description</th>
@@ -296,7 +301,7 @@ const Billing: React.FC = () => {
               </tr>
             ) : (
               wallet.transactions.map((txn) => (
-                <tr key={txn.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                <tr key={txn.id} className="hover:bg-slate-50 dark:hover:bg-[#2B5748]/50/50 transition">
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{new Date(txn.date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{txn.description}</td>
                   <td className="px-6 py-4">

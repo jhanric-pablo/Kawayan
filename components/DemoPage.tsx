@@ -48,11 +48,11 @@ const DemoPage: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4 sm:p-8">
-      <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden relative">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0F172A] flex flex-col items-center justify-center p-4 sm:p-8">
+      <div className="max-w-4xl w-full bg-white dark:bg-[#1E293B]/40 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-[#4D7CFF]/20 overflow-hidden relative">
         
         {/* Progress Bar */}
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 dark:bg-slate-700">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 dark:bg-[#1E293B]/50">
           <div 
             className="h-full bg-emerald-500 transition-all duration-700 ease-out"
             style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
@@ -97,7 +97,7 @@ const DemoPage: React.FC<Props> = ({ onNavigate }) => {
             <button 
               onClick={prevStep}
               disabled={currentStep === 0}
-              className={`p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed`}
+              className={`p-4 rounded-2xl border border-slate-200 dark:border-[#4D7CFF]/20 text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-[#334155]/50 disabled:opacity-30 disabled:cursor-not-allowed`}
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
@@ -106,7 +106,7 @@ const DemoPage: React.FC<Props> = ({ onNavigate }) => {
               {steps.map((_, i) => (
                 <div 
                   key={i}
-                  className={`h-1.5 rounded-full transition-all duration-500 ${currentStep === i ? 'w-8 bg-emerald-500' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}
+                  className={`h-1.5 rounded-full transition-all duration-500 ${currentStep === i ? 'w-8 bg-emerald-500' : 'w-2 bg-slate-200 dark:bg-[#1E293B]/50'}`}
                 />
               ))}
             </div>

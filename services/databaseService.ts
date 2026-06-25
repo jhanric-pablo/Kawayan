@@ -267,6 +267,44 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
   }
   
   // --- Posts ---
+  async postExists(postId: string): Promise<boolean> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const row = db.prepare('SELECT id FROM generated_posts WHERE id = ?').get(postId);
+      return !!row;
+    } catch {
+      return false;
+    }
+  }
+
+  async countUserPostsInMonth(userId: string, year: number, month: number): Promise<number> {
+    const db = this.dbConfig.getDatabase();
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    try {
+      const row = db.prepare(
+        `SELECT COUNT(*) as count FROM generated_posts WHERE user_id = ? AND date LIKE ?`
+      ).get(userId, `${prefix}%`) as { count: number };
+      return row?.count ?? 0;
+    } catch (error) {
+      console.error('Error counting monthly posts:', error);
+      return 0;
+    }
+  }
+
+  async assertTierAllowsNewPost(userId: string, postDate: string): Promise<void> {
+    const [year, month] = postDate.split('-').map(Number);
+    const wallet = await this.getWallet(userId);
+    const limit =
+      wallet.subscription === 'PRO' || wallet.subscription === 'ENTERPRISE' ? 16 : 8;
+    const count = await this.countUserPostsInMonth(userId, year, month);
+    if (count >= limit) {
+      const err = new Error('TIER_LIMIT_REACHED');
+      (err as any).code = 'TIER_LIMIT_REACHED';
+      (err as any).limit = limit;
+      throw err;
+    }
+  }
+
   async savePost(post: GeneratedPost): Promise<void> {
     const db = this.dbConfig.getDatabase();
     
@@ -298,6 +336,10 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
           post.id
         );
       } else {
+        const isPaidAddOn = String(post.id).startsWith('addon-');
+        if (!isPaidAddOn) {
+          await this.assertTierAllowsNewPost(post.userId, post.date);
+        }
         // Insert new post
         db.prepare(`
           INSERT INTO generated_posts (id, user_id, date, topic, caption, image_prompt, image_url, status, virality_score, virality_reason, format, external_link, published_at, regen_count, history)
@@ -889,6 +931,164 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
     }
   }
   
+  // ─────────────────────────────────────────────────────────────────────────
+  // Business Verification Methods
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async submitVerification(userId: string, businessAddress: string, businessPhone: string, documentName: string, documentPath: string): Promise<void> {
+    const db = this.dbConfig.getDatabase();
+    const id = `verif_${Date.now()}`;
+    try {
+      // Upsert: if a previous record exists (e.g. rejected), replace it
+      db.prepare(`
+        INSERT INTO business_verifications (id, user_id, business_address, business_phone, document_name, document_path, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending')
+        ON CONFLICT(user_id) DO UPDATE SET
+          business_address = excluded.business_address,
+          business_phone = excluded.business_phone,
+          document_name = excluded.document_name,
+          document_path = excluded.document_path,
+          status = 'pending',
+          rejection_reason = NULL,
+          reviewed_by = NULL,
+          reviewed_at = NULL,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(id, userId, businessAddress, businessPhone, documentName, documentPath);
+    } catch (error) {
+      console.error('Error submitting verification:', error);
+      throw error;
+    }
+  }
+
+  async resubmitVerification(userId: string, documentName: string, documentPath: string): Promise<void> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const updated = db.prepare(`
+        UPDATE business_verifications SET
+          document_name = ?, document_path = ?,
+          status = 'pending', rejection_reason = NULL,
+          reviewed_by = NULL, reviewed_at = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(documentName, documentPath, userId);
+      if (updated.changes === 0) throw new Error('No verification record found to update');
+    } catch (error) {
+      console.error('Error resubmitting verification:', error);
+      throw error;
+    }
+  }
+
+  async getVerification(userId: string): Promise<any | null> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const row = db.prepare('SELECT * FROM business_verifications WHERE user_id = ?').get(userId) as any;
+      if (!row) return null;
+      return {
+        id: row.id,
+        userId: row.user_id,
+        businessAddress: row.business_address,
+        businessPhone: row.business_phone,
+        documentName: row.document_name,
+        documentPath: row.document_path,
+        status: row.status,
+        rejectionReason: row.rejection_reason,
+        reviewedBy: row.reviewed_by,
+        reviewedAt: row.reviewed_at,
+        createdAt: row.created_at,
+      };
+    } catch (error) {
+      console.error('Error getting verification:', error);
+      return null;
+    }
+  }
+
+  async getVerificationById(id: string): Promise<any | null> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const row = db.prepare('SELECT * FROM business_verifications WHERE id = ?').get(id) as any;
+      if (!row) return null;
+      return {
+        id: row.id,
+        userId: row.user_id,
+        businessAddress: row.business_address,
+        businessPhone: row.business_phone,
+        documentName: row.document_name,
+        document_path: row.document_path,
+        status: row.status,
+        rejectionReason: row.rejection_reason,
+      };
+    } catch (error) {
+      console.error('Error getting verification by id:', error);
+      return null;
+    }
+  }
+
+  async getAllVerifications(): Promise<any[]> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const rows = db.prepare(`
+        SELECT bv.*, u.email, u.business_name
+        FROM business_verifications bv
+        JOIN users u ON bv.user_id = u.id
+        ORDER BY bv.created_at DESC
+      `).all() as any[];
+      return rows.map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        email: row.email,
+        businessName: row.business_name,
+        businessAddress: row.business_address,
+        businessPhone: row.business_phone,
+        documentName: row.document_name,
+        documentPath: row.document_path,
+        status: row.status,
+        rejectionReason: row.rejection_reason,
+        reviewedBy: row.reviewed_by,
+        reviewedAt: row.reviewed_at,
+        createdAt: row.created_at,
+      }));
+    } catch (error) {
+      console.error('Error getting all verifications:', error);
+      return [];
+    }
+  }
+
+  async approveVerification(id: string, adminId: string): Promise<void> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      db.prepare(`
+        UPDATE business_verifications SET
+          status = 'verified',
+          reviewed_by = ?,
+          reviewed_at = CURRENT_TIMESTAMP,
+          rejection_reason = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(adminId, id);
+    } catch (error) {
+      console.error('Error approving verification:', error);
+      throw error;
+    }
+  }
+
+  async rejectVerification(id: string, adminId: string, reason: string): Promise<void> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      db.prepare(`
+        UPDATE business_verifications SET
+          status = 'rejected',
+          reviewed_by = ?,
+          reviewed_at = CURRENT_TIMESTAMP,
+          rejection_reason = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(adminId, reason, id);
+    } catch (error) {
+      console.error('Error rejecting verification:', error);
+      throw error;
+    }
+  }
+
   // --- Helper Methods ---
   private async initializeDefaultAdmin(): Promise<void> {
     const db = this.dbConfig.getDatabase();
