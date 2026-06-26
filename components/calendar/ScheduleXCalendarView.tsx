@@ -13,6 +13,7 @@ import 'temporal-polyfill/global';
 
 import { ContentIdea, GeneratedPost } from '../../types';
 import { mapToScheduleXEvents, plainDateFromParts } from './mapScheduleXEvents';
+import { ADDON_POST_PRICE_PHP } from '../../utils/tierLimits';
 import KawayanMonthGridEvent from './KawayanMonthGridEvent';
 import './scheduleXTheme.css';
 
@@ -227,8 +228,9 @@ const ScheduleXCalendarView: React.FC<Props> = ({
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'kawayan-add-btn';
-        btn.textContent = 'ADD';
-        btn.title = 'Add single post ($1.50)';
+        btn.textContent = '+';
+        btn.setAttribute('aria-label', `Add single post (₱${ADDON_POST_PRICE_PHP})`);
+        btn.title = `Add single post (₱${ADDON_POST_PRICE_PHP})`;
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           e.preventDefault();

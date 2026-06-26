@@ -257,7 +257,7 @@ const App: React.FC = () => {
                     <div className="flex items-center bg-[#273338]/5 dark:bg-[#2B5748]/40 p-1 rounded-2xl border border-[#273338]/10 dark:border-[#9CB080]/20">
                       {[
                         { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
-                        { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
+                        { id: ViewState.INSIGHTS, label: 'Growth Insights', icon: BarChart3, roles: ['user'] },
                         { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
                         { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
                       ].filter(item => item.roles.includes(user?.role || '')).map((item) => (

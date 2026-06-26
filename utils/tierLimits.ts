@@ -2,6 +2,8 @@ import { ContentIdea, GeneratedPost } from '../types';
 
 export const TRIAL_POST_LIMIT = 8;
 export const PRO_POST_LIMIT = 16;
+/** Standalone single-post add-on (PHP). */
+export const ADDON_POST_PRICE_PHP = 150;
 
 export type SubscriptionTier = 'FREE' | 'PRO' | 'ENTERPRISE';
 

@@ -14,7 +14,7 @@ interface Props {
 const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   const dialog = useOrganicDialog();
   const [dbService] = useState(() => new UniversalDatabaseService());
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'helpdesk' | 'logs' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'billing' | 'helpdesk' | 'logs' | 'settings'>('overview');
   
   // Stats State
   const [stats, setStats] = useState({
@@ -24,9 +24,13 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     revenue: 0,
     cancelledTransactions: 0,
     pendingTransactions: 0,
+    retentionRate: 0,
     revenueData: [] as any[],
     churnData: [] as any[]
   });
+
+  const [pendingTxns, setPendingTxns] = useState<any[]>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
   
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -75,7 +79,33 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
 
   useEffect(() => {
     if (activeTab === 'verification') loadVerifications();
+    if (activeTab === 'billing') loadPendingTransactions();
   }, [activeTab]);
+
+  const loadPendingTransactions = async () => {
+    setBillingLoading(true);
+    try {
+      const list = await dbService.getPendingTransactionsAdmin();
+      setPendingTxns(list);
+    } catch (e) {
+      console.error('Error loading pending transactions:', e);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const handleApproveTransaction = async (transactionId: string) => {
+    const confirmed = await dialog.confirm('Approve this payment and credit the user wallet?');
+    if (!confirmed) return;
+    try {
+      await dbService.approveTransactionAdmin(transactionId);
+      await dialog.alert({ title: 'Approved', message: 'Payment verified and balance updated.' });
+      loadPendingTransactions();
+      loadData();
+    } catch (e) {
+      await dialog.alert('Failed to approve transaction.');
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -362,6 +392,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
              { id: 'overview', label: 'Overview', icon: Activity },
              { id: 'users', label: 'Users', icon: Users },
              { id: 'verification', label: 'Verification', icon: Shield },
+             { id: 'billing', label: 'Billing', icon: CreditCard },
              { id: 'helpdesk', label: 'Help Desk', icon: MessageSquare },
              { id: 'logs', label: 'Audit Logs', icon: Clock },
              { id: 'settings', label: 'Settings', icon: Settings },
@@ -409,6 +440,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
               { label: 'Active Sessions', value: stats.activeUsers, icon: Activity, accent: false },
               { label: 'Posts Created', value: stats.totalPostsGenerated, icon: TrendingUp, accent: false },
               { label: 'Cancelled Txns', value: stats.cancelledTransactions, icon: XCircle, accent: false },
+              { label: '30-Day Retention', value: `${stats.retentionRate ?? 0}%`, icon: TrendingUp, accent: false },
               { label: 'Pending Txns', value: stats.pendingTransactions, icon: Wallet, accent: false },
             ].map((stat, idx) => (
               <div key={idx} className={`p-5 rounded-2xl border transition-all hover:-translate-y-0.5 ${stat.accent ? 'border-[#273338]/10' : 'border-[#2B5748] dark:border-[#9CB080]/20'} bg-white dark:bg-[#2B5748]/40`} style={stat.accent ? { boxShadow: '0 4px 20px -4px rgba(43, 87, 72,0.15)' } : {}}>
@@ -425,8 +457,8 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white dark:bg-[#2B5748]/40 p-6 rounded-2xl border border-[#2B5748] dark:border-[#9CB080]/20 h-80">
-              <h3 className="font-display text-base text-slate-800 dark:text-white mb-4">Revenue Growth</h3>
-              <ResponsiveContainer width="100%" height="100%">
+              <h3 className="font-display text-base text-slate-800 dark:text-white mb-4">User Growth</h3>
+              <ResponsiveContainer width="100%" height="90%">
                 <AreaChart data={stats.revenueData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -440,6 +472,19 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                   <Tooltip contentStyle={{borderRadius: '12px', border: '1px solid #2B5748', backgroundColor: '#fff', color: '#273338', boxShadow: '0 4px 16px rgba(43, 87, 72,0.08)'}} />
                   <Area type="monotone" dataKey="value" stroke="#2B5748" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
                 </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="lg:col-span-1 bg-white dark:bg-[#2B5748]/40 p-6 rounded-2xl border border-[#2B5748] dark:border-[#9CB080]/20 h-80">
+              <h3 className="font-display text-base text-slate-800 dark:text-white mb-4">User Retention Rate</h3>
+              <ResponsiveContainer width="100%" height="90%">
+                <BarChart data={stats.churnData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#9CB080" opacity={0.2} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} unit="%" />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #2B5748' }} formatter={(v: number) => [`${v}%`, 'Retention']} />
+                  <Bar dataKey="value" fill="#618764" radius={[6, 6, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
 
@@ -752,6 +797,63 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
         </>
       )}
 
+      {/* BILLING TAB */}
+      {activeTab === 'billing' && (
+        <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-100 dark:border-[#9CB080]/20 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 dark:border-[#9CB080]/20">
+            <h3 className="font-display text-lg text-slate-800 dark:text-white">Payment Verification & Billing Cycles</h3>
+            <p className="text-xs text-slate-400 mt-1">Review pending wallet top-ups and manage subscription billing status per user.</p>
+          </div>
+          <div className="overflow-x-auto">
+            {billingLoading ? (
+              <div className="flex items-center justify-center py-16"><div className="w-8 h-8 rounded-full border-2 border-[#2B5748] border-t-transparent animate-spin"/></div>
+            ) : pendingTxns.length === 0 ? (
+              <div className="text-center py-16 text-slate-400 italic">No pending transactions — all payments verified.</div>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 dark:bg-[#273338] text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wide border-b border-slate-100 dark:border-[#9CB080]/20">
+                  <tr>
+                    <th className="px-5 py-3">User</th>
+                    <th className="px-5 py-3">Description</th>
+                    <th className="px-5 py-3">Amount</th>
+                    <th className="px-5 py-3">Date</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                  {pendingTxns.map((txn) => (
+                    <tr key={txn.id} className="hover:bg-slate-50 dark:hover:bg-[#2B5748]/40 transition">
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-slate-800 dark:text-white text-sm">{txn.userEmail || txn.userId}</p>
+                        <p className="text-xs text-slate-400 font-mono">{txn.id}</p>
+                      </td>
+                      <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{txn.description}</td>
+                      <td className="px-5 py-4 font-bold text-[#2B5748] dark:text-[#9CB080]">₱{Number(txn.amount).toLocaleString()}</td>
+                      <td className="px-5 py-4 text-xs text-slate-500">{new Date(txn.date).toLocaleString()}</td>
+                      <td className="px-5 py-4">
+                        <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-orange-100 text-orange-700">{txn.status}</span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={() => handleApproveTransaction(txn.id)}
+                          className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#2B5748] text-white hover:opacity-90 transition"
+                        >
+                          Verify Payment
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="p-4 border-t border-slate-100 dark:border-[#9CB080]/20 text-xs text-slate-400">
+            Manage active billing cycles per user under the <button type="button" onClick={() => setActiveTab('users')} className="font-bold text-[#2B5748] dark:text-[#9CB080] hover:underline">Users</button> tab (subscription plan + expiry).
+          </div>
+        </div>
+      )}
+
       {/* HELP DESK TAB */}
       {activeTab === 'helpdesk' && (
         <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-100 dark:border-[#9CB080]/20 shadow-sm overflow-hidden">
@@ -761,6 +863,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                 <th className="px-6 py-4">Ticket</th>
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Subject</th>
+                <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Priority</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Action</th>
@@ -768,12 +871,19 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
               {tickets.length === 0 ? (
-                 <tr><td colSpan={6} className="text-center p-8 text-slate-400">No tickets found.</td></tr>
+                 <tr><td colSpan={7} className="text-center p-8 text-slate-400">No tickets found.</td></tr>
               ) : tickets.map(ticket => (
                 <tr key={ticket.id} className="hover:bg-slate-50 dark:hover:bg-[#2B5748]/50/50">
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">#{ticket.ticketNum}</td>
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-xs">{ticket.userEmail}</td>
                   <td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{ticket.subject}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                      ticket.category === 'Billing' ? 'bg-emerald-50 text-emerald-700' :
+                      ticket.category === 'Technical' ? 'bg-amber-50 text-amber-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>{ticket.category || 'General'}</span>
+                  </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${ 
                       ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-700' : 

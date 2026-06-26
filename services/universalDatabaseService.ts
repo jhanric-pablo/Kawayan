@@ -146,9 +146,20 @@ export class UniversalDatabaseService {
     pendingTransactions: number;
     revenueData: { name: string; value: number }[];
     churnData: { name: string; value: number }[];
+    retentionRate: number;
   }> {
     const service = await this.getService();
     return service.getAdminStats(start, end);
+  }
+
+  async getPendingTransactionsAdmin(): Promise<any[]> {
+    const service = await this.getService();
+    return service.getPendingTransactionsAdmin();
+  }
+
+  async approveTransactionAdmin(transactionId: string): Promise<void> {
+    const service = await this.getService();
+    return service.approveTransactionAdmin(transactionId);
   }
 
   async getAllUsers(): Promise<User[]> {

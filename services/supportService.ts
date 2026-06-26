@@ -10,12 +10,12 @@ class SupportService {
     } : { 'Content-Type': 'application/json' };
   }
 
-  async createTicket(user: User, subject: string, priority: string, message: string = ''): Promise<Ticket | null> {
+  async createTicket(user: User, subject: string, priority: string, message: string = '', category: Ticket['category'] = 'General'): Promise<Ticket | null> {
     try {
       const response = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ subject, priority, message })
+        body: JSON.stringify({ subject, priority, message, category })
       });
       
       if (!response.ok) throw new Error('Failed to create ticket');

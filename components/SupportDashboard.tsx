@@ -20,6 +20,7 @@ const SupportDashboard: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [filter, setFilter] = useState<'All' | 'Open' | 'Resolved' | 'History'>('All');
+  const [categoryFilter, setCategoryFilter] = useState<'All' | 'Technical' | 'Billing' | 'General'>('All');
   const [isLoading, setIsLoading] = useState(true);
   const [reply, setReply] = useState('');
   const [isSending, setIsTyping] = useState(false);
@@ -202,9 +203,10 @@ const SupportDashboard: React.FC = () => {
   const processedTickets = useMemo(() => {
     let result = tickets.filter(t => {
       const matchesFilter = filter === 'All' || filter === 'History' || t.status === filter;
+      const matchesCategory = categoryFilter === 'All' || t.category === categoryFilter;
       const matchesSearch = t.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            t.subject.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesCategory && matchesSearch;
     });
 
     return result.sort((a, b) => {
@@ -219,7 +221,7 @@ const SupportDashboard: React.FC = () => {
       }
       return sortDirection === 'desc' ? -comparison : comparison;
     });
-  }, [tickets, filter, searchQuery, sortKey, sortDirection]);
+  }, [tickets, filter, categoryFilter, searchQuery, sortKey, sortDirection]);
 
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden">
@@ -454,6 +456,13 @@ const SupportDashboard: React.FC = () => {
                        </button>
                      ))}
                   </div>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                     {(['All', 'Technical', 'Billing', 'General'] as const).map(c => (
+                       <button key={c} onClick={() => setCategoryFilter(c)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition whitespace-nowrap ${categoryFilter === c ? 'bg-[#618764] text-white' : 'bg-[#273338]/5 dark:bg-[#273338] text-slate-400'}`}>
+                         {c === 'All' ? 'All Types' : c}
+                       </button>
+                     ))}
+                  </div>
                   <div className="relative">
                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                      <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-[#273338] border border-transparent focus:border-[#2B5748] rounded-xl text-sm outline-none transition-all" />
@@ -475,7 +484,12 @@ const SupportDashboard: React.FC = () => {
                               <span className="text-[10px] text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
                            </div>
                            <h4 className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{ticket.subject}</h4>
-                           <div className="mt-2 flex items-center gap-2">
+                           <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                ticket.category === 'Billing' ? 'bg-emerald-100 text-emerald-700' :
+                                ticket.category === 'Technical' ? 'bg-amber-100 text-amber-700' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>{ticket.category || 'General'}</span>
                               <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-700' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{ticket.priority}</span>
                               <span className={`text-[9px] font-black uppercase tracking-wider ${ticket.status === 'Open' ? 'text-emerald-600' : ticket.status === 'Resolved' ? 'text-slate-400' : 'text-blue-500'}`}>{ticket.status}</span>
                            </div>

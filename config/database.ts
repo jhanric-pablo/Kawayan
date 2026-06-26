@@ -226,6 +226,13 @@ export class DatabaseConfig {
       this.db.exec("ALTER TABLE active_calls ADD COLUMN reason TEXT");
     }
 
+    // Migration for tickets category
+    const ticketTableInfo = this.db.prepare("PRAGMA table_info(tickets)").all() as any[];
+    if (!ticketTableInfo.some(col => col.name === 'category')) {
+      console.log('Migration: Adding category column to tickets');
+      this.db.exec("ALTER TABLE tickets ADD COLUMN category TEXT NOT NULL DEFAULT 'General'");
+    }
+
     // Call History table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS call_history (

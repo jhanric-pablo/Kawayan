@@ -18,6 +18,7 @@ import {
   getScheduleDayRange,
   TIER_LIMIT_MESSAGE,
   TIER_LIMIT_TITLE,
+  ADDON_POST_PRICE_PHP,
 } from '../utils/tierLimits';
 
 interface Props {
@@ -439,17 +440,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       return;
     }
 
-    const cost = 1.5;
+    const cost = ADDON_POST_PRICE_PHP;
     const topic = await dialog.prompt({
-      title: 'Single Post Add-on · $1.50',
-      message: 'Add a standalone post to this date ($1.50). Describe your topic:',
+      title: `Single Post Add-on · ₱${cost}`,
+      message: `Add a standalone post to this date (₱${cost}). Describe your topic:`,
       placeholder: 'e.g. Weekend promo, new menu item…',
     });
     if (!topic) return;
 
     const confirmed = await dialog.confirm({
-      title: 'Confirm $1.50 Add-on',
-      message: `Purchase this single post add-on for $${cost.toFixed(2)}? The amount will be deducted from your wallet balance.`,
+      title: `Confirm ₱${cost} Add-on`,
+      message: `Purchase this single post add-on for ₱${cost.toLocaleString()}? The amount will be deducted from your wallet balance.`,
     });
     if (confirmed) {
        try {
@@ -466,7 +467,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
          const post = await createPostFromIdea(newIdea, `addon-${Date.now()}`);
          setGeneratedContent(post);
          await persistPost(post);
-         await dialog.alert({ message: 'Purchase successful! Your $1.50 add-on post is ready in the preview panel.', title: 'Add-on Purchased' });
+         await dialog.alert({ message: `Purchase successful! Your ₱${cost} add-on post is ready in the preview panel.`, title: 'Add-on Purchased' });
          
        } catch (e: any) {
          if (e.message?.includes('TIER_LIMIT')) return;
@@ -871,7 +872,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             </div>
           </div>
           <p className="text-[11px] font-medium text-[#618764] dark:text-[#9CB080]/80 max-w-sm text-right hidden sm:block">
-            Click any day to preview or generate · use <span className="font-bold text-[#2B5748] dark:text-[#9CB080]">ADD</span> on empty cells for $1.50 add-on
+            Click any day to preview or generate · tap <span className="font-bold text-[#2B5748] dark:text-[#9CB080]">+</span> on empty cells for ₱{ADDON_POST_PRICE_PHP} add-on
           </p>
         </div>
 
@@ -957,7 +958,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                       ? `Idea: "${ideas.find(i => i.day === selectedDay)?.topic}"`
                       : "Hit 'AI Draft' to generate Taglish content for this day."}
                     <span className="block mt-2 text-[11px] text-[#618764] dark:text-[#9CB080]/70">
-                      Empty days show an <span className="font-semibold">ADD</span> pill ($1.50 single-post add-on).
+                      Empty days show a <span className="font-semibold">+</span> control (₱{ADDON_POST_PRICE_PHP} single-post add-on).
                     </span>
                   </p>
                 </div>

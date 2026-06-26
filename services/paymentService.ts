@@ -187,6 +187,45 @@ class PaymentService {
 
     return response.json();
   }
+
+  async xenditCheckout(payload: {
+    type: 'topup' | 'subscription';
+    amount: number;
+    method: 'GCASH' | 'MAYA' | 'CARD';
+    plan?: 'PRO';
+  }): Promise<{
+    mode: 'redirect' | 'completed';
+    checkoutUrl?: string;
+    wallet?: Wallet;
+    receipt?: {
+      referenceId: string;
+      method: string;
+      amount: number;
+      type: string;
+      plan?: string;
+      completedAt: string;
+    };
+  }> {
+    const userId = this.getUserId();
+    if (!userId) throw new Error('Not authenticated');
+
+    const response = await fetch('/api/wallet/xendit-checkout', {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({
+        userId,
+        clientOrigin: window.location.origin,
+        ...payload,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Payment could not be completed');
+    }
+
+    return response.json();
+  }
 }
 
 export const paymentService = new PaymentService();

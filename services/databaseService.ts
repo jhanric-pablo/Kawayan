@@ -710,19 +710,32 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
   }
 
   // --- Support Tickets ---
+  async getNextTicketNum(): Promise<number> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const row = db.prepare('SELECT MAX(ticket_num) as maxNum FROM tickets').get() as { maxNum: number | null };
+      const maxNum = row?.maxNum ?? 0;
+      return Math.max(1001, maxNum + 1);
+    } catch (error) {
+      console.error('Error getting next ticket number:', error);
+      return 1001;
+    }
+  }
+
   async createTicket(ticket: any): Promise<void> {
     const db = this.dbConfig.getDatabase();
     
     try {
       db.prepare(`
-        INSERT INTO tickets (id, ticket_num, user_id, user_email, subject, priority, status, created_at, messages)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tickets (id, ticket_num, user_id, user_email, subject, category, priority, status, created_at, messages)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         ticket.id,
         ticket.ticketNum,
         ticket.userId,
         ticket.userEmail,
         ticket.subject,
+        ticket.category || 'General',
         ticket.priority,
         ticket.status,
         ticket.createdAt,
@@ -744,6 +757,7 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         userId: row.user_id,
         userEmail: row.user_email,
         subject: row.subject,
+        category: row.category || 'General',
         priority: row.priority,
         status: row.status,
         createdAt: row.created_at,
@@ -765,7 +779,7 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         userId: row.user_id,
         userEmail: row.user_email,
         subject: row.subject,
-        priority: row.priority,
+        category: row.category || 'General',
         status: row.status,
         createdAt: row.created_at,
         messages: JSON.parse(row.messages || '[]')
@@ -870,7 +884,8 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
     cancelledTransactions: number;
     pendingTransactions: number;
     revenueData: { name: string; value: number }[];
-    churnData: { name: string; value: number }[];
+    churnData: { name: string; value: number; activeUsers?: number }[];
+    retentionRate: number;
   }> {
     const db = this.dbConfig.getDatabase();
     
@@ -898,13 +913,45 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         const date = new Date(item.month + '-01');
         return {
           name: date.toLocaleDateString('en-US', { month: 'short' }),
-          value: item.count * 500 // Cumulative would be better but this shows monthly "sales"
+          value: item.count
         };
       });
 
-      // Mock Churn (we don't have deleted_at yet, so return 0s or minimal)
-      // Legitimately, we have 0 churn in this schema.
-      const churnData = revenueData.map(d => ({ name: d.name, value: 0 }));
+      const monthlyActive = db.prepare(`
+        SELECT strftime('%Y-%m', created_at) as month, COUNT(DISTINCT user_id) as active
+        FROM generated_posts
+        WHERE created_at BETWEEN ? AND ?
+        GROUP BY month
+        ORDER BY month ASC
+      `).all(startFilter, endFilter) as { month: string; active: number }[];
+
+      const cohortSize = (db.prepare(`
+        SELECT COUNT(*) as count FROM users
+        WHERE role = 'user' AND created_at <= date('now', '-30 days')
+      `).get() as { count: number }).count;
+
+      const activeLast30 = (db.prepare(`
+        SELECT COUNT(DISTINCT user_id) as count FROM generated_posts
+        WHERE created_at >= date('now', '-30 days')
+      `).get() as { count: number }).count;
+
+      const retentionRate = cohortSize > 0
+        ? Math.round((activeLast30 / cohortSize) * 100)
+        : 0;
+
+      const churnData = monthlyActive.map(item => {
+        const date = new Date(item.month + '-01');
+        const usersInMonth = (db.prepare(`
+          SELECT COUNT(*) as count FROM users
+          WHERE role = 'user' AND created_at <= ?
+        `).get(item.month + '-28') as { count: number }).count;
+        const rate = usersInMonth > 0 ? Math.round((item.active / usersInMonth) * 100) : 0;
+        return {
+          name: date.toLocaleDateString('en-US', { month: 'short' }),
+          value: rate,
+          activeUsers: item.active,
+        };
+      });
 
       return {
         totalUsers,
@@ -914,7 +961,8 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         cancelledTransactions,
         pendingTransactions,
         revenueData,
-        churnData
+        churnData,
+        retentionRate,
       };
     } catch (error) {
       console.error('Error getting admin stats:', error);
@@ -926,9 +974,41 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
         cancelledTransactions: 0,
         pendingTransactions: 0,
         revenueData: [],
-        churnData: []
+        churnData: [],
+        retentionRate: 0,
       };
     }
+  }
+
+  async getPendingTransactionsAdmin(): Promise<any[]> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const rows = db.prepare(`
+        SELECT t.*, u.email as user_email
+        FROM transactions t
+        LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.status = 'PENDING'
+        ORDER BY t.date DESC
+        LIMIT 100
+      `).all() as any[];
+      return rows.map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        userEmail: row.user_email,
+        amount: row.amount,
+        description: row.description,
+        type: row.type,
+        status: row.status,
+        date: row.date,
+      }));
+    } catch (error) {
+      console.error('Error getting pending transactions:', error);
+      return [];
+    }
+  }
+
+  async approveTransactionAdmin(transactionId: string): Promise<void> {
+    return this.approveTransaction(transactionId);
   }
   
   // ─────────────────────────────────────────────────────────────────────────

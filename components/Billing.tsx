@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle, Package, AlertTriangle, Plus, Loader2, Download, X, Smartphone, XCircle, RefreshCw } from 'lucide-react';
+import { CreditCard, CheckCircle, Plus, Loader2, Download, X, XCircle, RefreshCw } from 'lucide-react';
 import { paymentService, Wallet } from '../services/paymentService';
 import { useOrganicDialog } from './OrganicDialog';
+import XenditCheckoutModal, { PaymentReceipt } from './XenditCheckoutModal';
+
+const QUICK_AMOUNTS = [100, 500, 1000];
 
 const Billing: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -11,8 +14,14 @@ const Billing: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+
+  const [checkoutModal, setCheckoutModal] = useState<{
+    open: boolean;
+    mode: 'topup' | 'subscription';
+    amount: number;
+    plan?: 'PRO';
+  }>({ open: false, mode: 'topup', amount: 0 });
   
-  // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [newPaymentMethod, setNewPaymentMethod] = useState({ type: 'GCASH', number: '' });
@@ -20,28 +29,33 @@ const Billing: React.FC = () => {
   useEffect(() => {
     loadWallet();
 
-    // Check for success URL param
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('success') === 'true') {
       setShowSuccessPopup(true);
-      // Clean up URL without reloading
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
   const loadWallet = async () => {
     setLoading(true);
-    
-    // Trigger verification check before loading data
     try {
       await paymentService.verifyPayment();
     } catch (e) {
-      console.warn("Auto-verification failed:", e);
+      console.warn('Payment verification skipped:', e);
     }
-
     const data = await paymentService.getWalletData();
     setWallet(data);
     setLoading(false);
+  };
+
+  const handleCheckoutSuccess = (updated: Wallet, _receipt: PaymentReceipt) => {
+    setWallet(updated);
+  };
+
+  const handleTopUp = () => {
+    const amount = Number(topUpAmount);
+    if (!amount || amount <= 0) return;
+    setCheckoutModal({ open: true, mode: 'topup', amount });
   };
 
   const handleVerifyManual = async () => {
@@ -54,22 +68,6 @@ const Billing: React.FC = () => {
       await dialog.alert(error.message);
     } finally {
       setProcessing(false);
-    }
-  };
-
-  const handleTopUp = async () => {
-    if (!topUpAmount || isNaN(Number(topUpAmount))) return;
-    setProcessing(true);
-    try {
-      const { checkoutUrl } = await paymentService.initiateTopUp(Number(topUpAmount));
-      
-      // Redirect to Xendit Checkout
-      window.location.href = checkoutUrl;
-    } catch (error: any) {
-      await dialog.alert(error.message || "Payment Initialization Failed.");
-    } finally {
-      setProcessing(false);
-      setTopUpAmount('');
     }
   };
 
@@ -103,8 +101,7 @@ const Billing: React.FC = () => {
   };
 
   const handleSavePaymentMethod = async () => {
-    // In a real app, this would tokenise with Xendit
-    await dialog.alert(`Payment Method Saved: ${newPaymentMethod.type} - ${newPaymentMethod.number}`);
+    await dialog.alert(`Payment method saved: ${newPaymentMethod.type} — ${newPaymentMethod.number}`);
     setShowPaymentModal(false);
   };
 
@@ -114,15 +111,11 @@ const Billing: React.FC = () => {
     if (plan === 'PRO') {
        const cost = 499;
        if ((wallet?.balance || 0) < cost) {
-         await dialog.alert("Insufficient balance. Please top up first.");
+         await dialog.alert('Insufficient balance. Please top up your wallet via Xendit first.');
          return;
        }
-       const confirmed = await dialog.confirm(`Upgrade to PRO for ₱499/mo? This will be deducted from your wallet.`);
-       if (confirmed) {
-         await paymentService.purchaseSubscription('PRO', cost);
-         await loadWallet();
-         setShowPlanModal(false);
-       }
+       setShowPlanModal(false);
+       setCheckoutModal({ open: true, mode: 'subscription', amount: cost, plan: 'PRO' });
     } else {
        await paymentService.cancelSubscription();
        await loadWallet();
@@ -141,7 +134,18 @@ const Billing: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       
-      {/* Success Popup */}
+      <XenditCheckoutModal
+        open={checkoutModal.open}
+        mode={checkoutModal.mode}
+        amount={checkoutModal.amount}
+        plan={checkoutModal.plan}
+        onClose={() => {
+          setCheckoutModal((p) => ({ ...p, open: false }));
+          setTopUpAmount('');
+        }}
+        onSuccess={handleCheckoutSuccess}
+      />
+
       {showSuccessPopup && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-[#2B5748]/40 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-[#9CB080]/20 text-center animate-in zoom-in-95 duration-300">
@@ -149,7 +153,7 @@ const Billing: React.FC = () => {
               <CheckCircle className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
             </div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Payment Successful!</h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">Your wallet balance has been updated successfully. You can now continue creating amazing content.</p>
+            <p className="text-slate-500 dark:text-slate-400 mb-8">Your Xendit payment was received. Your wallet balance has been updated.</p>
             <button 
               onClick={() => setShowSuccessPopup(false)}
                 className="w-full text-white py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 bg-[#2B5748]"
@@ -161,12 +165,11 @@ const Billing: React.FC = () => {
         </div>
       )}
 
-      {/* Payment Method Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
            <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg dark:text-white">Update Payment Method</h3>
+                <h3 className="font-bold text-lg dark:text-white">Payment Method (Xendit)</h3>
                 <button onClick={() => setShowPaymentModal(false)}><X className="w-5 h-5 text-slate-400"/></button>
               </div>
               <div className="space-y-4">
@@ -198,7 +201,6 @@ const Billing: React.FC = () => {
         </div>
       )}
 
-      {/* Plan Selection Modal */}
       {showPlanModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
            <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
@@ -225,12 +227,11 @@ const Billing: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Billing & Wallet</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage your credits and subscription.</p>
+          <p className="text-slate-500 dark:text-slate-400">Top up and subscribe via Xendit (GCash, Maya, cards).</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Wallet Balance Card */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
            <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20" style={{ background: "#2B5748" }}></div>
            
@@ -246,8 +247,8 @@ const Billing: React.FC = () => {
                <button onClick={() => setShowPlanModal(true)} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition">Change Plan</button>
              </div>
 
-             <div className="flex gap-4 items-end">
-               <div className="flex-1">
+             <div className="flex gap-4 items-end flex-wrap">
+               <div className="flex-1 min-w-[140px]">
                  <label className="text-xs text-slate-400 mb-1 block">Amount to Load</label>
                  <input 
                    type="number" 
@@ -257,6 +258,18 @@ const Billing: React.FC = () => {
                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-[#2B5748] transition"
                  />
                </div>
+               <div className="flex gap-1.5 pb-0.5">
+                 {QUICK_AMOUNTS.map((amt) => (
+                   <button
+                     key={amt}
+                     type="button"
+                     onClick={() => setTopUpAmount(String(amt))}
+                     className="text-[10px] font-bold px-2.5 py-1.5 rounded-full border border-white/20 text-white/80 hover:bg-white/10 transition"
+                   >
+                     ₱{amt}
+                   </button>
+                 ))}
+               </div>
                <button 
                  onClick={handleTopUp}
                  disabled={processing || !topUpAmount}
@@ -264,14 +277,13 @@ const Billing: React.FC = () => {
                 style={{ background: "#2B5748", boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.35)' }}
                >
                  {processing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
-                 Top Up
+                 Top Up via Xendit
                </button>
              </div>
            </div>
         </div>
       </div>
 
-      {/* Transaction History */}
       <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#273338]/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 dark:text-white">Transaction History</h3>
@@ -296,7 +308,7 @@ const Billing: React.FC = () => {
             {wallet.transactions.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
-                  No transactions yet. Top up to get started.
+                  No transactions yet. Top up via Xendit to get started.
                 </td>
               </tr>
             ) : (
@@ -320,7 +332,7 @@ const Billing: React.FC = () => {
                             onClick={handleVerifyManual}
                             disabled={processing}
                             className="text-xs text-emerald-500 hover:text-emerald-700 flex items-center gap-1 transition disabled:opacity-50"
-                            title="Verify Payment Status"
+                            title="Verify with Xendit"
                           >
                              <RefreshCw className={`w-4 h-4 ${processing ? 'animate-spin' : ''}`}/>
                           </button>

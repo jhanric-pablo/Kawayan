@@ -603,6 +603,134 @@ app.post('/api/admin/wallet/approve', authenticateToken, requireAdmin, async (re
   }
 });
 
+app.get('/api/admin/pending-transactions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pending = await dbService.getPendingTransactionsAdmin();
+    res.json(pending);
+  } catch (error) {
+    logger.error('Pending transactions error', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch pending transactions' });
+  }
+});
+
+app.post('/api/wallet/xendit-checkout', authenticateToken, async (req, res) => {
+  const { userId, type, amount, method, plan, clientOrigin } = req.body;
+  const user = req.user;
+
+  if (userId !== user.userId && user.role !== 'admin') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  const validMethods = ['GCASH', 'MAYA', 'CARD'];
+  const paymentMethod = validMethods.includes(method) ? method : 'GCASH';
+  const numericAmount = Number(amount);
+
+  if (!numericAmount || numericAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  const externalId = `invoice_${userId}_${Date.now()}`;
+  const methodLabel = paymentMethod === 'GCASH' ? 'GCash' : paymentMethod === 'MAYA' ? 'Maya' : 'Card';
+  const xenditSecret = process.env.XENDIT_SECRET_KEY;
+  const hasLiveXendit =
+    xenditSecret &&
+    !xenditSecret.includes('your_') &&
+    xenditSecret.length > 8;
+
+  try {
+    if (type === 'topup' && hasLiveXendit) {
+      const authHeader = 'Basic ' + Buffer.from(xenditSecret + ':').toString('base64');
+      const origin = req.get('origin');
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.get('host');
+      const baseUrl = clientOrigin || origin || `${protocol}://${host}`;
+
+      const response = await fetch('https://api.xendit.co/v2/invoices', {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          external_id: externalId,
+          amount: numericAmount,
+          currency: 'PHP',
+          customer: { email: user.email },
+          success_redirect_url: `${baseUrl}/billing?success=true`,
+          failure_redirect_url: `${baseUrl}/billing?failed=true`,
+        }),
+      });
+
+      const invoice = await response.json();
+
+      if (response.ok && invoice.invoice_url) {
+        await dbService.createTransaction(
+          userId,
+          numericAmount,
+          `Xendit Invoice: ${externalId}`,
+          'CREDIT',
+          'PENDING'
+        );
+        logger.logUserAction('xendit_checkout_redirect', userId, { externalId, amount: numericAmount });
+        return res.json({
+          mode: 'redirect',
+          checkoutUrl: invoice.invoice_url,
+          externalId,
+        });
+      }
+
+      logger.warn('Xendit invoice failed, using local checkout completion', { status: response.status });
+    }
+
+    if (type === 'subscription') {
+      const wallet = await dbService.getWallet(userId);
+      if (wallet.balance < numericAmount) {
+        return res.status(400).json({ error: 'Insufficient balance. Please top up your wallet first.' });
+      }
+      await dbService.createTransaction(
+        userId,
+        numericAmount,
+        `Xendit Wallet · Pro Subscription via ${methodLabel} (${externalId})`,
+        'DEBIT',
+        'COMPLETED'
+      );
+      await dbService.updateSubscription(userId, plan || 'PRO');
+    } else {
+      await dbService.createTransaction(
+        userId,
+        numericAmount,
+        `Xendit Invoice: ${externalId} · ${methodLabel}`,
+        'CREDIT',
+        'COMPLETED'
+      );
+    }
+
+    const updatedWallet = await dbService.getWallet(userId);
+    logger.logUserAction('xendit_checkout_completed', userId, {
+      type,
+      amount: numericAmount,
+      method: paymentMethod,
+      externalId,
+    });
+
+    res.json({
+      mode: 'completed',
+      wallet: updatedWallet,
+      receipt: {
+        referenceId: externalId,
+        method: paymentMethod,
+        amount: numericAmount,
+        type: type || 'topup',
+        plan: plan || undefined,
+        completedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Xendit checkout error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Payment could not be completed' });
+  }
+});
+
 app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
   const { userId, amount, description, plan } = req.body;
   const user = req.user;
@@ -954,17 +1082,11 @@ app.get('/api/support/tickets', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/support/tickets', authenticateToken, async (req, res) => {
-  const { subject, priority, message } = req.body;
+  const { subject, priority, message, category } = req.body;
   const user = req.user;
 
   try {
-    // Determine ticket number (simple auto-increment simulation or fetch count)
-    // For now, let's just make a random one or rely on DB service if it handled it?
-    // DB service insert expects ticket object.
-    
-    // Better: let DB service handle ticket number or calculate it here.
-    // Let's do a simple count query or just use timestamp
-    const ticketNum = Math.floor(1000 + Math.random() * 9000); 
+    const ticketNum = await dbService.getNextTicketNum();
 
     const ticket = {
       id: Date.now().toString(),
@@ -972,6 +1094,7 @@ app.post('/api/support/tickets', authenticateToken, async (req, res) => {
       userId: user.userId,
       userEmail: user.email,
       subject,
+      category: ['Technical', 'Billing', 'General'].includes(category) ? category : 'General',
       priority,
       status: 'Open',
       createdAt: new Date().toISOString(),

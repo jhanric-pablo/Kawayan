@@ -252,6 +252,7 @@ export class ClientDatabaseService {
     pendingTransactions: number;
     revenueData: { name: string; value: number }[];
     churnData: { name: string; value: number }[];
+    retentionRate: number;
   }> {
     try {
       const query = start && end ? `?start=${start}&end=${end}` : '';
@@ -271,9 +272,32 @@ export class ClientDatabaseService {
         cancelledTransactions: 0,
         pendingTransactions: 0,
         revenueData: [],
-        churnData: []
+        churnData: [],
+        retentionRate: 0,
       };
     }
+  }
+
+  async getPendingTransactionsAdmin(): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/pending-transactions`, {
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch pending transactions');
+      return await response.json();
+    } catch (error) {
+      logger.error('Error getting pending transactions (api)', { error });
+      return [];
+    }
+  }
+
+  async approveTransactionAdmin(transactionId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/admin/wallet/approve`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ transactionId })
+    });
+    if (!response.ok) throw new Error('Failed to approve transaction');
   }
 
   async getAuditLogs(limit: number = 100): Promise<any[]> {

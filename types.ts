@@ -78,6 +78,7 @@ export interface Ticket {
   userId: string;
   userEmail: string;
   subject: string;
+  category: 'Technical' | 'Billing' | 'General';
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   status: 'Open' | 'Pending' | 'Resolved';
   createdAt: string;

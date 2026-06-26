@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Users, RefreshCcw, ExternalLink, Heart, 
   Image as ImageIcon, UserPlus, Zap, BarChart3,
   Facebook, Instagram, MessageCircle, X, Eye, 
-  UserMinus, MousePointer2, TrendingUp
+  UserMinus, MousePointer2, TrendingUp, DollarSign
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { socialService, SocialPlatformData } from '../services/socialService';
+import { paymentService } from '../services/paymentService';
 import { useOrganicDialog } from './OrganicDialog';
 
 const InsightsDashboard: React.FC = () => {
@@ -15,6 +17,38 @@ const InsightsDashboard: React.FC = () => {
   const [targetPlatform, setTargetPlatform] = useState<'facebook' | 'instagram' | 'tiktok' | null>(null);
   const [modalUsername, setModalUsername] = useState('');
   const [platformData, setPlatformData] = useState<SocialPlatformData[]>([]);
+  const [walletSpend, setWalletSpend] = useState(0);
+
+  const chartColors = ['#2B5748', '#618764', '#9CB080', '#1877F2', '#dc2743'];
+
+  const engagementChartData = useMemo(() => {
+    return platformData.map((data) => {
+      const d = data as Record<string, number | string | undefined>;
+      const reach =
+        Number(d.views || 0) +
+        Number(d.interactions || 0) +
+        Number(d.likes || 0) +
+        Number(d.followers || 0);
+      return {
+        name: String(data.platform).charAt(0).toUpperCase() + String(data.platform).slice(1),
+        reach,
+        followers: Number(d.followers || 0),
+      };
+    });
+  }, [platformData]);
+
+  const totalReach = useMemo(
+    () => engagementChartData.reduce((sum, row) => sum + row.reach, 0),
+    [engagementChartData]
+  );
+
+  const estimatedDigitalValue = totalReach * 0.05;
+  const digitalRoiPercent =
+    walletSpend > 0
+      ? Math.round(((estimatedDigitalValue - walletSpend) / walletSpend) * 100)
+      : totalReach > 0
+        ? 100
+        : 0;
 
   useEffect(() => {
     loadData();
@@ -45,6 +79,16 @@ const InsightsDashboard: React.FC = () => {
       }
     }
     setPlatformData(data);
+
+    try {
+      const wallet = await paymentService.getWalletData();
+      const spend = wallet.transactions
+        .filter((t) => t.type === 'DEBIT' && t.status === 'COMPLETED')
+        .reduce((sum, t) => sum + t.amount, 0);
+      setWalletSpend(spend);
+    } catch {
+      setWalletSpend(0);
+    }
   };
 
   const openSyncModal = (platform: 'facebook' | 'instagram' | 'tiktok') => {
@@ -95,10 +139,10 @@ const InsightsDashboard: React.FC = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full animate-pulse-dot" style={{ background: "#2B5748" }}></span>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Live Analytics</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Growth Analytics</span>
           </div>
-          <h1 className="font-display text-4xl text-slate-900 dark:text-white">Social Insights</h1>
-          <p className="text-slate-400 text-sm">Automated data sync via Kawayan Extension.</p>
+          <h1 className="font-display text-4xl text-slate-900 dark:text-white">Growth Insights Dashboard</h1>
+          <p className="text-slate-400 text-sm">Engagement metrics, visual charts, and digital ROI via the Kawayan Extension.</p>
         </div>
 
         <div className="flex bg-white dark:bg-[#2B5748]/40 p-1.5 rounded-2xl border border-[#273338]/10 dark:border-[#9CB080]/20 gap-1.5">
@@ -118,6 +162,40 @@ const InsightsDashboard: React.FC = () => {
             ))}
         </div>
       </div>
+
+      {/* ROI + engagement charts */}
+      {platformData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 bg-white dark:bg-[#2B5748]/40 rounded-[2rem] border border-[#273338]/10 dark:border-[#9CB080]/20 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <DollarSign className="w-5 h-5 text-[#2B5748] dark:text-[#9CB080]" />
+              <h2 className="font-display text-lg text-slate-900 dark:text-white">Digital ROI</h2>
+            </div>
+            <p className={`text-4xl font-black ${digitalRoiPercent >= 0 ? 'text-[#2B5748] dark:text-[#9CB080]' : 'text-rose-500'}`}>
+              {digitalRoiPercent >= 0 ? '+' : ''}{digitalRoiPercent}%
+            </p>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+              Estimated value ₱{estimatedDigitalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} from {totalReach.toLocaleString()} reach units vs ₱{walletSpend.toLocaleString()} platform spend.
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-white dark:bg-[#2B5748]/40 rounded-[2rem] border border-[#273338]/10 dark:border-[#9CB080]/20 p-6 h-72">
+            <h2 className="font-display text-lg text-slate-900 dark:text-white mb-4">Engagement by Channel</h2>
+            <ResponsiveContainer width="100%" height="85%">
+              <BarChart data={engagementChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#9CB080" opacity={0.2} />
+                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #2B5748' }} />
+                <Bar dataKey="reach" radius={[8, 8, 0, 0]}>
+                  {engagementChartData.map((_, i) => (
+                    <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Main Stats Display */}
       <div className="grid grid-cols-1 gap-6">

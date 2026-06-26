@@ -196,16 +196,24 @@ async function seed() {
 
     // 6. Create Support Tickets
     console.log('Generating support tickets...');
-    const ticketSubjects = ['Cannot login', 'Billing issue', 'Slow response', 'General inquiry'];
+    const ticketSubjects = [
+      { subject: 'Extension sync not working', category: 'Technical' },
+      { subject: 'Billing issue — wallet top-up', category: 'Billing' },
+      { subject: 'Slow calendar load', category: 'Technical' },
+      { subject: 'General inquiry', category: 'General' },
+    ];
     for (let i = 0; i < 5; i++) {
       const user = createdUsers[2 + (i % (createdUsers.length - 2))];
       const ticketId = `seed-ticket-${user.id}-${Date.now()}-${i}`;
+      const meta = ticketSubjects[i % ticketSubjects.length];
+      const ticketNum = await dbService.getNextTicketNum();
       const ticket = {
         id: ticketId,
-        ticketNum: 5000 + i + (Date.now() % 1000),
+        ticketNum,
         userId: user.id,
         userEmail: user.email,
-        subject: ticketSubjects[i % ticketSubjects.length],
+        subject: meta.subject,
+        category: meta.category,
         priority: i === 0 ? 'Critical' : 'Medium',
         status: i % 2 === 0 ? 'Open' : 'Pending',
         createdAt: new Date().toISOString(),

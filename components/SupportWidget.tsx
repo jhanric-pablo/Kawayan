@@ -17,6 +17,7 @@ const SupportWidget: React.FC = () => {
   // Ticket State
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketPriority, setTicketPriority] = useState('Medium');
+  const [ticketCategory, setTicketCategory] = useState<'Technical' | 'Billing' | 'General'>('General');
 
   const [chatHistory, setChatHistory] = useState<{sender: 'user'|'bot'|'system'|'agent', text: string, timestamp?: string}[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
@@ -125,7 +126,7 @@ const SupportWidget: React.FC = () => {
     const userSession = JSON.parse(localStorage.getItem('kawayan_session') || '{}');
     if (userSession && userSession.id) {
       try {
-        const ticket = await supportService.createTicket(userSession, ticketSubject, ticketPriority, "Initial Request: " + ticketSubject);
+        const ticket = await supportService.createTicket(userSession, ticketSubject, ticketPriority, "Initial Request: " + ticketSubject, ticketCategory);
         if (ticket) {
           setActiveTicketId(ticket.id);
           setMode('chat');
@@ -198,7 +199,33 @@ const SupportWidget: React.FC = () => {
                   </button>
 
                   <button 
-                    onClick={() => setMode('ticket')}
+                    onClick={() => { setTicketCategory('Technical'); setMode('ticket'); }}
+                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-md transition-all group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
+                      <Bot className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 dark:text-white text-sm">Technical Issue</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">App, extension, or sync problems</p>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => { setTicketCategory('Billing'); setMode('ticket'); }}
+                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 dark:text-white text-sm">Billing Concern</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Wallet, payments, or subscription</p>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => { setTicketCategory('General'); setMode('ticket'); }}
                     className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all group text-left"
                   >
                     <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
@@ -297,6 +324,14 @@ const SupportWidget: React.FC = () => {
 
               {mode === 'ticket' && (
                 <form onSubmit={handleSubmitTicket} className="flex-1 p-4 space-y-4 bg-white dark:bg-[#1E293B]/40 overflow-y-auto">
+                   <div>
+                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                     <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value as typeof ticketCategory)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm">
+                       <option value="Technical">Technical</option>
+                       <option value="Billing">Billing</option>
+                       <option value="General">General</option>
+                     </select>
+                   </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Subject</label>
                      <input required type="text" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm" placeholder="Brief summary of issue" />
