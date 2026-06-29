@@ -66,7 +66,39 @@ io.on('connection', (socket) => {
       socket.to(socket.data.roomId).emit('peer-left');
     }
   });
+
+  // Support hub — tickets & calls (real-time, no refresh)
+  socket.on('support:join', ({ token }) => {
+    if (!token) return;
+    const payload = JWTService.verifyToken(token);
+    if (!payload) return;
+
+    socket.data.userId = payload.userId;
+    socket.data.role = payload.role;
+    socket.join(`user-${payload.userId}`);
+
+    if (payload.role === 'support' || payload.role === 'admin') {
+      socket.join('support-staff');
+    }
+  });
 });
+
+/** Push ticket updates to support staff and the ticket owner instantly */
+const broadcastTicket = async (ticketId) => {
+  const ticket = await dbService.getTicketById(ticketId);
+  if (!ticket) return;
+  io.to('support-staff').emit('ticket:updated', ticket);
+  io.to(`user-${ticket.userId}`).emit('ticket:updated', ticket);
+};
+
+const broadcastTicketCreated = (ticket) => {
+  io.to('support-staff').emit('ticket:created', ticket);
+  io.to(`user-${ticket.userId}`).emit('ticket:updated', ticket);
+};
+
+const broadcastCallsChanged = () => {
+  io.to('support-staff').emit('calls:changed');
+};
 
 // Trust proxy (required for Codespaces/Heroku/etc to get correct protocol/host)
 app.set('trust proxy', true);
@@ -150,14 +182,22 @@ app.get('/api/health', async (req, res) => {
 
 // Auth
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, role, businessName } = req.body;
+  const { email, password, role, businessName, acceptedTerms, termsVersion } = req.body;
   
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
+  const accountRole = role || 'user';
+  if (accountRole === 'user' && !acceptedTerms) {
+    return res.status(400).json({ error: 'You must accept the Terms of Service to register.' });
+  }
+
   try {
-    const user = await dbService.createUser(email, password, role, businessName);
+    const user = await dbService.createUser(email, password, accountRole, businessName, {
+      acceptedTerms: !!acceptedTerms,
+      termsVersion: termsVersion || '1.0',
+    });
     if (!user) {
       return res.status(409).json({ error: 'User already exists or invalid data' });
     }
@@ -917,18 +957,28 @@ app.get('/api/verification/status/:userId', authenticateToken, async (req, res) 
   }
 });
 
-// Re-upload document after rejection
+// Re-upload document after rejection (or first submit if no record yet — legacy users)
 app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single('document'), async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, businessAddress, businessPhone } = req.body;
     const requestingUser = req.user;
     if (requestingUser.userId !== userId && requestingUser.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
-    await dbService.resubmitVerification(userId, req.file.originalname, req.file.filename);
-    res.json({ message: 'Resubmitted for review', status: 'pending' });
+    const existing = await dbService.getVerification(userId);
+    if (!existing) {
+      if (!businessAddress || !businessPhone) {
+        return res.status(400).json({
+          error: 'No verification on file. Provide business address and phone for first-time submission.',
+        });
+      }
+      await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, req.file.filename);
+    } else {
+      await dbService.resubmitVerification(userId, req.file.originalname, req.file.filename);
+    }
+    res.json({ message: 'Submitted for review', status: 'pending' });
   } catch (error) {
     logger.error('Verification resubmit error', { error: error.message });
     res.status(500).json({ error: error.message });
@@ -1104,6 +1154,7 @@ app.post('/api/support/tickets', authenticateToken, async (req, res) => {
     await dbService.createTicket(ticket);
     
     logger.logUserAction('create_ticket', user.userId, { ticketId: ticket.id });
+    broadcastTicketCreated(ticket);
     
     res.json(ticket);
   } catch (error) {
@@ -1127,8 +1178,10 @@ app.put('/api/support/tickets/:id', authenticateToken, async (req, res) => {
     await dbService.updateTicket(id, status, messages);
     
     logger.logUserAction('update_ticket', user.userId, { ticketId: id, status });
+    await broadcastTicket(id);
     
-    res.json({ message: 'Ticket updated' });
+    const ticket = await dbService.getTicketById(id);
+    res.json(ticket || { message: 'Ticket updated' });
   } catch (error) {
     logger.error('Update ticket error', { error: error.message });
     res.status(500).json({ error: 'Failed to update ticket' });
@@ -1139,6 +1192,13 @@ app.post('/api/support/tickets/resolve-user', authenticateToken, async (req, res
   const { userId } = req.body;
   try {
     await dbService.resolveTicketByUserId(userId);
+    const tickets = await dbService.getTickets(userId);
+    for (const t of tickets) {
+      if (t.status === 'Resolved') {
+        io.to('support-staff').emit('ticket:updated', t);
+        io.to(`user-${userId}`).emit('ticket:updated', t);
+      }
+    }
     res.json({ message: 'User tickets resolved' });
   } catch (error) {
     logger.error('Resolve user tickets error', { error: error.message });
@@ -1177,6 +1237,7 @@ app.post('/api/support/calls/register', authenticateToken, async (req, res) => {
   const user = req.user;
   try {
     await dbService.registerCall(user.userId, user.email, roomName, reason);
+    broadcastCallsChanged();
     res.json({ message: 'Call registered' });
   } catch (error) {
     logger.error('Register call error', { error: error.message });
@@ -1189,6 +1250,7 @@ app.post('/api/support/calls/unregister', authenticateToken, async (req, res) =>
   const { agentId } = req.body;
   try {
     await dbService.unregisterCall(user.userId, agentId);
+    broadcastCallsChanged();
     res.json({ message: 'Call unregistered' });
   } catch (error) {
     logger.error('Unregister call error', { error: error.message });

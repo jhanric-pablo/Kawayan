@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { MessageSquare, Clock, User as UserIcon, PhoneCall, Search, Loader2, Send, ArrowLeft, MoreVertical, CheckCircle, History, ArrowUpDown, ChevronDown, AlertTriangle, Download, RefreshCw } from 'lucide-react';
 import { supportService } from '../services/supportService';
+import { supportRealtime } from '../services/supportRealtime';
 import { Ticket, User } from '../types';
 import CallOverlay from './CallOverlay';
 
@@ -36,9 +37,51 @@ const SupportDashboard: React.FC = () => {
     loadCalls();
     if (filter === 'History' || activeTab === 'calls') loadCallHistory();
 
-    const callInterval = setInterval(loadCalls, 5000);
-    return () => clearInterval(callInterval);
+    supportRealtime.connect();
+
+    const unsubs = [
+      supportRealtime.onTicketCreated((ticket) => {
+        setTickets((prev) => {
+          if (prev.some((t) => t.id === ticket.id)) return prev;
+          return [ticket, ...prev];
+        });
+      }),
+      supportRealtime.onTicketUpdated((ticket) => {
+        setTickets((prev) => {
+          const idx = prev.findIndex((t) => t.id === ticket.id);
+          if (idx === -1) return [ticket, ...prev];
+          const next = [...prev];
+          next[idx] = ticket;
+          return next;
+        });
+        setSelectedTicket((prev) => (prev?.id === ticket.id ? ticket : prev));
+      }),
+      supportRealtime.onCallsChanged(() => {
+        loadCalls();
+        if (activeTab === 'calls' || filter === 'History') loadCallHistory();
+      }),
+    ];
+
+    // Rare fallback if websocket disconnects
+    const fallback = setInterval(() => {
+      loadTickets();
+      loadCalls();
+    }, 60000);
+
+    return () => {
+      unsubs.forEach((u) => u());
+      clearInterval(fallback);
+    };
   }, [filter, activeTab]);
+
+  // Keep selected ticket in sync when polling finds new messages
+  useEffect(() => {
+    if (!selectedTicket) return;
+    const fresh = tickets.find((t) => t.id === selectedTicket.id);
+    if (fresh && JSON.stringify(fresh.messages) !== JSON.stringify(selectedTicket.messages)) {
+      setSelectedTicket(fresh);
+    }
+  }, [tickets, selectedTicket]);
 
   useEffect(() => {
     if (selectedTicket) {
@@ -361,6 +404,38 @@ const SupportDashboard: React.FC = () => {
                 Go to Ticket Queue <ArrowUpDown className="w-3 h-3" />
               </button>
             </div>
+          </div>
+
+          {/* Recent open tickets — live queue preview */}
+          <div className="bg-white dark:bg-[#2B5748]/40 p-6 rounded-2xl border border-slate-100 dark:border-[#9CB080]/20 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-800 dark:text-white">Recent Open Tickets</h3>
+              <button onClick={() => setActiveTab('tickets')} className="text-xs font-bold text-[#2B5748] hover:underline">View all</button>
+            </div>
+            {tickets.filter((t) => t.status === 'Open' || t.status === 'Pending').length === 0 ? (
+              <p className="text-sm text-slate-400 italic py-4 text-center">No open tickets — new client requests appear here automatically.</p>
+            ) : (
+              <ul className="space-y-2">
+                {tickets
+                  .filter((t) => t.status === 'Open' || t.status === 'Pending')
+                  .slice(0, 5)
+                  .map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('tickets'); setSelectedTicket(t); }}
+                        className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-[#9CB080]/20 hover:bg-slate-50 dark:hover:bg-[#273338]/30 transition flex justify-between items-center gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">#{t.ticketNum} — {t.subject}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{t.userEmail} · {t.category}</p>
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${t.status === 'Open' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            )}
           </div>
         </div>
       )}

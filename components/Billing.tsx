@@ -126,14 +126,14 @@ const Billing: React.FC = () => {
   if (loading || !wallet) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#2B5748] border-t-transparent animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#2B5748', borderTopColor: 'transparent' }} />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in relative">
+
       <XenditCheckoutModal
         open={checkoutModal.open}
         mode={checkoutModal.mode}
@@ -146,18 +146,23 @@ const Billing: React.FC = () => {
         onSuccess={handleCheckoutSuccess}
       />
 
+      {/* Success popup */}
       {showSuccessPopup && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#2B5748]/40 rounded-3xl p-8 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-[#9CB080]/20 text-center animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
+          <div className="glass-card p-8 w-full max-w-sm text-center animate-scale-in">
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(34,197,94,0.12)' }}>
+              <CheckCircle className="w-10 h-10 text-green-500" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Payment Successful!</h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">Your Xendit payment was received. Your wallet balance has been updated.</p>
-            <button 
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--fg)' }}>Payment Successful!</h3>
+            <p className="text-sm mb-7" style={{ color: 'var(--fg-muted)' }}>
+              Your Xendit payment was received. Wallet balance updated.
+            </p>
+            <button
               onClick={() => setShowSuccessPopup(false)}
-                className="w-full text-white py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 bg-[#2B5748]"
-                style={{ boxShadow: '0 4px 20px -4px rgba(43, 87, 72,0.35)' }}
+              className="w-full py-3.5 rounded-xl font-bold text-sm text-white"
+              style={{ background: 'linear-gradient(135deg, #2B5748, #3A7362)', boxShadow: '0 4px 16px -4px rgba(43,87,72,0.35)' }}
             >
               Great!
             </button>
@@ -165,197 +170,249 @@ const Billing: React.FC = () => {
         </div>
       )}
 
+      {/* Payment method modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg dark:text-white">Payment Method (Xendit)</h3>
-                <button onClick={() => setShowPaymentModal(false)}><X className="w-5 h-5 text-slate-400"/></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}>
+          <div className="glass-card p-6 w-full max-w-md animate-scale-in">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-lg" style={{ color: 'var(--fg)' }}>Payment Method (Xendit)</h3>
+              <button onClick={() => setShowPaymentModal(false)} className="p-1.5 rounded-lg transition"
+                style={{ color: 'var(--fg-muted)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--fg-subtle)' }}>Method</label>
+                <select
+                  value={newPaymentMethod.type}
+                  onChange={(e) => setNewPaymentMethod({ ...newPaymentMethod, type: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm"
+                  style={{ background: 'var(--card)', borderColor: 'var(--border-strong)', color: 'var(--fg)' }}
+                >
+                  <option value="GCASH">GCash</option>
+                  <option value="MAYA">Maya</option>
+                  <option value="CARD">Credit/Debit Card</option>
+                </select>
               </div>
-              <div className="space-y-4">
-                 <div>
-                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Method</label>
-                   <select 
-                     value={newPaymentMethod.type}
-                     onChange={(e) => setNewPaymentMethod({...newPaymentMethod, type: e.target.value})}
-                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#273338] dark:text-white"
-                   >
-                     <option value="GCASH">GCash</option>
-                     <option value="MAYA">Maya</option>
-                     <option value="CARD">Credit/Debit Card</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Account/Card Number</label>
-                   <input 
-                     type="text" 
-                     placeholder="0917..." 
-                     value={newPaymentMethod.number}
-                     onChange={(e) => setNewPaymentMethod({...newPaymentMethod, number: e.target.value})}
-                     className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#273338] dark:text-white"
-                   />
-                 </div>
-                 <button onClick={handleSavePaymentMethod} className="w-full py-3 rounded-full font-bold text-sm text-white transition hover:scale-105 active:scale-95 bg-[#2B5748]" style={{ boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.3)' }}>Save Method</button>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--fg-subtle)' }}>Account Number</label>
+                <input
+                  type="text"
+                  placeholder="0917..."
+                  value={newPaymentMethod.number}
+                  onChange={(e) => setNewPaymentMethod({ ...newPaymentMethod, number: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none"
+                  style={{ background: 'var(--card)', borderColor: 'var(--border-strong)', color: 'var(--fg)' }}
+                />
               </div>
-           </div>
+              <button onClick={handleSavePaymentMethod}
+                className="w-full py-3 rounded-xl font-bold text-sm text-white"
+                style={{ background: 'linear-gradient(135deg, #2B5748, #3A7362)', boxShadow: '0 4px 16px -4px rgba(43,87,72,0.3)' }}>
+                Save Method
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
+      {/* Plan change modal */}
       {showPlanModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-lg dark:text-white">Change Subscription Plan</h3>
-                <button onClick={() => setShowPlanModal(false)}><X className="w-5 h-5 text-slate-400"/></button>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'FREE' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-[#9CB080]/20'}`} onClick={() => handleSwitchPlan('FREE')}>
-                    <h4 className="font-bold dark:text-white">Free Trial</h4>
-                    <p className="text-sm text-slate-500">8 posts/mo</p>
-                    <p className="font-bold mt-2">₱0</p>
-                 </div>
-                 <div className={`p-4 rounded-xl border-2 cursor-pointer transition ${wallet.subscription === 'PRO' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-[#9CB080]/20'}`} onClick={() => handleSwitchPlan('PRO')}>
-                    <h4 className="font-bold dark:text-white">Pro Plan</h4>
-                    <p className="text-sm text-slate-500">16 posts/mo + Analytics</p>
-                    <p className="font-bold mt-2">₱499/mo</p>
-                 </div>
-              </div>
-           </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}>
+          <div className="glass-card p-6 w-full max-w-lg animate-scale-in">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg" style={{ color: 'var(--fg)' }}>Change Subscription Plan</h3>
+              <button onClick={() => setShowPlanModal(false)} className="p-1.5 rounded-lg transition"
+                style={{ color: 'var(--fg-muted)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {([
+                { id: 'FREE', name: 'Free Trial', posts: '8 posts/mo', price: '₱0' },
+                { id: 'PRO', name: 'Pro Plan', posts: '16 posts/mo + Analytics', price: '₱499/mo' },
+              ] as const).map((plan) => (
+                <button key={plan.id} onClick={() => handleSwitchPlan(plan.id)}
+                  className="p-5 rounded-xl border-2 text-left transition-all"
+                  style={{
+                    borderColor: wallet.subscription === plan.id ? '#2B5748' : 'var(--border)',
+                    background: wallet.subscription === plan.id ? 'rgba(43,87,72,0.07)' : 'var(--card)',
+                  }}>
+                  <div className="font-bold mb-1" style={{ color: wallet.subscription === plan.id ? '#2B5748' : 'var(--fg)' }}>
+                    {plan.name}
+                    {wallet.subscription === plan.id && <span className="ml-2 badge badge-green text-[10px]">Current</span>}
+                  </div>
+                  <div className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>{plan.posts}</div>
+                  <div className="font-bold text-lg" style={{ color: 'var(--fg)' }}>{plan.price}</div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="flex justify-between items-center">
+      {/* Page header */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Billing & Wallet</h1>
-          <p className="text-slate-500 dark:text-slate-400">Top up and subscribe via Xendit (GCash, Maya, cards).</p>
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--fg)' }}>Billing & Wallet</h1>
+          <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
+            Top up and subscribe via Xendit (GCash, Maya, cards).
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
-           <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20" style={{ background: "#2B5748" }}></div>
-           
-           <div className="relative z-10">
-             <div className="flex justify-between items-start mb-8">
-               <div>
-                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${wallet.subscription === 'PRO' ? 'border' : 'bg-slate-700 text-slate-300'}`} style={wallet.subscription === 'PRO' ? { background: 'rgba(43, 87, 72,0.15)', color: '#2B5748', borderColor: 'rgba(43, 87, 72,0.3)' } : {}}>
-                   {wallet.subscription} Plan
-                 </span>
-                 <h2 className="text-sm font-medium text-slate-400 mt-4 uppercase tracking-wider">Available Balance</h2>
-                 <p className="text-4xl font-bold mt-1">₱{wallet.balance.toFixed(2)}</p>
-               </div>
-               <button onClick={() => setShowPlanModal(true)} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition">Change Plan</button>
-             </div>
+      {/* Wallet card */}
+      <div className="rounded-2xl overflow-hidden relative"
+        style={{
+          background: 'linear-gradient(135deg, #1A3D30 0%, #2B5748 50%, #1F4034 100%)',
+          boxShadow: '0 16px 48px -8px rgba(26,43,38,0.4)',
+        }}>
+        <div className="absolute inset-0 dot-pattern-dark opacity-30" />
+        <div className="absolute top-[-40px] right-[-40px] w-56 h-56 rounded-full opacity-10 blur-3xl bg-[#9CB080]" />
 
-             <div className="flex gap-4 items-end flex-wrap">
-               <div className="flex-1 min-w-[140px]">
-                 <label className="text-xs text-slate-400 mb-1 block">Amount to Load</label>
-                 <input 
-                   type="number" 
-                   value={topUpAmount}
-                   onChange={(e) => setTopUpAmount(e.target.value)}
-                   placeholder="0.00"
-                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-[#2B5748] transition"
-                 />
-               </div>
-               <div className="flex gap-1.5 pb-0.5">
-                 {QUICK_AMOUNTS.map((amt) => (
-                   <button
-                     key={amt}
-                     type="button"
-                     onClick={() => setTopUpAmount(String(amt))}
-                     className="text-[10px] font-bold px-2.5 py-1.5 rounded-full border border-white/20 text-white/80 hover:bg-white/10 transition"
-                   >
-                     ₱{amt}
-                   </button>
-                 ))}
-               </div>
-               <button 
-                 onClick={handleTopUp}
-                 disabled={processing || !topUpAmount}
-                 className="text-white px-6 py-2.5 rounded-full font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: "#2B5748", boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.35)' }}
-               >
-                 {processing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
-                 Top Up via Xendit
-               </button>
-             </div>
-           </div>
+        <div className="relative z-10 p-7">
+          <div className="flex justify-between items-start mb-7">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                style={{ background: wallet.subscription === 'PRO' ? 'rgba(156,176,128,0.2)' : 'rgba(255,255,255,0.1)', color: wallet.subscription === 'PRO' ? '#9CB080' : 'rgba(255,255,255,0.7)' }}>
+                {wallet.subscription === 'PRO' && <span className="w-1.5 h-1.5 rounded-full bg-[#9CB080]" />}
+                {wallet.subscription} Plan
+              </span>
+              <p className="text-sm text-white/50 mt-5 uppercase tracking-widest font-bold text-[11px]">Available Balance</p>
+              <p className="text-4xl font-bold text-white mt-1">₱{wallet.balance.toFixed(2)}</p>
+            </div>
+            <button onClick={() => setShowPlanModal(true)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.15)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}>
+              Change Plan
+            </button>
+          </div>
+
+          <div className="flex gap-3 flex-wrap items-end">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-1.5 block">Amount to Load</label>
+              <input
+                type="number"
+                value={topUpAmount}
+                onChange={(e) => setTopUpAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-4 py-2.5 rounded-xl border text-white text-sm font-medium focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.15)' }}
+              />
+            </div>
+            <div className="flex gap-1.5 pb-0.5">
+              {QUICK_AMOUNTS.map((amt) => (
+                <button key={amt} type="button" onClick={() => setTopUpAmount(String(amt))}
+                  className="text-xs font-bold px-3 py-2 rounded-xl transition-all"
+                  style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.15)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}>
+                  ₱{amt}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleTopUp}
+              disabled={processing || !topUpAmount}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-50"
+              style={{ background: '#9CB080', color: '#1A3D30', boxShadow: '0 4px 16px -4px rgba(156,176,128,0.4)' }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => e.currentTarget.style.transform = ''}>
+              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Top Up via Xendit
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#273338]/50 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 dark:text-white">Transaction History</h3>
-          <button 
+      {/* Transactions */}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border)' }}>
+          <h3 className="font-bold" style={{ color: 'var(--fg)' }}>Transaction History</h3>
+          <button
             onClick={downloadInvoice}
             disabled={wallet.transactions.length === 0}
-            className="text-xs flex items-center gap-1 text-emerald-600 font-bold hover:text-emerald-700 disabled:opacity-50"
-          >
-            <Download className="w-3 h-3" /> Download CSV
+            className="flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:opacity-40"
+            style={{ color: '#2B5748' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#1A3D30'}
+            onMouseLeave={e => e.currentTarget.style.color = '#2B5748'}>
+            <Download className="w-3.5 h-3.5" /> Download CSV
           </button>
         </div>
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 dark:bg-[#273338] text-slate-500 dark:text-slate-400 font-medium border-b border-slate-100 dark:border-[#9CB080]/20">
-            <tr>
-              <th className="px-6 py-4">Date</th>
-              <th className="px-6 py-4">Description</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-            {wallet.transactions.length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead style={{ background: 'var(--bg-alt)', borderBottom: '1px solid var(--border)' }}>
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
-                  No transactions yet. Top up via Xendit to get started.
-                </td>
+                {['Date', 'Description', 'Status', 'Amount'].map(h => (
+                  <th key={h} className="px-6 py-3.5 text-[11px] font-bold uppercase tracking-widest"
+                    style={{ color: 'var(--fg-muted)' }}>
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ) : (
-              wallet.transactions.map((txn) => (
-                <tr key={txn.id} className="hover:bg-slate-50 dark:hover:bg-[#2B5748]/50/50 transition">
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{new Date(txn.date).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{txn.description}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                        txn.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 
-                        txn.status === 'PENDING' ? 'bg-orange-100 text-orange-700' : 
-                        txn.status === 'CANCELLED' ? 'bg-slate-100 text-slate-700' :
-                        'bg-rose-100 text-rose-700'
-                      }`}>
-                        {txn.status}
-                      </span>
-                      {txn.status === 'PENDING' && (
-                        <div className="flex gap-1">
-                          <button 
-                            onClick={handleVerifyManual}
-                            disabled={processing}
-                            className="text-xs text-emerald-500 hover:text-emerald-700 flex items-center gap-1 transition disabled:opacity-50"
-                            title="Verify with Xendit"
-                          >
-                             <RefreshCw className={`w-4 h-4 ${processing ? 'animate-spin' : ''}`}/>
-                          </button>
-                          <button 
-                            onClick={() => handleCancelTransaction(txn.id)}
-                            disabled={cancellingId === txn.id}
-                            className="text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1 transition disabled:opacity-50"
-                            title="Cancel Transaction"
-                          >
-                             {cancellingId === txn.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <XCircle className="w-4 h-4"/>}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className={`px-6 py-4 text-right font-bold ${txn.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {txn.type === 'CREDIT' ? '+' : '-'}₱{txn.amount.toFixed(2)}
+            </thead>
+            <tbody>
+              {wallet.transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>
+                    No transactions yet. Top up via Xendit to get started.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                wallet.transactions.map((txn) => (
+                  <tr key={txn.id} className="transition-colors"
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-alt)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--fg-muted)' }}>
+                      {new Date(txn.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 font-medium" style={{ color: 'var(--fg)' }}>
+                      {txn.description}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`badge ${
+                          txn.status === 'COMPLETED' ? 'badge-green' :
+                          txn.status === 'PENDING' ? 'badge-amber' :
+                          txn.status === 'CANCELLED' ? 'badge-sage' :
+                          'badge-red'
+                        }`}>
+                          {txn.status}
+                        </span>
+                        {txn.status === 'PENDING' && (
+                          <div className="flex gap-1">
+                            <button onClick={handleVerifyManual} disabled={processing} title="Verify with Xendit"
+                              className="p-1 rounded transition disabled:opacity-50"
+                              style={{ color: '#2B5748' }}>
+                              <RefreshCw className={`w-3.5 h-3.5 ${processing ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button onClick={() => handleCancelTransaction(txn.id)} disabled={cancellingId === txn.id} title="Cancel"
+                              className="p-1 rounded transition disabled:opacity-50"
+                              style={{ color: '#C0392B' }}>
+                              {cancellingId === txn.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`px-6 py-4 text-right font-bold ${txn.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}>
+                      {txn.type === 'CREDIT' ? '+' : '-'}₱{txn.amount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

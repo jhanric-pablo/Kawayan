@@ -31,7 +31,15 @@ class SupportService {
       const response = await fetch('/api/support/tickets', {
         headers: this.getAuthHeaders()
       });
-      if (!response.ok) return [];
+      if (response.status === 401 || response.status === 403) {
+        console.warn('Support ticket fetch unauthorized — please log in again.');
+        return [];
+      }
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('Error getting tickets:', err.error || response.statusText);
+        return [];
+      }
       return await response.json();
     } catch (error) {
       console.error('Error getting tickets:', error);

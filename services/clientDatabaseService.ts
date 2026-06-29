@@ -13,12 +13,25 @@ export class ClientDatabaseService {
   }
 
   // --- Users (Auth) ---
-  async createUser(email: string, password: string, role: 'user' | 'admin' = 'user', businessName?: string): Promise<User | null> {
+  async createUser(
+    email: string,
+    password: string,
+    role: 'user' | 'admin' = 'user',
+    businessName?: string,
+    options?: { acceptedTerms?: boolean; termsVersion?: string }
+  ): Promise<User | null> {
     try {
       const response = await fetch(`${this.baseUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role, businessName })
+        body: JSON.stringify({
+          email,
+          password,
+          role,
+          businessName,
+          acceptedTerms: options?.acceptedTerms,
+          termsVersion: options?.termsVersion,
+        })
       });
 
       if (!response.ok) {

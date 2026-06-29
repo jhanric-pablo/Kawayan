@@ -51,9 +51,15 @@ export class UniversalDatabaseService {
   }
 
   // --- Wrapper Methods ---
-  async createUser(email: string, password: string, role: 'user' | 'admin' = 'user', businessName?: string): Promise<User | null> {
+  async createUser(
+    email: string,
+    password: string,
+    role: 'user' | 'admin' = 'user',
+    businessName?: string,
+    options?: { acceptedTerms?: boolean; termsVersion?: string }
+  ): Promise<User | null> {
     const service = await this.getService();
-    return service.createUser(email, password, role, businessName);
+    return service.createUser(email, password, role, businessName, options);
   }
 
   async loginUser(email: string, password: string): Promise<{ user: User; token: string } | null> {

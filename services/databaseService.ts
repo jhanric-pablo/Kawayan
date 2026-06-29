@@ -13,7 +13,13 @@ export class DatabaseService {
   }
   
   // --- Users (Auth) ---
-  async createUser(email: string, password: string, role: 'user' | 'admin' | 'support' = 'user', businessName?: string): Promise<User | null> {
+  async createUser(
+    email: string,
+    password: string,
+    role: 'user' | 'admin' | 'support' = 'user',
+    businessName?: string,
+    options?: { acceptedTerms?: boolean; termsVersion?: string }
+  ): Promise<User | null> {
     const db = this.dbConfig.getDatabase();
 
     // Validate password strength before DB operations
@@ -39,9 +45,17 @@ export class DatabaseService {
       };
       
       db.prepare(`
-        INSERT INTO users (id, email, password_hash, role, business_name)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(newUser.id, newUser.email, newUser.passwordHash, newUser.role, newUser.businessName || null);
+        INSERT INTO users (id, email, password_hash, role, business_name, terms_accepted_at, terms_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        newUser.id,
+        newUser.email,
+        newUser.passwordHash,
+        newUser.role,
+        newUser.businessName || null,
+        options?.acceptedTerms ? new Date().toISOString() : null,
+        options?.acceptedTerms ? (options.termsVersion || null) : null
+      );
       
       logger.info('User created successfully', { userId: newUser.id, email, role });
       return newUser;
@@ -751,21 +765,37 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
     const db = this.dbConfig.getDatabase();
     try {
       const rows = db.prepare('SELECT * FROM tickets WHERE user_id = ? ORDER BY created_at DESC').all(userId) as any[];
-      return rows.map(row => ({
-        id: row.id,
-        ticketNum: row.ticket_num,
-        userId: row.user_id,
-        userEmail: row.user_email,
-        subject: row.subject,
-        category: row.category || 'General',
-        priority: row.priority,
-        status: row.status,
-        createdAt: row.created_at,
-        messages: JSON.parse(row.messages || '[]')
-      }));
+      return rows.map(row => this.mapTicketRow(row));
     } catch (error) {
       console.error('Error getting tickets:', error);
       return [];
+    }
+  }
+
+  mapTicketRow(row: any) {
+    return {
+      id: row.id,
+      ticketNum: row.ticket_num,
+      userId: row.user_id,
+      userEmail: row.user_email,
+      subject: row.subject,
+      category: row.category || 'General',
+      priority: row.priority,
+      status: row.status,
+      createdAt: row.created_at,
+      messages: JSON.parse(row.messages || '[]')
+    };
+  }
+
+  async getTicketById(ticketId: string): Promise<any | null> {
+    const db = this.dbConfig.getDatabase();
+    try {
+      const row = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId) as any;
+      if (!row) return null;
+      return this.mapTicketRow(row);
+    } catch (error) {
+      console.error('Error getting ticket by id:', error);
+      return null;
     }
   }
 
@@ -773,17 +803,7 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
     const db = this.dbConfig.getDatabase();
     try {
       const rows = db.prepare('SELECT * FROM tickets ORDER BY created_at DESC').all() as any[];
-      return rows.map(row => ({
-        id: row.id,
-        ticketNum: row.ticket_num,
-        userId: row.user_id,
-        userEmail: row.user_email,
-        subject: row.subject,
-        category: row.category || 'General',
-        status: row.status,
-        createdAt: row.created_at,
-        messages: JSON.parse(row.messages || '[]')
-      }));
+      return rows.map(row => this.mapTicketRow(row));
     } catch (error) {
       console.error('Error getting all tickets:', error);
       return [];
@@ -1017,7 +1037,7 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
 
   async submitVerification(userId: string, businessAddress: string, businessPhone: string, documentName: string, documentPath: string): Promise<void> {
     const db = this.dbConfig.getDatabase();
-    const id = `verif_${Date.now()}`;
+    const id = `verif_${userId}_${Date.now()}`;
     try {
       // Upsert: if a previous record exists (e.g. rejected), replace it
       db.prepare(`

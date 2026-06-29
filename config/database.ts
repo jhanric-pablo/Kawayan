@@ -39,6 +39,14 @@ export class DatabaseConfig {
       console.log('Migration: Adding theme to users');
       this.db.exec("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'light'");
     }
+    if (!userInfo.some(col => col.name === 'terms_accepted_at')) {
+      console.log('Migration: Adding terms_accepted_at to users');
+      this.db.exec("ALTER TABLE users ADD COLUMN terms_accepted_at DATETIME");
+    }
+    if (!userInfo.some(col => col.name === 'terms_version')) {
+      console.log('Migration: Adding terms_version to users');
+      this.db.exec("ALTER TABLE users ADD COLUMN terms_version TEXT");
+    }
     
     // Brand profiles table
     this.db.exec(`

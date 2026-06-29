@@ -12,6 +12,7 @@ Kawayan AI is a professional content automation and management platform tailored
 ## 📖 Documentation
 All detailed documentation is available in the [`/md`](./md) directory. Follow the logical flow below:
 
+0. [**System Guide**](./md/SYSTEM_GUIDE.md) — **Capstone submission**. Complete 20-section technical manual ([PDF](./md/SYSTEM_GUIDE.pdf) via `npm run guide:system-pdf`).
 1. [**User Guide**](./md/USER_GUIDE.md) - **Start Here**. Overview for SMEs, Support, and Admins.
 2. [**Feature Checklist**](./md/FEATURE_CHECKLIST.md) - Functional scope status (done / enhanced / N/A).
 3. [**System Manual**](./md/SYSTEM_MANUAL.md) - Technical operations and troubleshooting.

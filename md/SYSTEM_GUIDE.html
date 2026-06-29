@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Kawayan AI — System Guide</title>
+  <style>
+    @page { margin: 18mm 16mm; size: A4; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      color: #1a2e28;
+      max-width: 100%;
+    }
+    h1 { font-size: 22pt; color: #2B5748; border-bottom: 2px solid #9CB080; padding-bottom: 0.3em; page-break-before: always; }
+    h1:first-of-type { page-break-before: avoid; }
+    h2 { font-size: 14pt; color: #2B5748; margin-top: 1.4em; }
+    h3 { font-size: 12pt; color: #3d6b5a; }
+    h4 { font-size: 11pt; }
+    table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 9pt; }
+    th, td { border: 1px solid #c5d4c8; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #e8f0ea; font-weight: 600; }
+    tr:nth-child(even) td { background: #f7faf8; }
+    code, pre { font-family: "SF Mono", Consolas, monospace; font-size: 9pt; }
+    pre { background: #f0f4f2; padding: 10px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+    blockquote { border-left: 4px solid #9CB080; margin: 1em 0; padding: 0.5em 1em; background: #f7faf8; color: #3d4a44; }
+    hr { border: none; border-top: 1px solid #c5d4c8; margin: 2em 0; }
+    ul, ol { padding-left: 1.4em; }
+    li { margin: 0.25em 0; }
+    .mermaid { background: #fafcfa; border: 1px dashed #9CB080; font-size: 8pt; }
+  </style>
+</head>
+<body>
+<h1>Kawayan AI — Complete System Guide</h1>
+<h2>Table of Contents</h2>
+<ol><li>[Introduction](#1-introduction)</li><li>[System Overview](#2-system-overview)</li><li>[Relationship to the Capstone Paper](#3-relationship-to-the-capstone-paper)</li><li>[System Architecture](#4-system-architecture)</li><li>[Complete System Flow](#5-complete-system-flow)</li><li>[Module-by-Module Explanation](#6-module-by-module-explanation)</li><li>[Database Documentation](#7-database-documentation)</li><li>[Folder Structure](#8-folder-structure)</li><li>[Code Flow](#9-code-flow)</li><li>[User Guide](#10-user-guide)</li><li>[Administrator Guide](#11-administrator-guide)</li><li>[Security Features](#12-security-features)</li><li>[Technologies Used](#13-technologies-used)</li><li>[Algorithms and Business Logic](#14-algorithms-and-business-logic)</li><li>[Error Handling](#15-error-handling)</li><li>[Testing](#16-testing)</li><li>[Future Improvements](#17-future-improvements)</li><li>[Frequently Asked Questions](#18-frequently-asked-questions-faq)</li><li>[Glossary](#19-glossary)</li><li>[Conclusion](#20-conclusion)</li></ol>
+<hr/>
+<h2>1. Introduction</h2>
+<h3>1.1 Purpose of the System</h3>
+<p><strong>Kawayan AI</strong> is a web-based social media content management platform designed for <strong>Filipino Small and Medium Enterprises (SMEs)</strong>. It helps business owners who lack dedicated marketing teams to:</p>
+<ul><li>Plan monthly social media content with AI assistance</li><li>Generate <strong>Taglish</strong> (Filipino–English) captions and images</li><li>Schedule posts on an interactive editorial calendar</li><li>Pay for premium features through <strong>Xendit</strong> (GCash, Maya, cards)</li><li>Track engagement metrics from Facebook, Instagram, and TikTok</li><li>Receive technical and billing support through an integrated help desk</li></ul>
+<p>The system reduces the time, cost, and expertise barrier for SMEs to maintain a consistent social media presence.</p>
+<h3>1.2 Project Overview</h3>
+<p>Kawayan combines a <strong>React</strong> single-page application, an <strong>Express.js</strong> REST API, and a <strong>SQLite</strong> database into one deployable product. AI content generation is powered primarily by an <strong>Unsloth LLM proxy</strong> (with optional local <strong>Ollama</strong> fallback). Payments flow through <strong>Xendit</strong>. A <strong>Chrome browser extension</strong> syncs live platform insights into the Growth Insights Dashboard.</p>
+<p>The visual design follows an <strong>Organic Wabi-Sabi</strong> design system: forest green (<code>#2B5748</code>), soft sage (<code>#9CB080</code>), Fraunces serif headings, and Nunito/Quicksand UI text.</p>
+<h3>1.3 Objectives</h3>
+<table><thead><tr><th>#</th><th>Objective</th><th>System implementation</th></tr></thead><tbody><tr><td>O1</td><td>Automate SME social content planning</td><td>AI monthly plan + batch generation (<code>generateContentPlan</code>, <code>handleBatchGenerate</code>)</td></tr><tr><td>O2</td><td>Provide an interactive editorial calendar</td><td>Schedule-X calendar with day panel (<code>ContentCalendar.tsx</code>)</td></tr><tr><td>O3</td><td>Enforce fair usage via subscription tiers</td><td>Trial 8 posts / Pro 16 posts (<code>utils/tierLimits.ts</code>)</td></tr><tr><td>O4</td><td>Monetize via wallet and add-on posts</td><td>Xendit top-up + ₱150 add-on module</td></tr><tr><td>O5</td><td>Deliver growth analytics</td><td>Growth Insights Dashboard + browser extension</td></tr><tr><td>O6</td><td>Support MSME onboarding with verification</td><td>Business document upload + admin approval queue</td></tr><tr><td>O7</td><td>Provide integrated customer support</td><td>Help desk widget, tickets (#1001+), live WebRTC calls</td></tr><tr><td>O8</td><td>Enable administrative governance</td><td>Admin panel: users, billing, audit logs, retention stats</td></tr></tbody></table>
+<h3>1.4 Scope</h3>
+<p><strong>In scope (implemented):</strong></p>
+<ul><li>User registration, login, brand survey, business verification</li><li>AI content planning, batch creation, single-post editing</li><li>Calendar scheduling (Draft → Scheduled → Published)</li><li>Wallet, Xendit payments, Pro subscription (₱499/mo)</li><li>Growth Insights with extension sync</li><li>Help desk (tickets, categories, calls)</li><li>Admin and support dashboards</li><li>Role-based access (user, support, admin)</li></ul>
+<p><strong>Out of scope / partial:</strong></p>
+<ul><li>Full OAuth for all social platforms (username + extension sync is primary path)</li><li>Xendit webhook handler (route exists as stub; manual/admin verification available)</li><li>Native mobile apps</li><li>Automated posting to platforms without browser extension assistance</li></ul>
+<h3>1.5 Intended Users</h3>
+<table><thead><tr><th>Role</th><th>Description</th><th>Default test account</th></tr></thead><tbody><tr><td><strong>SME User</strong></td><td>Café, bakery, retail owner creating content</td><td><code>cafe@kawayan.ph</code> / <code>Password123!</code></td></tr><tr><td><strong>Support Agent</strong></td><td>Handles tickets and live calls</td><td><code>support@kawayan.ph</code> / <code>Support123!</code></td></tr><tr><td><strong>Administrator</strong></td><td>Manages users, payments, verifications</td><td><code>admin@kawayan.ph</code> / <code>Admin123!</code></td></tr></tbody></table>
+<p>See <code>md/ACCOUNTS.md</code> for the full seeded account list.</p>
+<hr/>
+<h2>2. System Overview</h2>
+<h3>2.1 High-Level Explanation</h3>
+<p>A user registers, uploads business verification documents, and completes a brand survey. Once an admin approves verification, the user accesses the <strong>Content Calendar</strong>. They describe a monthly strategy; AI generates content ideas assigned to calendar days. <strong>Batch Create</strong> produces captions and images for all slots. Users edit posts in a right-side panel, schedule them, and optionally publish via the browser extension.</p>
+<p>Billing uses a <strong>prepaid wallet</strong> funded through <strong>Xendit</strong>. Pro users get 16 posts per month; trial users get 8. Extra posts beyond the cap cost <strong>₱150</strong> each (add-on module).</p>
+<h3>2.2 Main Features</h3>
+<table><thead><tr><th>Feature</th><th>Description</th></tr></thead><tbody><tr><td>Interactive Editorial Calendar</td><td>Month grid/list, day click panel, + add-on control</td></tr><tr><td>AI Content Planning</td><td>Taglish captions, image prompts, virality scoring</td></tr><tr><td>Batch Generation</td><td>Up to 8 or 16 posts with captions + images in one run</td></tr><tr><td>Tier Limits</td><td>FREE=8, PRO=16 posts per calendar month</td></tr><tr><td>Add-on Posts</td><td>₱150 paid supplemental post (<code>addon-</code> ID bypasses cap)</td></tr><tr><td>Xendit Billing</td><td>Wallet top-up, Pro subscription, transaction history</td></tr><tr><td>Growth Insights</td><td>Engagement metrics, charts, digital ROI estimate</td></tr><tr><td>Browser Extension</td><td>Sync FB/IG/TikTok stats; assist posting</td></tr><tr><td>Business Verification</td><td>Document upload; admin approve/reject</td></tr><tr><td>Help Desk</td><td>Technical/Billing tickets, AI chat, WebRTC calls</td></tr><tr><td>Admin Portal</td><td>Users, billing verification, growth/retention charts</td></tr></tbody></table>
+<h3>2.3 Problems the System Solves</h3>
+<table><thead><tr><th>Problem</th><th>Kawayan solution</th></tr></thead><tbody><tr><td>SMEs lack time for consistent posting</td><td>AI batch generation + calendar scheduling</td></tr><tr><td>Hiring social media managers is expensive</td><td>Self-service AI at tiered subscription cost</td></tr><tr><td>Content does not match Filipino audience</td><td>Taglish generation tuned to brand profile</td></tr><tr><td>No single view of multi-platform schedule</td><td>Unified editorial calendar</td></tr><tr><td>Payment friction for micro-services</td><td>Xendit wallet (GCash/Maya familiar to PH users)</td></tr><tr><td>No visibility into post performance</td><td>Growth Insights + extension sync</td></tr><tr><td>Support scattered across channels</td><td>Integrated help desk with categorized tickets</td></tr></tbody></table>
+<h3>2.4 Overall Architecture</h3>
+<pre class="mermaid">flowchart TB
+    subgraph Client["Client Layer"]
+        UI[React SPA&lt;br/&gt;Vite + TypeScript]
+        EXT[Chrome Extension&lt;br/&gt;MV3]
+    end
+
+    subgraph API["Application Layer"]
+        EXP[Express.js server.js&lt;br/&gt;REST + Socket.io]
+        MW[JWT Auth Middleware]
+        AI[AI Proxy Routes&lt;br/&gt;Unsloth / Ollama]
+    end
+
+    subgraph Data["Data Layer"]
+        DB[(SQLite kawayan.db)]
+        UPLOADS[uploads/verifications/]
+    end
+
+    subgraph External["External Services"]
+        XENDIT[Xendit Payment API]
+        UNSLOTH[Unsloth LLM API]
+        OLLAMA[Ollama Local LLM]
+        POLL[Pollinations.ai Images]
+        SOCIAL[Social Platform Pages&lt;br/&gt;via Extension]
+    end
+
+    UI --&gt;|HTTPS /api/*| EXP
+    EXT --&gt;|postMessage| UI
+    EXP --&gt; MW
+    MW --&gt; DB
+    EXP --&gt; AI
+    AI --&gt; UNSLOTH
+    AI --&gt; OLLAMA
+    UI --&gt; POLL
+    EXP --&gt; XENDIT
+    EXT --&gt; SOCIAL
+    EXP --&gt; UPLOADS
+    UI &lt;--&gt;|WebRTC signaling| EXP</pre>
+<hr/>
+<h2>3. Relationship to the Capstone Paper</h2>
+<p>This section maps <strong>typical Capstone thesis chapters</strong> to what Kawayan implements. Adjust chapter numbers to match your group's actual paper.</p>
+<h3>3.1 Research Objectives ↔ System Features</h3>
+<table><thead><tr><th>Research objective (typical)</th><th>Feature that fulfills it</th><th>Why it exists</th></tr></thead><tbody><tr><td>Design a content tool for PH SMEs</td><td>Brand survey + Taglish AI</td><td>Personalizes output to local businesses</td></tr><tr><td>Automate scheduling</td><td><code>content_plans</code> + calendar day assignment</td><td>Reduces manual calendar work</td></tr><tr><td>Implement tiered SaaS model</td><td>8/16 post limits + Pro plan</td><td>Sustainable freemium business model</td></tr><tr><td>Integrate local payments</td><td>Xendit wallet</td><td>PH-standard e-wallet checkout</td></tr><tr><td>Measure digital ROI</td><td>Growth Insights ROI card</td><td>Connects spend to engagement outcomes</td></tr><tr><td>Ensure trustworthy onboarding</td><td>Business verification</td><td>Reduces fraud; aligns with MSME registration</td></tr><tr><td>Provide user support</td><td>Help desk + ticket categories</td><td>Operational requirement for real deployment</td></tr></tbody></table>
+<h3>3.2 Methodology ↔ Development Approach</h3>
+<table><thead><tr><th>Methodology element</th><th>Implementation evidence</th></tr></thead><tbody><tr><td>Agile / iterative development</td><td>Git history, modular React components</td></tr><tr><td>Prototyping</td><td><code>DemoPage.tsx</code>, organic UI iterations</td></tr><tr><td>Requirements-driven design</td><td><code>md/FEATURE_CHECKLIST.md</code> traceability</td></tr><tr><td>User-centered design</td><td>Wabi-Sabi UI, sliding panel vs modal</td></tr><tr><td>Hybrid AI strategy</td><td>Cloud Unsloth + local Ollama proxy</td></tr></tbody></table>
+<h3>3.3 System Requirements ↔ Features</h3>
+<p>See <strong>Section 6</strong> and <code>md/FEATURE_CHECKLIST.md</code> for the full requirements matrix (22 functional items, all implemented or enhanced).</p>
+<h3>3.4 Design ↔ UI/UX Decisions</h3>
+<table><thead><tr><th>Design decision</th><th>Rationale</th></tr></thead><tbody><tr><td>Full-screen calendar</td><td>Paper requirement: interactive editorial calendar</td></tr><tr><td>Right sliding panel</td><td>Non-disruptive editing vs popup modals</td></tr><tr><td><code>+</code> control on empty days</td><td>Less visual noise than "ADD" text</td></tr><tr><td>Organic Wabi-Sabi theme</td><td>Capstone branding; readable for long sessions</td></tr><tr><td>Role-separated dashboards</td><td>Admin/support should not see SME calendar by default</td></tr></tbody></table>
+<h3>3.5 Implementation ↔ Tech Stack</h3>
+<p>Documented in <strong>Section 4</strong> and <strong>Section 13</strong>. Primary stack: React 19, Express 5, SQLite, JWT, Xendit, Socket.io.</p>
+<h3>3.6 Testing ↔ Validation Activities</h3>
+<p>Documented in <strong>Section 16</strong>. Includes <code>systemTest.ts</code>, <code>dbTest.ts</code>, manual UAT scripts in <code>md/TESTING_GUIDE.md</code>.</p>
+<h3>3.7 Evaluation ↔ Metrics</h3>
+<table><thead><tr><th>Metric</th><th>Where measured</th></tr></thead><tbody><tr><td>User growth</td><td>Admin → User Growth chart</td></tr><tr><td>Retention</td><td>Admin → 30-day retention % + bar chart</td></tr><tr><td>Engagement</td><td>Growth Insights per platform</td></tr><tr><td>Digital ROI</td><td>Insights ROI card (reach value vs wallet spend)</td></tr><tr><td>Content output</td><td>Posts created count (admin stats)</td></tr><tr><td>Support load</td><td>Open tickets, call history</td></tr></tbody></table>
+<h3>3.8 Expected Outcomes</h3>
+<table><thead><tr><th>Expected outcome</th><th>Verification</th></tr></thead><tbody><tr><td>SMEs can plan 8–16 posts/month</td><td>Batch create + tier enforcement</td></tr><tr><td>Calendar reflects monthly schedule</td><td><code>generated_posts.date</code> + Schedule-X events</td></tr><tr><td>Payments process through Xendit</td><td><code>Xendit Invoice:</code> transaction records</td></tr><tr><td>Analytics visible per platform</td><td>Extension sync → Insights dashboard</td></tr><tr><td>Admins can govern the platform</td><td>Admin panel full feature set</td></tr></tbody></table>
+<hr/>
+<h2>4. System Architecture</h2>
+<h3>4.1 Frontend</h3>
+<table><thead><tr><th>Aspect</th><th>Detail</th></tr></thead><tbody><tr><td>Framework</td><td>React 19 + TypeScript</td></tr><tr><td>Build tool</td><td>Vite 6</td></tr><tr><td>Styling</td><td>Tailwind CSS + custom Wabi-Sabi tokens (<code>index.html</code>)</td></tr><tr><td>Routing</td><td>State-based <code>ViewState</code> enum in <code>App.tsx</code> (not URL router for main app views)</td></tr><tr><td>Calendar</td><td>Schedule-X (<code>@schedule-x/react</code>)</td></tr><tr><td>Charts</td><td>Recharts (Insights, Admin, Support dashboards)</td></tr><tr><td>Real-time</td><td>Socket.io client (<code>CallOverlay.tsx</code>)</td></tr></tbody></table>
+<p><strong>Key principle:</strong> The browser never talks to SQLite directly. All data goes through <code>ClientDatabaseService</code> → REST API.</p>
+<h3>4.2 Backend</h3>
+<table><thead><tr><th>Aspect</th><th>Detail</th></tr></thead><tbody><tr><td>Runtime</td><td>Node.js</td></tr><tr><td>Framework</td><td>Express 5 (<code>server.js</code>)</td></tr><tr><td>Port</td><td><code>3001</code> (default)</td></tr><tr><td>File uploads</td><td>Multer → <code>uploads/verifications/</code></td></tr><tr><td>WebSockets</td><td>Socket.io for WebRTC signaling</td></tr><tr><td>Static files</td><td>Serves <code>dist/</code> (production build)</td></tr></tbody></table>
+<blockquote><strong>Note:</strong> A legacy <strong>PHP backend</strong> exists under <code>backend/</code> but is <strong>not</strong> used by the main <code>npm run dev:full</code> flow. The active API is <code>server.js</code>.</blockquote>
+<h3>4.3 Database</h3>
+<table><thead><tr><th>Aspect</th><th>Detail</th></tr></thead><tbody><tr><td>Engine</td><td>SQLite via <code>better-sqlite3</code></td></tr><tr><td>File</td><td><code>kawayan.db</code> (path from <code>DB_PATH</code> env)</td></tr><tr><td>Schema</td><td>Defined in <code>config/database.ts</code></td></tr><tr><td>Migrations</td><td>Inline <code>ALTER TABLE</code> checks on startup</td></tr><tr><td>WAL mode</td><td>Enabled for concurrent read performance</td></tr><tr><td>Foreign keys</td><td><code>PRAGMA foreign_keys = ON</code></td></tr></tbody></table>
+<h3>4.4 APIs</h3>
+<p>All REST endpoints are prefixed with <code>/api/</code>. See <strong>Appendix A</strong> for the complete route table.</p>
+<p><strong>Authentication header:</strong></p>
+<pre><code>Authorization: Bearer &lt;JWT token&gt;
+</code></pre>
+<h3>4.5 Authentication</h3>
+<pre class="mermaid">sequenceDiagram
+    participant U as User Browser
+    participant API as Express API
+    participant DB as SQLite
+    participant JWT as JWT Service
+
+    U-&gt;&gt;API: POST /api/auth/login {email, password}
+    API-&gt;&gt;DB: SELECT user by email
+    API-&gt;&gt;JWT: bcrypt.compare(password, hash)
+    API-&gt;&gt;JWT: generateToken({userId, email, role})
+    API-&gt;&gt;DB: INSERT sessions (bcrypt hash of token)
+    API--&gt;&gt;U: {user, token}
+    U-&gt;&gt;U: localStorage.kawayan_jwt = token
+
+    Note over U,API: Subsequent requests
+    U-&gt;&gt;API: GET /api/posts/user/:id + Bearer token
+    API-&gt;&gt;JWT: verifyToken(token)
+    API-&gt;&gt;DB: Query posts
+    API--&gt;&gt;U: JSON response</pre>
+<h3>4.6 Storage</h3>
+<table><thead><tr><th>Storage</th><th>Purpose</th></tr></thead><tbody><tr><td><code>kawayan.db</code></td><td>All persistent application data</td></tr><tr><td><code>uploads/verifications/</code></td><td>Business registration PDFs/images</td></tr><tr><td><code>localStorage</code></td><td>JWT token (<code>kawayan_jwt</code>), session (<code>kawayan_session</code>), view restore</td></tr><tr><td><code>dist/</code></td><td>Built frontend assets</td></tr></tbody></table>
+<h3>4.7 External Services</h3>
+<table><thead><tr><th>Service</th><th>Purpose</th><th>Config</th></tr></thead><tbody><tr><td><strong>Xendit</strong></td><td>Invoice creation, payment verification</td><td><code>XENDIT_SECRET_KEY</code></td></tr><tr><td><strong>Unsloth LLM</strong></td><td>Content plan, captions, support bot</td><td><code>UNSLOTH_API_URL</code>, <code>UNSLOTH_API_KEY</code></td></tr><tr><td><strong>Ollama</strong></td><td>Local LLM fallback</td><td><code>POST /api/ai/local</code> → port 11434</td></tr><tr><td><strong>Pollinations.ai</strong></td><td>AI image URLs</td><td>Used in <code>geminiService.generateImageFromPrompt</code></td></tr><tr><td><strong>Chrome Extension</strong></td><td>Stats sync + posting assist</td><td><code>extension/manifest.json</code></td></tr></tbody></table>
+<h3>4.8 Component Communication</h3>
+<pre class="mermaid">sequenceDiagram
+    participant C as ContentCalendar.tsx
+    participant CDS as ClientDatabaseService
+    participant API as server.js
+    participant DBS as databaseService.ts
+    participant DB as SQLite
+
+    C-&gt;&gt;CDS: savePost(post)
+    CDS-&gt;&gt;API: POST /api/posts + JWT
+    API-&gt;&gt;DBS: savePost() + assertTierAllowsNewPost()
+    DBS-&gt;&gt;DB: INSERT generated_posts
+    DB--&gt;&gt;DBS: OK
+    DBS--&gt;&gt;API: post saved
+    API--&gt;&gt;CDS: 200 JSON
+    CDS--&gt;&gt;C: Updated state</pre>
+<hr/>
+<h2>5. Complete System Flow</h2>
+<h3>5.1 Application Lifecycle (End-to-End)</h3>
+<pre class="mermaid">flowchart TD
+    A[User opens website] --&gt; B{Logged in?}
+    B --&gt;|No| C[Landing Page]
+    C --&gt; D[Login / Sign Up]
+    D --&gt; E[POST /api/auth/login or register]
+    E --&gt; F{Role?}
+    F --&gt;|admin| G[Admin Dashboard]
+    F --&gt;|support| H[Support Dashboard]
+    F --&gt;|user| I{Verified?}
+    I --&gt;|No| J[Verification Status Screen]
+    I --&gt;|Yes| K{Brand profile?}
+    K --&gt;|No| L[Brand Survey]
+    K --&gt;|Yes| M[Content Calendar]
+    M --&gt; N[Plan / Batch / Edit / Schedule]
+    N --&gt; O[Posts saved to DB]
+    O --&gt; P[Optional: Growth Insights / Billing / Support]
+    P --&gt; Q[Logout → clear session]</pre>
+<h3>5.2 Registration Flow</h3>
+<ol><li>User opens <strong>Sign Up</strong> (<code>Login.tsx</code> with <code>initialIsSignUp</code>).</li><li>Enters email, password, business name, address, phone, verification document.</li><li><code>ValidationService</code> + <code>JWTService.validatePasswordStrength</code> check password rules.</li><li><code>POST /api/auth/register</code> creates user row; auto-login returns JWT.</li><li><code>POST /api/verification/submit</code> uploads document (multer, max 5MB, JPG/PNG/PDF).</li><li><code>App.tsx</code> routes to <strong>Verification Status</strong> until admin approves.</li><li>Admin approves → user completes <strong>Brand Survey</strong> → <strong>Calendar</strong>.</li></ol>
+<h3>5.3 Content Creation Flow</h3>
+<ol><li>User enters monthly strategy text.</li><li><strong>Plan Month</strong> → <code>generateContentPlan()</code> → Unsloth API → validated ideas saved to <code>content_plans</code>.</li><li><strong>Batch Create</strong> → loop: <code>generatePostCaptionAndImagePrompt</code> + <code>generateImageFromPrompt</code> per idea.</li><li>Each post saved via <code>POST /api/posts</code> with status <code>Draft</code>.</li><li>User clicks calendar day → panel loads post.</li><li>User edits caption, regenerates image (max 2 regens), uploads photo.</li><li><strong>Schedule</strong> sets <code>status: 'Scheduled'</code> and persists.</li><li><strong>Post Now</strong> opens platform modal (TikTok/Facebook/Instagram) for extension-assisted posting.</li></ol>
+<h3>5.4 Add-on Post Flow (₱150)</h3>
+<ol><li>User clicks <strong>+</strong> on empty calendar cell.</li><li>Organic dialog prompts for topic.</li><li>Confirm ₱150 charge → <code>paymentService.makePayment(150, ...)</code>.</li><li>Post created with ID prefix <code>addon-</code> (skips tier limit check).</li><li>AI generates content; panel opens with new draft.</li></ol>
+<h3>5.5 Billing Flow (Xendit)</h3>
+<ol><li>User navigates to <strong>Billing</strong>.</li><li>Enters amount → <strong>Top Up via Xendit</strong>.</li><li><code>XenditCheckoutModal</code> → select GCash/Maya/Card.</li><li><code>POST /api/wallet/xendit-checkout</code>:</li><li>   - If live Xendit key: creates invoice → redirect to Xendit hosted page.</li><li>   - Otherwise: completes locally with <code>Xendit Invoice: invoice_*</code> record.</li><li>Wallet balance updates; transaction appears in history.</li><li><strong>Change Plan → Pro</strong>: ₱499 debited from wallet after checkout confirmation.</li></ol>
+<h3>5.6 Support Ticket Flow</h3>
+<ol><li>User opens <strong>Support Widget</strong> → Technical Issue or Billing Concern.</li><li><code>POST /api/support/tickets</code> assigns <code>ticketNum</code> from <code>getNextTicketNum()</code> (≥1001).</li><li>Support agent sees ticket in <strong>Support Dashboard</strong>.</li><li>Agent replies; status updated via <code>PUT /api/support/tickets/:id</code>.</li><li>Resolved when <code>status: 'Resolved'</code>.</li></ol>
+<h3>5.7 Logout Flow</h3>
+<ol><li>User clicks Logout in nav.</li><li><code>POST /api/auth/logout</code> (optional server-side session cleanup).</li><li><code>localStorage</code> cleared (<code>kawayan_jwt</code>, <code>kawayan_session</code>).</li><li>App returns to <strong>Landing Page</strong>.</li></ol>
+<hr/>
+<h2>6. Module-by-Module Explanation</h2>
+<h3>6.1 Authentication Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Secure account access and role routing</td></tr><tr><td><strong>Files</strong></td><td><code>Login.tsx</code>, <code>services/jwtService.ts</code>, <code>server.js</code> auth routes</td></tr><tr><td><strong>Inputs</strong></td><td>Email, password; signup adds business fields + document</td></tr><tr><td><strong>Outputs</strong></td><td>JWT token, user object, session row</td></tr><tr><td><strong>Tables</strong></td><td><code>users</code>, <code>sessions</code></td></tr><tr><td><strong>APIs</strong></td><td><code>POST /api/auth/register</code>, <code>/login</code>, <code>/logout</code>, <code>GET /api/auth/me</code></td></tr><tr><td><strong>Validation</strong></td><td>Password strength (8+ chars, mixed case, digit, special)</td></tr><tr><td><strong>Errors</strong></td><td>401 invalid credentials; 400 weak password</td></tr><tr><td><strong>Permissions</strong></td><td>Public register/login; authenticated <code>/me</code></td></tr></tbody></table>
+<h3>6.2 Business Verification Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Verify MSME legitimacy before content access</td></tr><tr><td><strong>Files</strong></td><td><code>Login.tsx</code>, <code>VerificationStatus.tsx</code>, <code>AdminDashboard.tsx</code></td></tr><tr><td><strong>Inputs</strong></td><td>PDF/JPG/PNG document, address, phone</td></tr><tr><td><strong>Outputs</strong></td><td><code>pending</code> / <code>verified</code> / <code>rejected</code> status</td></tr><tr><td><strong>Tables</strong></td><td><code>business_verifications</code></td></tr><tr><td><strong>APIs</strong></td><td><code>/api/verification/submit</code>, <code>/status/:userId</code>, admin approve/reject</td></tr><tr><td><strong>Validation</strong></td><td>Multer: 5MB max; MIME type filter</td></tr><tr><td><strong>Permissions</strong></td><td>User submits; admin approves</td></tr></tbody></table>
+<h3>6.3 Brand Profile Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Capture brand voice for AI personalization</td></tr><tr><td><strong>Files</strong></td><td><code>BrandSurvey.tsx</code>, <code>Settings.tsx</code></td></tr><tr><td><strong>Inputs</strong></td><td>Industry, audience, voice, themes, colors, contact</td></tr><tr><td><strong>Outputs</strong></td><td><code>brand_profiles</code> row</td></tr><tr><td><strong>Tables</strong></td><td><code>brand_profiles</code></td></tr><tr><td><strong>APIs</strong></td><td><code>POST /api/profiles</code>, <code>GET /api/profiles/:userId</code></td></tr><tr><td><strong>Validation</strong></td><td><code>ValidationService</code> brand field checks</td></tr><tr><td><strong>Permissions</strong></td><td>Owner or admin/support read</td></tr></tbody></table>
+<h3>6.4 Content Calendar Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Core editorial workspace</td></tr><tr><td><strong>Files</strong></td><td><code>ContentCalendar.tsx</code>, <code>calendar/ScheduleXCalendarView.tsx</code></td></tr><tr><td><strong>Inputs</strong></td><td>Month strategy, day clicks, ideas, post edits</td></tr><tr><td><strong>Outputs</strong></td><td><code>generated_posts</code>, <code>content_plans</code></td></tr><tr><td><strong>Tables</strong></td><td><code>generated_posts</code>, <code>content_plans</code></td></tr><tr><td><strong>APIs</strong></td><td><code>/api/posts</code>, <code>/api/plans</code>, AI via <code>geminiService</code></td></tr><tr><td><strong>Validation</strong></td><td>Tier limit on new posts; add-on bypass for <code>addon-*</code> IDs</td></tr><tr><td><strong>Errors</strong></td><td>403 <code>TIER_LIMIT_REACHED</code>; quota dialogs</td></tr><tr><td><strong>Permissions</strong></td><td>Verified users only</td></tr></tbody></table>
+<h3>6.5 AI Content Generation Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Generate plans, captions, images, virality scores</td></tr><tr><td><strong>Files</strong></td><td><code>services/geminiService.ts</code>, <code>services/validationService.ts</code></td></tr><tr><td><strong>Inputs</strong></td><td>Brand profile, topic, month name</td></tr><tr><td><strong>Outputs</strong></td><td><code>ContentIdea[]</code>, <code>GeneratedPost</code> fields</td></tr><tr><td><strong>APIs</strong></td><td><code>POST /api/ai/unsloth</code>, <code>POST /api/ai/local</code></td></tr><tr><td><strong>Validation</strong></td><td><code>ValidationService.validateContentIdeas</code>, <code>validatePostResponse</code></td></tr><tr><td><strong>Fallback</strong></td><td>Ollama local if cloud fails</td></tr></tbody></table>
+<h3>6.6 Billing &amp; Wallet Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Prepaid credits and Pro subscription</td></tr><tr><td><strong>Files</strong></td><td><code>Billing.tsx</code>, <code>XenditCheckoutModal.tsx</code>, <code>paymentService.ts</code></td></tr><tr><td><strong>Inputs</strong></td><td>Top-up amount, payment method, plan selection</td></tr><tr><td><strong>Outputs</strong></td><td>Wallet balance, transaction rows</td></tr><tr><td><strong>Tables</strong></td><td><code>wallets</code>, <code>transactions</code></td></tr><tr><td><strong>APIs</strong></td><td><code>/api/wallet/*</code>, <code>/api/admin/wallet/approve</code></td></tr><tr><td><strong>Business rules</strong></td><td>Pro = ₱499/mo; pending txn expires after 12h</td></tr><tr><td><strong>Permissions</strong></td><td>User owns wallet; admin approves pending</td></tr></tbody></table>
+<h3>6.7 Growth Insights Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Engagement analytics and ROI</td></tr><tr><td><strong>Files</strong></td><td><code>InsightsDashboard.tsx</code>, <code>socialService.ts</code>, <code>extension/*</code></td></tr><tr><td><strong>Inputs</strong></td><td>Extension sync messages, platform usernames</td></tr><tr><td><strong>Outputs</strong></td><td>Metric cards, bar chart, ROI percentage</td></tr><tr><td><strong>Tables</strong></td><td><code>social_connections</code></td></tr><tr><td><strong>APIs</strong></td><td><code>/api/social/connections</code>, <code>/api/social/stats/:platform/:username</code></td></tr><tr><td><strong>Permissions</strong></td><td>Authenticated user</td></tr></tbody></table>
+<h3>6.8 Help Desk Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>User support via tickets and calls</td></tr><tr><td><strong>Files</strong></td><td><code>SupportWidget.tsx</code>, <code>SupportDashboard.tsx</code>, <code>CallOverlay.tsx</code></td></tr><tr><td><strong>Inputs</strong></td><td>Ticket subject, category, messages, call reason</td></tr><tr><td><strong>Outputs</strong></td><td>Ticket rows, call history</td></tr><tr><td><strong>Tables</strong></td><td><code>tickets</code>, <code>active_calls</code>, <code>call_history</code></td></tr><tr><td><strong>APIs</strong></td><td><code>/api/support/tickets</code>, <code>/api/support/calls/*</code></td></tr><tr><td><strong>Categories</strong></td><td>Technical, Billing, General</td></tr><tr><td><strong>Ticket IDs</strong></td><td>Sequential from 1001</td></tr><tr><td><strong>Permissions</strong></td><td>Users create; support/admin manage</td></tr></tbody></table>
+<h3>6.9 Admin Module</h3>
+<table><thead><tr><th>Attribute</th><th>Detail</th></tr></thead><tbody><tr><td><strong>Purpose</strong></td><td>Platform governance</td></tr><tr><td><strong>Files</strong></td><td><code>AdminDashboard.tsx</code></td></tr><tr><td><strong>Inputs</strong></td><td>Date range, user edits, verification decisions</td></tr><tr><td><strong>Outputs</strong></td><td>Stats, charts, audit entries</td></tr><tr><td><strong>Tables</strong></td><td>All tables (read); <code>audit_logs</code> (write)</td></tr><tr><td><strong>APIs</strong></td><td><code>/api/admin/*</code></td></tr><tr><td><strong>Permissions</strong></td><td><code>role === 'admin'</code> only (<code>requireAdmin</code>)</td></tr></tbody></table>
+<hr/>
+<h2>7. Database Documentation</h2>
+<h3>7.1 Entity Relationship Diagram</h3>
+<pre class="mermaid">erDiagram
+    users ||--o| brand_profiles : has
+    users ||--o{ generated_posts : creates
+    users ||--o| wallets : owns
+    users ||--o{ transactions : via_wallet
+    users ||--o{ tickets : submits
+    users ||--o{ sessions : has
+    users ||--o{ content_plans : stores
+    users ||--o{ social_connections : links
+    users ||--o| business_verifications : submits
+    users ||--o{ audit_logs : triggers
+    users ||--o{ active_calls : places
+    users ||--o{ call_history : logs
+    wallets ||--o{ transactions : records</pre>
+<h3>7.2 Table Reference</h3>
+<h4><code>users</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Unique user ID |
+| email | TEXT | UNIQUE | Login identifier |
+| password_hash | TEXT | | bcrypt hash |
+| role | TEXT | CHECK | user / admin / support |
+| business_name | TEXT | | Display name |
+| theme | TEXT | | light / dark |
+| created_at, updated_at | DATETIME | | Timestamps |</h4>
+<p><strong>Why it exists:</strong> Central identity for all roles.</p>
+<h4><code>brand_profiles</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Profile ID |
+| user_id | TEXT | FK→users | Owner |
+| business_name, industry, target_audience, brand_voice, key_themes | TEXT | | AI context |
+| brand_colors, contact_email, contact_phone | TEXT | | Optional branding |</h4>
+<p><strong>Why it exists:</strong> Personalizes all AI-generated content.</p>
+<h4><code>generated_posts</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Post ID (<code>addon-*</code> for add-ons) |
+| user_id | TEXT | FK→users | Owner |
+| date | TEXT | | YYYY-MM-DD schedule date |
+| topic | TEXT | | Post theme |
+| caption | TEXT | | Taglish caption text |
+| image_prompt | TEXT | | Prompt used for image generation |
+| image_url | TEXT | | Pollinations or uploaded image URL |
+| status | TEXT | CHECK | Draft / Scheduled / Published |
+| virality_score | INTEGER | CHECK 0–100 | AI virality estimate |
+| virality_reason | TEXT | | Explanation of virality score |
+| format | TEXT | | Content format hint (e.g. reel, carousel) |
+| external_link | TEXT | | Link to published post on platform |
+| published_at | DATETIME | | When marked Published |
+| regen_count | INTEGER | DEFAULT 0 | Caption/image regen count (max 2 in UI) |
+| history | TEXT | JSON | Previous caption/image versions |
+| created_at, updated_at | DATETIME | | Timestamps |</h4>
+<p><strong>Why it exists:</strong> Core content storage for the calendar.</p>
+<h4><code>content_plans</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Plan ID |
+| user_id | TEXT | FK→users | Owner |
+| month | TEXT | | e.g. "June" |
+| ideas | TEXT | JSON | Array of ContentIdea |</h4>
+<p><strong>Why it exists:</strong> Persists AI monthly plan between sessions.</p>
+<h4><code>wallets</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| user_id | TEXT | PK, FK→users | One wallet per user |
+| balance | REAL | | PHP balance |
+| currency | TEXT | | Default PHP |
+| subscription | TEXT | CHECK | FREE / PRO / ENTERPRISE |</h4>
+<p><strong>Why it exists:</strong> Prepaid billing model for Xendit integration.</p>
+<h4><code>transactions</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Transaction ID |
+| user_id | TEXT | FK→wallets | Owner |
+| amount | REAL | | PHP value |
+| status | TEXT | CHECK | PENDING/COMPLETED/FAILED/CANCELLED |
+| type | TEXT | CHECK | CREDIT / DEBIT |
+| description | TEXT | | e.g. Xendit Invoice: invoice_* |</h4>
+<p><strong>Why it exists:</strong> Financial audit trail.</p>
+<h4><code>tickets</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Internal UUID |
+| ticket_num | INTEGER | | Human-facing ID (≥1001) |
+| user_id | TEXT | FK→users | Submitter |
+| user_email | TEXT | | Submitter email (denormalized) |
+| subject | TEXT | | Ticket title |
+| priority | TEXT | CHECK | Low / Medium / High / Critical |
+| status | TEXT | CHECK | Open / Pending / Resolved |
+| category | TEXT | DEFAULT General | Technical / Billing / General |
+| messages | TEXT | JSON | Chat thread array |
+| created_at, updated_at | DATETIME | | Timestamps |</h4>
+<p><strong>Why it exists:</strong> Help desk paper requirement.</p>
+<h4><code>business_verifications</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Verification ID |
+| user_id | TEXT | FK→users, UNIQUE | One per user |
+| business_address | TEXT | | Registered business address |
+| business_phone | TEXT | | Contact phone |
+| document_name | TEXT | | Original filename |
+| document_path | TEXT | | Path under <code>uploads/verifications/</code> |
+| status | TEXT | CHECK | pending / verified / rejected |
+| rejection_reason | TEXT | | Admin reason if rejected |
+| reviewed_by | TEXT | | Admin user ID |
+| reviewed_at | DATETIME | | Approval/rejection timestamp |
+| created_at, updated_at | DATETIME | | Timestamps |</h4>
+<p><strong>Why it exists:</strong> MSME trust and onboarding gate.</p>
+<h4><code>social_connections</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Connection ID |
+| user_id | TEXT | FK→users | Owner |
+| platform | TEXT | CHECK | facebook / instagram / tiktok |
+| connected | INTEGER | | 1 if linked |
+| username | TEXT | | Platform handle |
+| access_token | TEXT | | OAuth token (if used) |
+| followers | INTEGER | | Cached follower count |
+| engagement | REAL | | Cached engagement rate |
+| data | TEXT | JSON | Full extension sync payload |
+| created_at, updated_at | DATETIME | | Timestamps |</h4>
+<p><strong>UNIQUE</strong> constraint on <code>(user_id, platform)</code>.</p>
+<p><strong>Why it exists:</strong> Growth Insights data source.</p>
+<h4><code>sessions</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Session ID |
+| user_id | TEXT | FK→users | Owner |
+| token | TEXT | | bcrypt hash of JWT |
+| expires_at | DATETIME | | Session expiry |</h4>
+<p><strong>Why it exists:</strong> Server-side session invalidation support.</p>
+<h4><code>audit_logs</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | Log ID |
+| user_id | TEXT | FK→users | Actor |
+| action | TEXT | | e.g. create_post, login |
+| details | TEXT | | JSON context |
+| timestamp | DATETIME | | When |</h4>
+<p><strong>Why it exists:</strong> Admin governance and security auditing.</p>
+<h4><code>active_calls</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| user_id | TEXT | PK, FK→users | Caller |
+| user_email | TEXT | | Caller email |
+| room_name | TEXT | | Socket.io / WebRTC room ID |
+| reason | TEXT | | Why user called |
+| started_at | DATETIME | | Call start time |</h4>
+<p><strong>Why it exists:</strong> Tracks in-progress support calls for agents.</p>
+<h4><code>call_history</code>
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | TEXT | PK | History record ID |
+| user_id | TEXT | FK→users | Caller |
+| user_email | TEXT | | Caller email |
+| call_id | TEXT | | Room/call identifier |
+| reason | TEXT | | Call reason |
+| started_at | DATETIME | | Call start |
+| ended_at | DATETIME | | Call end |
+| duration_seconds | INTEGER | | Call length |
+| agent_id | TEXT | | Support agent user ID |</h4>
+<p><strong>Why it exists:</strong> Permanent record of completed support calls.</p>
+<hr/>
+<h2>8. Folder Structure</h2>
+<pre><code>Kawayan/
+├── App.tsx                 # Main app shell, routing, auth gate
+├── index.tsx               # React entry point
+├── index.html              # Global CSS tokens, fonts, paper grain
+├── server.js               # Express API + Socket.io (PRIMARY BACKEND)
+├── types.ts                # Shared TypeScript interfaces
+├── package.json            # Dependencies and scripts
+│
+├── config/
+│   └── database.ts         # SQLite schema, migrations, indexes
+│
+├── components/
+│   ├── ContentCalendar.tsx # Main calendar + batch + add-on
+│   ├── Billing.tsx         # Wallet and Xendit
+│   ├── InsightsDashboard.tsx
+│   ├── AdminDashboard.tsx
+│   ├── SupportDashboard.tsx
+│   ├── SupportWidget.tsx
+│   ├── Login.tsx           # Auth + signup + doc upload
+│   ├── BrandSurvey.tsx
+│   ├── VerificationStatus.tsx
+│   ├── XenditCheckoutModal.tsx
+│   ├── CallOverlay.tsx     # WebRTC calls
+│   └── calendar/           # Schedule-X integration
+│
+├── services/
+│   ├── databaseService.ts      # SQLite operations (Node)
+│   ├── clientDatabaseService.ts  # REST client (Browser)
+│   ├── universalDatabaseService.ts # Environment switcher
+│   ├── paymentService.ts
+│   ├── geminiService.ts        # AI content (Unsloth proxy)
+│   ├── socialService.ts
+│   ├── supportService.ts
+│   ├── jwtService.ts
+│   └── validationService.ts
+│
+├── utils/
+│   ├── tierLimits.ts       # 8/16 limits, ₱150 add-on, day ranges
+│   ├── sessionView.ts      # View persistence
+│   └── logger.ts
+│
+├── extension/              # Chrome MV3 extension
+├── tests/                  # systemTest, dbTest
+├── md/                     # Documentation (this guide included)
+├── uploads/verifications/  # Uploaded business documents
+├── public/                 # Static assets
+├── backend/                # Legacy PHP API (not primary)
+└── scripts/                # PDF generation scripts
+</code></pre>
+<hr/>
+<h2>9. Code Flow</h2>
+<h3>9.1 Request Lifecycle</h3>
+<pre class="mermaid">sequenceDiagram
+    participant UI as React Component
+    participant SVC as Service Layer
+    participant API as Express Route
+    participant DBS as databaseService
+    participant DB as SQLite
+
+    UI-&gt;&gt;SVC: dbService.savePost(post)
+    SVC-&gt;&gt;API: fetch POST /api/posts + Bearer JWT
+    API-&gt;&gt;API: authenticateToken()
+    API-&gt;&gt;API: Check userId ownership
+    API-&gt;&gt;DBS: savePost(post)
+    DBS-&gt;&gt;DBS: assertTierAllowsNewPost()
+    DBS-&gt;&gt;DB: INSERT OR UPDATE
+    DB--&gt;&gt;DBS: result
+    DBS--&gt;&gt;API: success
+    API--&gt;&gt;SVC: 200 JSON
+    SVC--&gt;&gt;UI: mergePostIntoState()</pre>
+<h3>9.2 Service Layer Pattern</h3>
+<table><thead><tr><th>Environment</th><th>Service used</th><th>Data access</th></tr></thead><tbody><tr><td>Browser (dev)</td><td><code>UniversalDatabaseService</code> → <code>ClientDatabaseService</code></td><td>HTTP to Express</td></tr><tr><td>Node (tests/seed)</td><td><code>UniversalDatabaseService</code> → <code>DatabaseService</code></td><td>Direct SQLite</td></tr></tbody></table>
+<p>This pattern lets the same React components work in the browser while tests hit the database directly.</p>
+<h3>9.3 AI Generation Flow</h3>
+<ol><li><code>ContentCalendar</code> calls <code>generateContentPlan(profile, month, count)</code>.</li><li><code>geminiService</code> builds prompt with brand context.</li><li><code>POST /api/ai/unsloth</code> proxies to Unsloth API.</li><li>Response parsed via <code>extractJson()</code>.</li><li><code>ValidationService.validateContentIdeas()</code> sanitizes output.</li><li><code>normalizeIdeasToBatchCount()</code> pads to exactly 8 or 16 ideas.</li><li>Ideas saved via <code>POST /api/plans</code>.</li></ol>
+<h3>9.4 Response Handling</h3>
+<ul><li>Success: JSON body parsed; React state updated.</li><li>403 tier limit: <code>TIER_LIMIT_REACHED</code> → organic dialog.</li><li>401: Redirect to login.</li><li>Network error: Caught in service; <code>console.error</code> + user alert.</li></ul>
+<hr/>
+<h2>10. User Guide</h2>
+<h3>10.1 Logging In</h3>
+<ol><li>Open the application URL (default: <code>http://localhost:5173</code>).</li><li>Click <strong>Login</strong> or go to Sign Up.</li><li>Enter email and password (see <code>md/ACCOUNTS.md</code>).</li><li>On success, routing depends on role and verification status.</li></ol>
+<h3>10.2 Registering</h3>
+<ol><li>Click <strong>Sign Up</strong>.</li><li>Fill business name, address, phone, email, password.</li><li>Upload business verification document (PDF/JPG/PNG, max 5MB).</li><li>Wait for admin approval (Verification Status screen).</li><li>After approval, complete <strong>Brand Survey</strong>.</li></ol>
+<h3>10.3 Navigating the System</h3>
+<table><thead><tr><th>Nav item</th><th>Available to</th><th>Function</th></tr></thead><tbody><tr><td>Calendar</td><td>Verified users</td><td>Main workspace</td></tr><tr><td>Growth Insights</td><td>Users</td><td>Analytics</td></tr><tr><td>Billing</td><td>Users</td><td>Wallet + subscription</td></tr><tr><td>Settings</td><td>Users</td><td>Profile + connections</td></tr><tr><td>Support bubble</td><td>Users</td><td>Help desk widget</td></tr><tr><td>Admin</td><td>Admin only</td><td>Governance portal</td></tr></tbody></table>
+<h3>10.4 Using the Calendar</h3>
+<ol><li>Enter monthly strategy → <strong>Plan Month</strong>.</li><li><strong>Batch Create</strong> to generate all posts (or click individual days).</li><li>Click a day to open the right panel.</li><li><strong>AI Draft</strong> → edit caption → <strong>Regenerate Image</strong> (max 2).</li><li><strong>Save Draft</strong> or <strong>Schedule</strong>.</li><li>Empty days: click <strong>+</strong> for ₱150 add-on post.</li></ol>
+<h3>10.5 Billing</h3>
+<ol><li>Go to <strong>Billing</strong>.</li><li>Enter amount or use quick ₱100/₱500/₱1000.</li><li><strong>Top Up via Xendit</strong> → select payment method → pay.</li><li><strong>Change Plan</strong> for Pro (₱499/mo, requires wallet balance).</li></ol>
+<h3>10.6 Growth Insights</h3>
+<ol><li>Install Kawayan Chrome extension.</li><li>Open <strong>Growth Insights</strong>.</li><li>Connect platform (+ Facebook / Instagram / TikTok).</li><li>Open platform in browser; extension syncs stats.</li><li>Click <strong>Refresh</strong> to update metrics.</li></ol>
+<h3>10.7 Support</h3>
+<ol><li>Click support bubble (bottom-right).</li><li>Choose <strong>Technical Issue</strong>, <strong>Billing Concern</strong>, or <strong>AI Assistant</strong>.</li><li>For calls: <strong>Call Us</strong> → enter reason → WebRTC session.</li></ol>
+<h3>10.8 Logging Out</h3>
+<p>Click <strong>Logout</strong> in the navigation bar. Session tokens are cleared from browser storage.</p>
+<hr/>
+<h2>11. Administrator Guide</h2>
+<h3>11.1 Accessing Admin Panel</h3>
+<p>Login as <code>admin@kawayan.ph</code> / <code>Admin123!</code> or navigate to <code>#admin-portal</code>.</p>
+<h3>11.2 Admin Functions</h3>
+<table><thead><tr><th>Tab</th><th>Functions</th></tr></thead><tbody><tr><td><strong>Overview</strong></td><td>Revenue, users, posts, retention, growth charts, recent audit logs</td></tr><tr><td><strong>Users</strong></td><td>Search, edit role, adjust wallet, set subscription plan (expiry field in UI; stored in admin workflow), delete user</td></tr><tr><td><strong>Verification</strong></td><td>Review uploaded documents; approve or reject with reason</td></tr><tr><td><strong>Billing</strong></td><td>List pending Xendit transactions; <strong>Verify Payment</strong> to credit wallet</td></tr><tr><td><strong>Help Desk</strong></td><td>View all tickets with category filters</td></tr><tr><td><strong>Audit Logs</strong></td><td>Full system activity history</td></tr><tr><td><strong>Settings</strong></td><td>Maintenance mode, registration toggle, admin password</td></tr></tbody></table>
+<h3>11.3 Permissions Summary</h3>
+<table><thead><tr><th>Action</th><th>Admin</th><th>Support</th><th>User</th></tr></thead><tbody><tr><td>View all users</td><td>✅</td><td>❌</td><td>❌</td></tr><tr><td>Approve verification</td><td>✅</td><td>❌</td><td>❌</td></tr><tr><td>Verify payments</td><td>✅</td><td>❌</td><td>❌</td></tr><tr><td>View all tickets</td><td>✅</td><td>✅</td><td>Own only</td></tr><tr><td>Create posts</td><td>✅</td><td>❌</td><td>✅</td></tr><tr><td>Adjust wallet</td><td>✅</td><td>❌</td><td>❌</td></tr></tbody></table>
+<hr/>
+<h2>12. Security Features</h2>
+<h3>12.1 Authentication</h3>
+<ul><li><strong>bcrypt</strong> password hashing (12 salt rounds) — <code>jwtService.hashPassword</code></li><li><strong>JWT</strong> (HS256) with configurable expiry (<code>SESSION_TIMEOUT</code>, default 24h)</li><li>Tokens stored client-side in <code>localStorage</code>; server stores bcrypt hash in <code>sessions</code></li></ul>
+<h3>12.2 Authorization</h3>
+<ul><li><code>authenticateToken</code> middleware on protected routes</li><li><code>requireAdmin</code> for <code>/api/admin/*</code></li><li>Per-route ownership checks (<code>userId === req.user.userId</code>)</li><li>Role-based UI routing in <code>App.tsx</code></li></ul>
+<h3>12.3 Password Policy</h3>
+<p>Minimum 8 characters, uppercase, lowercase, digit, and special character (<code>JWTService.validatePasswordStrength</code>).</p>
+<h3>12.4 Input Validation</h3>
+<ul><li><code>ValidationService.sanitizeInput()</code> strips HTML/script tags</li><li>AI responses validated against schemas before use</li><li>Multer file type whitelist for verification uploads</li></ul>
+<h3>12.5 SQL Injection Prevention</h3>
+<ul><li><strong>Parameterized queries</strong> throughout <code>databaseService.ts</code> (<code>.prepare().run()</code> with <code>?</code> placeholders)</li><li>No string concatenation of user input into SQL</li></ul>
+<h3>12.6 XSS Prevention</h3>
+<ul><li>React escapes JSX by default</li><li><code>sanitizeInput</code> on user-provided strings</li><li>CSP headers set in <code>server.js</code> (allows required CDNs)</li></ul>
+<h3>12.7 CSRF</h3>
+<ul><li>API uses Bearer token (not cookies) for auth — reduces CSRF surface</li><li>No cookie-based session for API calls</li></ul>
+<h3>12.8 File Upload Validation</h3>
+<ul><li>Max 5MB (<code>multer</code> limits)</li><li>Allowed types: JPG, PNG, PDF</li><li>Files stored outside web root with admin-only document access route</li></ul>
+<h3>12.9 Audit Trail</h3>
+<p>All significant actions logged to <code>audit_logs</code> via <code>logger.logUserAction</code>.</p>
+<hr/>
+<h2>13. Technologies Used</h2>
+<table><thead><tr><th>Technology</th><th>Version</th><th>Purpose</th><th>Why chosen</th></tr></thead><tbody><tr><td><strong>React</strong></td><td>19.x</td><td>UI framework</td><td>Component model, ecosystem, team familiarity</td></tr><tr><td><strong>TypeScript</strong></td><td>5.8</td><td>Type safety</td><td>Fewer runtime errors in large codebase</td></tr><tr><td><strong>Vite</strong></td><td>6.x</td><td>Build tool</td><td>Fast HMR for development</td></tr><tr><td><strong>Express</strong></td><td>5.x</td><td>REST API</td><td>Simple, well-documented Node server</td></tr><tr><td><strong>SQLite</strong></td><td>via better-sqlite3</td><td>Database</td><td>Zero-config, file-based, ideal for capstone deployment</td></tr><tr><td><strong>JWT + bcrypt</strong></td><td>—</td><td>Auth</td><td>Industry standard, stateless API auth</td></tr><tr><td><strong>Schedule-X</strong></td><td>4.x</td><td>Calendar UI</td><td>Professional month grid without building from scratch</td></tr><tr><td><strong>Recharts</strong></td><td>3.x</td><td>Charts</td><td>Admin/Insights visualizations</td></tr><tr><td><strong>Socket.io</strong></td><td>4.x</td><td>WebRTC signaling</td><td>Real-time support calls</td></tr><tr><td><strong>Xendit</strong></td><td>API</td><td>Payments</td><td>Philippine-standard gateway (GCash, Maya)</td></tr><tr><td><strong>Unsloth LLM</strong></td><td>API</td><td>AI text</td><td>Taglish content generation</td></tr><tr><td><strong>Tailwind CSS</strong></td><td>—</td><td>Styling</td><td>Rapid Wabi-Sabi theme implementation</td></tr><tr><td><strong>Multer</strong></td><td>2.x</td><td>File uploads</td><td>Verification document handling</td></tr><tr><td><strong>Chrome Extension</strong></td><td>MV3</td><td>Social sync</td><td>Access platform DOM for insights</td></tr></tbody></table>
+<hr/>
+<h2>14. Algorithms and Business Logic</h2>
+<h3>14.1 Tier Limit Check</h3>
+<pre><code>count = posts in current month for user
+limit = FREE ? 8 : 16
+if new post AND NOT addon-id AND count &gt;= limit → reject
+</code></pre>
+<p>Implemented in <code>databaseService.assertTierAllowsNewPost</code>.</p>
+<h3>14.2 Batch Idea Normalization</h3>
+<p>AI may return 5–7 ideas; <code>normalizeIdeasToBatchCount</code> pads or trims to exactly 8 or 16, assigning spread days from today through month-end (<code>getScheduleDayRange</code>).</p>
+<h3>14.3 Ticket Number Assignment</h3>
+<pre><code>nextNum = max(1001, MAX(ticket_num) + 1)
+</code></pre>
+<h3>14.4 Digital ROI (Insights)</h3>
+<pre><code>totalReach = sum(views + interactions + likes + followers) across platforms
+estimatedValue = totalReach × ₱0.05
+ROI% = ((estimatedValue - walletSpend) / walletSpend) × 100
+</code></pre>
+<h3>14.5 Retention Rate (Admin)</h3>
+<pre><code>retention = (users with posts in last 30 days) / (users joined 30+ days ago) × 100
+</code></pre>
+<h3>14.6 Pending Transaction Expiry</h3>
+<p>Pending transactions older than <strong>12 hours</strong> auto-marked <code>FAILED</code> on wallet load.</p>
+<h3>14.7 Regeneration Limit</h3>
+<p>Each post allows max <strong>2</strong> caption/image regenerations (<code>regenCount</code> in UI; previous versions stored in <code>history</code> JSON).</p>
+<hr/>
+<h2>15. Error Handling</h2>
+<h3>15.1 Validation</h3>
+<table><thead><tr><th>Layer</th><th>Mechanism</th></tr></thead><tbody><tr><td>Frontend</td><td>Form validation, disabled buttons, organic dialogs</td></tr><tr><td>Service</td><td><code>ValidationService</code> for AI responses and inputs</td></tr><tr><td>API</td><td>400 for bad input, 403 for tier limit, 401 for auth</td></tr><tr><td>Database</td><td>CHECK constraints on enums and score ranges</td></tr></tbody></table>
+<h3>15.2 Exception Handling</h3>
+<ul><li>API routes wrapped in try/catch → 500 JSON <code>{error: message}</code></li><li>Services throw descriptive errors caught by components</li><li>AI failures fall back to <code>ValidationService.createFallbackContentIdeas</code></li></ul>
+<h3>15.3 User-Facing Messages</h3>
+<ul><li>Organic dialog (<code>useOrganicDialog</code>) for alerts/confirms</li><li>Tier limit: dedicated message with upgrade prompt</li><li>Payment failures: wallet balance insufficient message</li></ul>
+<h3>15.4 Logging</h3>
+<ul><li><code>utils/logger.ts</code> — structured server logging</li><li><code>audit_logs</code> table for admin-visible actions</li><li>Console errors in development (<code>npm run dev:full</code>)</li></ul>
+<hr/>
+<h2>16. Testing</h2>
+<h3>16.1 Functional Testing</h3>
+<p>Manual test scripts in <code>md/TESTING_GUIDE.md</code>: - Login/logout all roles - Calendar batch create - Xendit top-up flow - Ticket creation - Admin verification approve</p>
+<h3>16.2 Automated Tests</h3>
+<table><thead><tr><th>Command</th><th>File</th><th>Coverage</th></tr></thead><tbody><tr><td><code>npm test</code></td><td><code>tests/systemTest.ts</code></td><td>ValidationService, DatabaseService CRUD, admin stats</td></tr><tr><td><code>npm run test:db</code></td><td><code>tests/dbTest.ts</code></td><td>Schema, FK relationships, inserts</td></tr><tr><td><code>./test.sh</code></td><td>—</td><td>Build check + system test</td></tr></tbody></table>
+<h3>16.3 Integration Testing</h3>
+<ul><li><code>npm run dev:full</code> exercises full frontend → API → SQLite path</li><li>Extension tested manually against localhost dashboard</li></ul>
+<h3>16.4 User Acceptance Testing (UAT)</h3>
+<p>Recommended UAT script (see also <code>md/CAPSTONE_MEMBER_GUIDE.md</code>):</p>
+<ol><li>Register new SME account with document</li><li>Admin approves verification</li><li>Complete brand survey</li><li>Plan month + batch create 8 posts</li><li>Schedule 3 posts on different days</li><li>Top up wallet via Xendit</li><li>Purchase ₱150 add-on post</li><li>Sync one social platform</li><li>Submit billing ticket; support resolves</li><li>Admin reviews growth chart</li></ol>
+<hr/>
+<h2>17. Future Improvements</h2>
+<table><thead><tr><th>Area</th><th>Enhancement</th></tr></thead><tbody><tr><td>Payments</td><td>Complete Xendit webhook handler (currently stub)</td></tr><tr><td>Social</td><td>Full OAuth for Facebook/Instagram (callback stubs exist)</td></tr><tr><td>AI</td><td>Re-enable direct Gemini SDK as primary if quota allows</td></tr><tr><td>Mobile</td><td>Responsive PWA or native app</td></tr><tr><td>Analytics</td><td>Export PDF/CSV reports from Insights</td></tr><tr><td>Scheduling</td><td>Server-side cron to auto-publish at scheduled time</td></tr><tr><td>Retention</td><td>Proper cohort analysis with <code>deleted_at</code> on users</td></tr><tr><td>Security</td><td>Rate limiting on Express (exists in PHP legacy only)</td></tr><tr><td>Testing</td><td>Expand automated E2E with Playwright</td></tr></tbody></table>
+<hr/>
+<h2>18. Frequently Asked Questions (FAQ)</h2>
+<p><strong>Q: Why does the app use ViewState instead of URL routes?</strong>   A: Historical design choice in <code>App.tsx</code>. Main views are state-driven; <code>react-router-dom</code> is installed but used minimally.</p>
+<p><strong>Q: Where is the database file?</strong>   A: <code>./kawayan.db</code> by default (<code>DB_PATH</code> in <code>.env</code>).</p>
+<p><strong>Q: How do I reset all demo data?</strong>   A: Run <code>./seed.sh</code> (recreates database with sample users and posts).</p>
+<p><strong>Q: Why can't I create more than 8 posts?</strong>   A: Trial (FREE) tier limit. Upgrade to Pro (16) or buy ₱150 add-on posts.</p>
+<p><strong>Q: Is Gemini actually used?</strong>   A: The <code>geminiService.ts</code> file name is legacy. Production AI calls go through <code>/api/ai/unsloth</code>. <code>@google/genai</code> is in package.json but not imported in source. Images use Pollinations.ai URLs.</p>
+<p><strong>Q: How do add-on posts bypass the tier limit?</strong>   A: Post IDs starting with <code>addon-</code> skip <code>assertTierAllowsNewPost</code> after wallet payment.</p>
+<p><strong>Q: Why is my verification stuck?</strong>   A: Admin must approve in Admin → Verification tab.</p>
+<p><strong>Q: How do I run only the backend?</strong>   A: <code>npm run server</code> (port 3001).</p>
+<p><strong>Q: What's the difference between SYSTEM_GUIDE and other docs?</strong>   A: This System Guide is the full 20-section technical manual. <code>USER_GUIDE.md</code> covers end-user flows; <code>SYSTEM_MANUAL.md</code> covers operations; <code>FEATURE_CHECKLIST.md</code> maps paper requirements to code.</p>
+<p><strong>Q: Is the PHP backend used?</strong>   A: No, in the standard dev workflow. <code>server.js</code> is the active API.</p>
+<hr/>
+<h2>19. Glossary</h2>
+<table><thead><tr><th>Term</th><th>Definition</th></tr></thead><tbody><tr><td><strong>SME</strong></td><td>Small and Medium Enterprise — target user type</td></tr><tr><td><strong>Taglish</strong></td><td>Mix of Tagalog and English in captions</td></tr><tr><td><strong>Editorial calendar</strong></td><td>Month-view schedule of planned content</td></tr><tr><td><strong>Tier limit</strong></td><td>Monthly post cap (8 trial, 16 pro)</td></tr><tr><td><strong>Add-on post</strong></td><td>Paid extra post (₱150) beyond tier cap</td></tr><tr><td><strong>Xendit</strong></td><td>Philippine payment gateway API</td></tr><tr><td><strong>JWT</strong></td><td>JSON Web Token for API authentication</td></tr><tr><td><strong>WAL</strong></td><td>Write-Ahead Logging — SQLite performance mode</td></tr><tr><td><strong>Wabi-Sabi</strong></td><td>Design philosophy: organic, imperfect beauty</td></tr><tr><td><strong>Unsloth</strong></td><td>LLM API proxy for text generation</td></tr><tr><td><strong>Schedule-X</strong></td><td>Third-party React calendar component</td></tr><tr><td><strong>WebRTC</strong></td><td>Browser technology for live support calls</td></tr><tr><td><strong>MV3</strong></td><td>Manifest V3 — Chrome extension platform version</td></tr></tbody></table>
+<hr/>
+<h2>20. Conclusion</h2>
+<p>Kawayan AI delivers a complete capstone-grade platform for Filipino SME social media management. The system integrates <strong>AI content generation</strong>, an <strong>interactive editorial calendar</strong>, <strong>Xendit billing</strong>, <strong>growth analytics</strong>, <strong>business verification</strong>, and an <strong>integrated help desk</strong> under a unified Wabi-Sabi interface.</p>
+<p>Every major functional requirement from the capstone paper is traceable to implemented modules, database tables, and API endpoints documented in this guide. New team members can understand the full system — from user registration to admin governance — without reading source code, while developers can use Sections 4, 7, 8, and 9 as technical reference.</p>
+<p>The platform demonstrates that SMEs can plan, create, schedule, pay for, and measure social content through a single cohesive application aligned with Philippine payment norms and local language preferences.</p>
+<hr/>
+<h2>Appendix A: Complete API Route Reference</h2>
+<table><thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead><tbody><tr><td>GET</td><td><code>/api/health</code></td><td>No</td><td>Health check</td></tr><tr><td>POST</td><td><code>/api/auth/register</code></td><td>No</td><td>Register user</td></tr><tr><td>POST</td><td><code>/api/auth/login</code></td><td>No</td><td>Login</td></tr><tr><td>POST</td><td><code>/api/auth/logout</code></td><td>No</td><td>Logout</td></tr><tr><td>GET</td><td><code>/api/auth/me</code></td><td>JWT</td><td>Current user</td></tr><tr><td>PUT</td><td><code>/api/auth/theme</code></td><td>JWT</td><td>Update theme</td></tr><tr><td>PUT</td><td><code>/api/auth/password</code></td><td>JWT</td><td>Change password</td></tr><tr><td>POST</td><td><code>/api/profiles</code></td><td>JWT</td><td>Save brand profile</td></tr><tr><td>GET</td><td><code>/api/profiles/:userId</code></td><td>JWT</td><td>Get profile</td></tr><tr><td>POST</td><td><code>/api/posts</code></td><td>JWT</td><td>Save post (403 if tier limit)</td></tr><tr><td>GET</td><td><code>/api/posts/user/:userId</code></td><td>JWT</td><td>List user posts</td></tr><tr><td>POST</td><td><code>/api/plans</code></td><td>JWT</td><td>Save content plan</td></tr><tr><td>GET</td><td><code>/api/plans/:userId/:month</code></td><td>JWT</td><td>Get plan</td></tr><tr><td>GET</td><td><code>/api/wallet/:userId</code></td><td>JWT</td><td>Wallet + transactions</td></tr><tr><td>POST</td><td><code>/api/wallet/cancel-transaction</code></td><td>JWT</td><td>Cancel pending txn</td></tr><tr><td>POST</td><td><code>/api/wallet/verify-payment</code></td><td>JWT</td><td>Poll Xendit status</td></tr><tr><td>POST</td><td><code>/api/wallet/create-invoice</code></td><td>JWT</td><td>Create Xendit invoice</td></tr><tr><td>POST</td><td><code>/api/wallet/xendit-checkout</code></td><td>JWT</td><td>Checkout flow</td></tr><tr><td>POST</td><td><code>/api/wallet/topup</code></td><td>JWT</td><td>Create pending credit</td></tr><tr><td>POST</td><td><code>/api/wallet/purchase</code></td><td>JWT</td><td>Debit wallet / upgrade</td></tr><tr><td>POST</td><td><code>/api/wallet/cancel</code></td><td>JWT</td><td>Cancel subscription</td></tr><tr><td>POST</td><td><code>/api/admin/wallet/approve</code></td><td>Admin</td><td>Approve transaction</td></tr><tr><td>GET</td><td><code>/api/admin/pending-transactions</code></td><td>Admin</td><td>List pending</td></tr><tr><td>GET</td><td><code>/api/admin/stats</code></td><td>Admin</td><td>Dashboard stats</td></tr><tr><td>GET</td><td><code>/api/admin/logs</code></td><td>Admin</td><td>Audit logs</td></tr><tr><td>GET</td><td><code>/api/admin/users</code></td><td>Admin</td><td>All users</td></tr><tr><td>GET</td><td><code>/api/admin/tickets</code></td><td>Admin</td><td>All tickets</td></tr><tr><td>PUT</td><td><code>/api/admin/users/:id</code></td><td>Admin</td><td>Update user</td></tr><tr><td>DELETE</td><td><code>/api/admin/users/:id</code></td><td>Admin</td><td>Delete user</td></tr><tr><td>POST</td><td><code>/api/admin/balance</code></td><td>Admin</td><td>Adjust balance</td></tr><tr><td>POST</td><td><code>/api/admin/subscription</code></td><td>Admin</td><td>Set subscription</td></tr><tr><td>POST</td><td><code>/api/verification/submit</code></td><td>JWT+file</td><td>Upload doc</td></tr><tr><td>POST</td><td><code>/api/verification/resubmit</code></td><td>JWT+file</td><td>Re-upload after rejection</td></tr><tr><td>GET</td><td><code>/api/verification/status/:userId</code></td><td>JWT</td><td>Get status</td></tr><tr><td>GET</td><td><code>/api/admin/verifications</code></td><td>Admin</td><td>Pending queue</td></tr><tr><td>GET</td><td><code>/api/admin/verifications/:id/document</code></td><td>Admin</td><td>Download verification file</td></tr><tr><td>POST</td><td><code>/api/admin/verifications/:id/approve</code></td><td>Admin</td><td>Approve</td></tr><tr><td>POST</td><td><code>/api/admin/verifications/:id/reject</code></td><td>Admin</td><td>Reject</td></tr><tr><td>GET</td><td><code>/api/social/connections</code></td><td>JWT</td><td>Social connections</td></tr><tr><td>POST</td><td><code>/api/social/connections</code></td><td>JWT</td><td>Save connection</td></tr><tr><td>DELETE</td><td><code>/api/social/connections/:platform</code></td><td>JWT</td><td>Disconnect</td></tr><tr><td>GET</td><td><code>/api/social/stats/:platform/:username</code></td><td>No</td><td>Cached stats lookup</td></tr><tr><td>GET</td><td><code>/api/support/tickets</code></td><td>JWT</td><td>List tickets</td></tr><tr><td>POST</td><td><code>/api/support/tickets</code></td><td>JWT</td><td>Create ticket</td></tr><tr><td>PUT</td><td><code>/api/support/tickets/:id</code></td><td>JWT</td><td>Update ticket</td></tr><tr><td>POST</td><td><code>/api/support/tickets/resolve-user</code></td><td>JWT</td><td>Bulk-resolve user tickets</td></tr><tr><td>GET</td><td><code>/api/support/calls</code></td><td>JWT</td><td>Active calls</td></tr><tr><td>GET</td><td><code>/api/support/call-history</code></td><td>JWT</td><td>Completed calls</td></tr><tr><td>POST</td><td><code>/api/support/calls/register</code></td><td>JWT</td><td>Start call</td></tr><tr><td>POST</td><td><code>/api/support/calls/unregister</code></td><td>JWT</td><td>End call</td></tr><tr><td>POST</td><td><code>/api/webhooks/xendit</code></td><td>No</td><td>Webhook stub</td></tr><tr><td>POST</td><td><code>/api/ai/unsloth</code></td><td>No*</td><td>AI text proxy</td></tr><tr><td>POST</td><td><code>/api/ai/local</code></td><td>No*</td><td>Ollama proxy</td></tr></tbody></table>
+<p>*AI routes should be restricted in production deployments.</p>
+<hr/>
+<h2>Appendix B: Related Documents</h2>
+<table><thead><tr><th>Document</th><th>Path</th></tr></thead><tbody><tr><td>Feature Checklist (paper traceability)</td><td><code>md/FEATURE_CHECKLIST.md</code></td></tr><tr><td>Feature Checklist</td><td><code>md/FEATURE_CHECKLIST.md</code></td></tr><tr><td>User Guide</td><td><code>md/USER_GUIDE.md</code></td></tr><tr><td>System Manual (ops)</td><td><code>md/SYSTEM_MANUAL.md</code></td></tr><tr><td>Architecture</td><td><code>md/ARCHITECTURE.md</code></td></tr><tr><td>Database Schema</td><td><code>md/DATABASE_SCHEMA.md</code></td></tr><tr><td>Test Accounts</td><td><code>md/ACCOUNTS.md</code></td></tr><tr><td>Payment Setup</td><td><code>md/PAYMENT_SETUP.md</code></td></tr><tr><td>Testing Guide</td><td><code>md/TESTING_GUIDE.md</code></td></tr><tr><td>Extension Guide</td><td><code>md/EXTENSION_GUIDE.md</code></td></tr></tbody></table>
+<hr/>
+<p>*© 2025 Kawayan AI Capstone Project. This document accompanies the official Capstone research paper.*</p>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+</script>
+</body>
+</html>

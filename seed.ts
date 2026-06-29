@@ -109,6 +109,26 @@ async function seed() {
       console.log(`✓ Created profile for: ${p.businessName}`);
     }
 
+    // 2b. Auto-verify seeded SME users (legacy accounts without verification records)
+    const adminId = createdUsers[0].id;
+    for (const user of createdUsers.slice(2)) {
+      const existingVerif = await dbService.getVerification(user.id);
+      if (!existingVerif) {
+        await dbService.submitVerification(
+          user.id,
+          'Manila, Philippines',
+          '+639000000000',
+          'seed-business-permit.pdf',
+          'seed-business-permit.pdf'
+        );
+        const verif = await dbService.getVerification(user.id);
+        if (verif) {
+          await dbService.approveVerification(verif.id, adminId);
+          console.log(`✓ Auto-verified seeded user: ${user.email}`);
+        }
+      }
+    }
+
     // 3. Create Generated Posts (Past, Present, Future)
     const today = new Date();
     const months = [-2, -1, 0, 1]; // Last two months, current month, next month

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, X, Send, Phone, FileText, Loader2, ArrowLeft, Bot, Headset, Brain, ChevronDown, ChevronUp } from 'lucide-react';
 import { chatWithSupportBot } from '../services/geminiService';
 import { supportService } from '../services/supportService';
+import { supportRealtime } from '../services/supportRealtime';
 import CallOverlay from './CallOverlay';
 import { useOrganicDialog } from './OrganicDialog';
 
@@ -48,34 +49,48 @@ const SupportWidget: React.FC = () => {
     }
   }, [isOpen]);
 
-  // Poll for ticket updates
   useEffect(() => {
-    let interval: any;
-    if (activeTicketId && isOpen) {
-      interval = setInterval(async () => {
-        try {
-          const response = await fetch('/api/support/tickets', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('kawayan_jwt')}` }
-          });
-          if (response.ok) {
-            const tickets = await response.json();
-            const current = tickets.find((t: any) => t.id === activeTicketId);
-            if (current && current.messages) {
-               if (current.messages.length > chatHistory.filter(m => m.sender !== 'bot' && m.sender !== 'system').length) {
-                  const newHistory = current.messages;
-                  setChatHistory(newHistory);
-               }
-            }
-          }
-        } catch (e) { console.error("Polling error", e); }
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [activeTicketId, isOpen, chatHistory]);
+    if (!isOpen) return;
+    supportRealtime.connect();
+  }, [isOpen]);
 
-  const handleStartCall = (e: React.FormEvent) => {
+  // Real-time ticket messages from support agent
+  useEffect(() => {
+    if (!activeTicketId) return;
+
+    const unsub = supportRealtime.onTicketUpdated((ticket) => {
+      if (ticket.id !== activeTicketId) return;
+      setChatHistory((prev) => {
+        const system = prev.filter((m) => m.sender === 'system');
+        return [...system, ...(ticket.messages || [])];
+      });
+    });
+
+    return unsub;
+  }, [activeTicketId]);
+
+  const handleStartCall = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!callReason.trim()) return;
+
+    const userSession = JSON.parse(localStorage.getItem('kawayan_session') || '{}');
+    if (userSession?.id) {
+      try {
+        const ticket = await supportService.createTicket(
+          userSession,
+          `Live call: ${callReason.trim().slice(0, 80)}`,
+          'High',
+          `User requested live support call. Reason: ${callReason.trim()}`,
+          'General'
+        );
+        if (ticket) {
+          setActiveTicketId(ticket.id);
+        }
+      } catch (err) {
+        console.warn('Could not create call ticket (call will still proceed):', err);
+      }
+    }
+
     setIsCalling(true);
     setMode('chat');
   };
@@ -153,7 +168,7 @@ const SupportWidget: React.FC = () => {
       
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-4">
         {isOpen && (
-          <div className="bg-white dark:bg-[#1E293B]/40 w-80 h-[500px] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#4D7CFF]/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="bg-white dark:bg-[#1E293B]/40 w-80 max-h-[min(560px,85vh)] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#4D7CFF]/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
             {/* Header */}
             <div className="bg-slate-900 dark:bg-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
               <div className="flex items-center gap-2 overflow-hidden">
@@ -165,7 +180,7 @@ const SupportWidget: React.FC = () => {
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-xs truncate">
                     {mode === 'menu' ? 'Kawayan Support' : 
-                     mode === 'chat' ? 'AI Assistant' : 
+                     mode === 'chat' ? (activeTicketId ? `Ticket #${activeTicketId.slice(-4)}` : 'AI Assistant') : 
                      mode === 'ticket' ? 'Submit Ticket' : 'Request Call'}
                   </span>
                   {isCalling && sessionCallId && (
@@ -182,30 +197,43 @@ const SupportWidget: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col relative">
               
               {mode === 'menu' && (
-                <div className="flex-1 p-6 flex flex-col gap-4 justify-center bg-slate-50 dark:bg-[#0F172A]/50">
-                  <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-2">How can we help you today?</p>
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-50 dark:bg-[#0F172A]/50">
+                  <p className="text-center text-sm text-slate-500 dark:text-slate-400 shrink-0">How can we help you today?</p>
                   
                   <button 
                     onClick={() => setMode('chat')}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                      <Bot className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+                      <Bot className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="font-bold text-slate-800 dark:text-white text-sm">AI Assist</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Instant answers 24/7</p>
                     </div>
                   </button>
 
                   <button 
-                    onClick={() => { setTicketCategory('Technical'); setMode('ticket'); }}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-md transition-all group text-left"
+                    onClick={() => setMode('call')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border-2 border-purple-200 dark:border-purple-500/40 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
-                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
-                      <Bot className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shrink-0">
+                      <Headset className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-slate-800 dark:text-white text-sm">Call Us</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Talk to a human agent live</p>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => { setTicketCategory('Technical'); setMode('ticket'); }}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-md transition-all group text-left shrink-0"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
                       <h4 className="font-bold text-slate-800 dark:text-white text-sm">Technical Issue</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400">App, extension, or sync problems</p>
                     </div>
@@ -213,12 +241,12 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => { setTicketCategory('Billing'); setMode('ticket'); }}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                      <FileText className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+                      <FileText className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="font-bold text-slate-800 dark:text-white text-sm">Billing Concern</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Wallet, payments, or subscription</p>
                     </div>
@@ -226,27 +254,14 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => { setTicketCategory('General'); setMode('ticket'); }}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all group text-left"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                      <FileText className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform shrink-0">
+                      <FileText className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="font-bold text-slate-800 dark:text-white text-sm">New Ticket</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Submit a formal request</p>
-                    </div>
-                  </button>
-
-                  <button 
-                    onClick={() => setMode('call')}
-                    className="flex items-center gap-4 p-4 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all group text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform">
-                      <Headset className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-800 dark:text-white text-sm">Call Us</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Talk to a human agent</p>
                     </div>
                   </button>
                 </div>
@@ -255,10 +270,22 @@ const SupportWidget: React.FC = () => {
               {mode === 'chat' && (
                 <>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-[#0F172A]/50">
-                    {chatHistory.length === 0 && (
-                      <div className="text-center mt-10 opacity-50">
+                    {!activeTicketId && chatHistory.length === 0 && (
+                      <div className="text-center mt-6 opacity-70 px-2">
                         <Bot className="w-12 h-12 mx-auto mb-2 text-emerald-500"/>
-                        <p className="text-xs">Ask me anything about your business!</p>
+                        <p className="text-xs mb-3">AI answers instantly. For a human agent, submit a ticket or request a call from the menu.</p>
+                        <button
+                          type="button"
+                          onClick={() => setMode('menu')}
+                          className="text-[11px] font-bold text-emerald-600 hover:underline"
+                        >
+                          ← Back to Support Menu
+                        </button>
+                      </div>
+                    )}
+                    {activeTicketId && chatHistory.length === 0 && (
+                      <div className="text-center mt-6 opacity-70 px-2">
+                        <p className="text-xs">Your ticket is open. Type below — a support agent will see your messages.</p>
                       </div>
                     )}
                     {chatHistory.map((msg, idx) => {
@@ -311,7 +338,7 @@ const SupportWidget: React.FC = () => {
                       type="text" 
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Type your concern..."
+                      placeholder={activeTicketId ? "Message support agent..." : "Ask the AI assistant..."}
                       disabled={isTyping}
                       className="flex-1 text-sm bg-slate-100 dark:bg-[#0F172A] border-none rounded-full px-4 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white disabled:opacity-50"
                     />
