@@ -7,7 +7,7 @@ import TermsOfServiceModal from './TermsOfServiceModal';
 import { LogIn, UserPlus, AlertCircle, LayoutDashboard, Sun, Moon, Upload, FileText, X, ArrowRight, Sparkles, Shield, TrendingUp } from 'lucide-react';
 
 interface Props {
-  onLogin: (user: User) => void;
+  onLogin: (user: User) => void | Promise<void>;
   onNavigate: (view: ViewState) => void;
   isAdminLogin?: boolean;
   initialIsSignUp?: boolean;
@@ -60,7 +60,7 @@ const Login: React.FC<Props> = ({
     setValidationErrors([]);
     setIsLoading(true);
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedBusinessName = businessName.trim();
 
     try {
@@ -148,7 +148,7 @@ const Login: React.FC<Props> = ({
             setError("Access denied. Use the main Login page for SME accounts.");
             await dbService.logoutUser();
           } else {
-            onLogin(result.user);
+            await onLogin(result.user);
           }
         } else {
           setError("Invalid email or password.");

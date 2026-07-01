@@ -1,16 +1,27 @@
 import React, { useRef, useState } from 'react';
 import { Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut, Shield, ArrowRight } from 'lucide-react';
 import { VerificationStatus as VStatus } from '../types';
+import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
 
 interface Props {
+  userId?: string;
   status: VStatus;
   rejectionReason?: string;
   businessName?: string;
   onLogout: () => void;
   onResubmit?: () => void;
+  onSessionExpired?: () => void;
 }
 
-const VerificationStatus: React.FC<Props> = ({ status, rejectionReason, businessName, onLogout, onResubmit }) => {
+const VerificationStatus: React.FC<Props> = ({
+  userId: userIdProp,
+  status,
+  rejectionReason,
+  businessName,
+  onLogout,
+  onResubmit,
+  onSessionExpired,
+}) => {
   const [document, setDocument] = useState<File | null>(null);
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
@@ -39,10 +50,14 @@ const VerificationStatus: React.FC<Props> = ({ status, rejectionReason, business
     setUploading(true);
     setUploadError('');
     try {
-      const session = localStorage.getItem('kawayan_session');
-      const userId = session ? JSON.parse(session).id : null;
-      const token = localStorage.getItem('kawayan_jwt');
-      if (!userId || !token) throw new Error('Not authenticated');
+      const userId = userIdProp || getStoredUserId();
+      const token = getStoredToken();
+
+      if (!userId || !token) {
+        setUploadError('Your session has expired. Please sign out and sign in again.');
+        onSessionExpired?.();
+        return;
+      }
 
       const formData = new FormData();
       formData.append('userId', userId);
@@ -59,8 +74,14 @@ const VerificationStatus: React.FC<Props> = ({ status, rejectionReason, business
         body: formData,
       });
 
+      if (isAuthResponse(res.status)) {
+        setUploadError('Your session has expired. Please sign out and sign in again.');
+        onSessionExpired?.();
+        return;
+      }
+
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Upload failed');
       }
 

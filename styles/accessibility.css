@@ -1,0 +1,113 @@
+/* Kawayan AI — Accessibility widget styles (applied via classes on <html>) */
+
+html.a11y-font-0 { font-size: 100%; }
+html.a11y-font-1 { font-size: 112.5%; }
+html.a11y-font-2 { font-size: 125%; }
+html.a11y-font-3 { font-size: 140%; }
+
+html.a11y-high-contrast {
+  --bg: #ffffff;
+  --bg-alt: #f0f0f0;
+  --fg: #000000;
+  --fg-muted: #1a1a1a;
+  --fg-subtle: #333333;
+  --card: #ffffff;
+  --border: #000000;
+  --border-strong: #000000;
+  --primary: #000000;
+  --kw-green: #004d00;
+  --kw-sage: #006600;
+  --glass-bg: #ffffff;
+  --glass-border: #000000;
+}
+
+html.a11y-high-contrast.dark {
+  --bg: #000000;
+  --bg-alt: #111111;
+  --fg: #ffffff;
+  --fg-muted: #e8e8e8;
+  --fg-subtle: #cccccc;
+  --card: #000000;
+  --border: #ffffff;
+  --border-strong: #ffffff;
+  --primary: #ffffff;
+  --kw-green: #90ee90;
+  --kw-sage: #adffad;
+  --glass-bg: #000000;
+  --glass-border: #ffffff;
+}
+
+html.a11y-high-contrast body {
+  background-color: var(--bg) !important;
+  color: var(--fg) !important;
+}
+
+html.a11y-high-contrast .glass,
+html.a11y-high-contrast .glass-card,
+html.a11y-high-contrast .card {
+  border-width: 2px !important;
+  border-color: var(--border-strong) !important;
+}
+
+html.a11y-high-contrast button,
+html.a11y-high-contrast a,
+html.a11y-high-contrast input,
+html.a11y-high-contrast textarea,
+html.a11y-high-contrast select {
+  outline-offset: 2px;
+}
+
+html.a11y-highlight-links a:not(.a11y-widget-root a) {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+html.a11y-readable-font body,
+html.a11y-readable-font body *:not(.font-display):not(.a11y-widget-root *) {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  letter-spacing: 0.02em;
+}
+
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(.a11y-reduce-motion-off) *,
+  html:not(.a11y-reduce-motion-off) *::before,
+  html:not(.a11y-reduce-motion-off) *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Widget panel */
+.a11y-widget-root {
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.a11y-widget-toggle:focus-visible {
+  outline: 3px solid var(--kw-green, #2b5748);
+  outline-offset: 3px;
+}
+
+.a11y-widget-panel {
+  animation: a11y-slide-up 0.25s ease forwards;
+}
+
+@keyframes a11y-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

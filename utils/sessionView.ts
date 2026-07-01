@@ -24,6 +24,21 @@ export const readStoredView = (): ViewState | null => {
   return null;
 };
 
+const NON_APP_VIEWS = new Set<ViewState>([
+  ViewState.LANDING,
+  ViewState.LOGIN,
+  ViewState.SIGNUP,
+  ViewState.ADMIN_LOGIN,
+]);
+
+/** Stored view safe to restore after login or session refresh (never auth/marketing screens). */
+export const readRestorableView = (role?: string): ViewState | null => {
+  const stored = readStoredView();
+  if (!stored || NON_APP_VIEWS.has(stored)) return null;
+  if (role) return resolveViewForRole(role, stored);
+  return stored;
+};
+
 export const writeStoredView = (view: ViewState): void => {
   try {
     localStorage.setItem(VIEW_STORAGE_KEY, view);

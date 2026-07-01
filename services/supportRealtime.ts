@@ -13,6 +13,7 @@ class SupportRealtimeService {
   private ticketCreatedHandlers = new Set<TicketHandler>();
   private ticketUpdatedHandlers = new Set<TicketHandler>();
   private callsChangedHandlers = new Set<VoidHandler>();
+  private verificationUpdatedHandlers = new Set<VoidHandler>();
 
   connect(): void {
     const token = localStorage.getItem('kawayan_jwt');
@@ -34,6 +35,10 @@ class SupportRealtimeService {
 
       this.socket.on('calls:changed', () => {
         this.callsChangedHandlers.forEach((fn) => fn());
+      });
+
+      this.socket.on('verification:updated', () => {
+        this.verificationUpdatedHandlers.forEach((fn) => fn());
       });
 
       this.socket.on('connect', () => {
@@ -64,12 +69,18 @@ class SupportRealtimeService {
     return () => this.callsChangedHandlers.delete(handler);
   }
 
+  onVerificationUpdated(handler: VoidHandler): () => void {
+    this.verificationUpdatedHandlers.add(handler);
+    return () => this.verificationUpdatedHandlers.delete(handler);
+  }
+
   disconnect(): void {
     this.socket?.disconnect();
     this.socket = null;
     this.ticketCreatedHandlers.clear();
     this.ticketUpdatedHandlers.clear();
     this.callsChangedHandlers.clear();
+    this.verificationUpdatedHandlers.clear();
   }
 }
 

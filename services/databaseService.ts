@@ -3,6 +3,7 @@ import { User, BrandProfile, GeneratedPost } from '../types';
 import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
 import { JWTService } from './jwtService';
+import { normalizeEmail, sanitizeUserForSession } from '../utils/authSession';
 
 export class DatabaseService {
   private dbConfig: DatabaseConfig;
@@ -21,6 +22,7 @@ export class DatabaseService {
     options?: { acceptedTerms?: boolean; termsVersion?: string }
   ): Promise<User | null> {
     const db = this.dbConfig.getDatabase();
+    const normalizedEmail = normalizeEmail(email);
 
     // Validate password strength before DB operations
     const passwordValidation = JWTService.validatePasswordStrength(password);
@@ -29,8 +31,8 @@ export class DatabaseService {
     }
     
     try {
-      // Check if user already exists
-      const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      // Check if user already exists (case-insensitive)
+      const existingUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(normalizedEmail);
       if (existingUser) return null;
       
       // Hash password with JWT service
@@ -38,7 +40,7 @@ export class DatabaseService {
       
       const newUser: User = {
         id: Date.now().toString(),
-        email,
+        email: normalizedEmail,
         passwordHash,
         role,
         businessName
@@ -67,9 +69,10 @@ export class DatabaseService {
   
 async loginUser(email: string, password: string): Promise<{ user: User; token: string } | null> {
     const db = this.dbConfig.getDatabase();
+    const normalizedEmail = normalizeEmail(email);
     
     try {
-      const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+      const row = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(normalizedEmail) as any;
       
       if (!row) return null;
 
@@ -85,15 +88,16 @@ async loginUser(email: string, password: string): Promise<{ user: User; token: s
       // Verify password with JWT service
       const isValidPassword = await JWTService.verifyPassword(password, user.passwordHash);
       if (!isValidPassword) {
-        logger.logAuthAttempt(email, false);
+        logger.logAuthAttempt(normalizedEmail, false);
         return null;
       }
       
       // Create JWT session
       const token = await this.createSession(user.id);
+      const safeUser = sanitizeUserForSession(user) as User;
       
-      logger.logAuthAttempt(email, true, user.id);
-      return { user, token };
+      logger.logAuthAttempt(normalizedEmail, true, user.id);
+      return { user: safeUser, token };
     } catch (error) {
       logger.logDatabaseError('loginUser', error, email);
       return null;

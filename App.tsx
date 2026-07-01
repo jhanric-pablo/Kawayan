@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ViewState, BrandProfile, User, VerificationStatus } from './types';
 import BrandSurvey from './components/BrandSurvey';
@@ -19,43 +19,131 @@ import UniversalDatabaseService from './services/universalDatabaseService';
 import { supportRealtime } from './services/supportRealtime';
 import {
   hasPersistedSession,
-  readStoredView,
+  readRestorableView,
   writeStoredView,
   clearStoredView,
   readThemeFromSession,
   resolveViewForRole,
   getHomeViewForRole,
 } from './utils/sessionView';
+import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
-  const [isHydrating, setIsHydrating] = useState(() => hasPersistedSession());
+  const [isHydrating, setIsHydrating] = useState(false);
   const [view, setView] = useState<ViewState>(() => {
     if (hasPersistedSession()) {
-      // Restore last view immediately so there's no flash on refresh
-      return readStoredView() ?? ViewState.CALENDAR;
+      return readRestorableView() ?? ViewState.CALENDAR;
     }
     return ViewState.LANDING;
   });
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (!hasPersistedSession() || isStoredTokenExpired()) return null;
+    return readCachedUser();
+  });
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [darkMode, setDarkMode] = useState(() => readThemeFromSession());
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
+  const loginInProgressRef = useRef(false);
+  const sessionRestoredRef = useRef(false);
+  const handleLoginRef = useRef<(user: User, initialView?: ViewState) => Promise<void>>(async () => {});
 
   const navigateView = (next: ViewState) => {
     setView(next);
     writeStoredView(next);
   };
 
+  const continueAsUser = useCallback(async (loggedInUser: User, initialView?: ViewState) => {
+    try {
+      const profile = await dbService.getProfile(loggedInUser.id);
+      if (profile) {
+        setBrandProfile(profile);
+        navigateView(initialView || readRestorableView('user') || ViewState.CALENDAR);
+      } else {
+        navigateView(ViewState.SURVEY);
+      }
+    } catch {
+      navigateView(ViewState.SURVEY);
+    }
+  }, [dbService]);
+
+  const handleLogin = useCallback(async (loggedInUser: User, initialView?: ViewState) => {
+    loginInProgressRef.current = true;
+    try {
+      setUser(loggedInUser);
+      supportRealtime.connect();
+
+      if (loggedInUser.theme === 'dark') {
+        setDarkMode(true);
+      } else if (loggedInUser.theme === 'light') {
+        setDarkMode(false);
+      }
+
+      if (loggedInUser.role === 'admin') {
+        navigateView(resolveViewForRole('admin', initialView || readRestorableView('admin')));
+        return;
+      }
+
+      if (loggedInUser.role === 'support') {
+        navigateView(resolveViewForRole('support', initialView || readRestorableView('support')));
+        return;
+      }
+
+      const verif = await dbService.getVerificationStatus(loggedInUser.id);
+
+      if (verif?.status === 'auth_required') {
+        clearAuthSession();
+        setUser(null);
+        navigateView(ViewState.LOGIN);
+        return;
+      }
+
+      let vStatus: VerificationStatus;
+      let rejectionReason: string | undefined;
+
+      if (verif?.status === 'unavailable') {
+        const cached = readCachedVerificationStatus();
+        if (cached?.status) {
+          vStatus = cached.status as VerificationStatus;
+          rejectionReason = cached.rejectionReason;
+        } else {
+          const existingProfile = await dbService.getProfile(loggedInUser.id);
+          vStatus = existingProfile ? 'verified' : 'pending';
+        }
+      } else {
+        vStatus = (verif?.status as VerificationStatus) ?? 'none';
+        rejectionReason = verif?.rejectionReason;
+        cacheVerificationStatus(vStatus, rejectionReason);
+      }
+
+      setVerifStatus(vStatus);
+      setVerifRejectionReason(rejectionReason);
+
+      if (vStatus !== 'verified') {
+        navigateView(ViewState.VERIFICATION);
+        return;
+      }
+
+      await continueAsUser(loggedInUser, initialView);
+      sessionRestoredRef.current = true;
+    } finally {
+      loginInProgressRef.current = false;
+    }
+  }, [continueAsUser, dbService]);
+
+  handleLoginRef.current = handleLogin;
+
   useEffect(() => {
     console.log('Initializing Kawayan AI App...');
 
+    let cancelled = false;
+
     const initApp = async () => {
-      const shouldHydrate = hasPersistedSession();
-      if (shouldHydrate) setIsHydrating(true);
+      const shouldRestore = hasPersistedSession() && !isStoredTokenExpired();
+      if (shouldRestore) setIsHydrating(true);
 
       let restoredUser: User | null = null;
 
@@ -68,21 +156,29 @@ const App: React.FC = () => {
           currentUser = dbService.getCurrentUser();
         }
 
+        if (currentUser && isStoredTokenExpired()) {
+          clearAuthSession();
+          currentUser = null;
+          navigateView(ViewState.LANDING);
+        } else if (currentUser && !getStoredToken()) {
+          clearAuthSession();
+          currentUser = null;
+          navigateView(ViewState.LANDING);
+        }
+
+        if (cancelled || loginInProgressRef.current) return;
+
         if (currentUser) {
           restoredUser = currentUser;
+          sessionRestoredRef.current = true;
           console.log('Found existing session for user:', currentUser.email);
-          supportRealtime.connect();
-          if (currentUser.theme === 'dark') {
-            setDarkMode(true);
-          } else if (currentUser.theme === 'light') {
-            setDarkMode(false);
-          }
-          const restoredView = readStoredView();
-          await handleLogin(
+          await handleLoginRef.current(
             currentUser,
-            isPaymentSuccess ? ViewState.BILLING : restoredView ?? undefined
+            isPaymentSuccess ? ViewState.BILLING : readRestorableView() ?? undefined
           );
         }
+
+        if (cancelled) return;
 
         const path = window.location.pathname;
         const hash = window.location.hash;
@@ -98,26 +194,27 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Error initializing app:', error);
       } finally {
-        if (!restoredUser) {
-          // If there was a stored JWT/session but it's expired or invalid,
-          // send the user to LOGIN (not LANDING) so they can sign back in.
-          if (hasPersistedSession()) {
-            clearStoredView();
-            setView(ViewState.LOGIN);
-          } else {
-            clearStoredView();
-            setView(ViewState.LANDING);
-          }
-        }
         setIsHydrating(false);
+
+        if (cancelled || loginInProgressRef.current || sessionRestoredRef.current) return;
+
+        const cached = readCachedUser();
+        const tokenStillValid = !!getStoredToken() && !isStoredTokenExpired();
+
+        if (cached && tokenStillValid) {
+          sessionRestoredRef.current = true;
+          void handleLoginRef.current(cached, readRestorableView() ?? undefined);
+        }
       }
     };
 
     initApp();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update HTML class for dark mode
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -125,54 +222,6 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
-
-  const handleLogin = async (loggedInUser: User, initialView?: ViewState) => {
-    setUser(loggedInUser);
-    supportRealtime.connect();
-    
-    // Set theme from user preference (DB Priority)
-    if (loggedInUser.theme === 'dark') {
-      setDarkMode(true);
-    } else {
-      setDarkMode(false);
-    }
-    
-    if (loggedInUser.role === 'admin') {
-      navigateView(resolveViewForRole('admin', initialView || readStoredView()));
-    } else if (loggedInUser.role === 'support') {
-      navigateView(resolveViewForRole('support', initialView || readStoredView()));
-    } else {
-      // Fetch verification status
-      try {
-        const verif = await dbService.getVerificationStatus(loggedInUser.id);
-        const vStatus: VerificationStatus = verif?.status ?? 'none';
-        setVerifStatus(vStatus);
-        setVerifRejectionReason(verif?.rejectionReason);
-
-        // Block access if not verified
-        if (vStatus !== 'verified') {
-          navigateView(ViewState.VERIFICATION);
-          return;
-        }
-      } catch (e) {
-        console.warn('Could not fetch verification status:', e);
-      }
-
-      // Verified — check if user has a brand profile
-      try {
-        const profile = await dbService.getProfile(loggedInUser.id);
-        if (profile) {
-          setBrandProfile(profile);
-          navigateView(initialView || readStoredView() || ViewState.CALENDAR);
-        } else {
-          navigateView(ViewState.SURVEY);
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        navigateView(ViewState.SURVEY);
-      }
-    }
-  };
 
   const handleLogout = async () => {
     await dbService.logoutUser();
@@ -191,6 +240,86 @@ const App: React.FC = () => {
     setVerifStatus('pending');
     setVerifRejectionReason(undefined);
   };
+
+  const handleSessionExpired = () => {
+    clearAuthSession();
+    setUser(null);
+    setBrandProfile(null);
+    setVerifStatus('none');
+    setVerifRejectionReason(undefined);
+    clearStoredView();
+    navigateView(ViewState.LOGIN);
+  };
+
+  const refreshVerificationStatus = async () => {
+    if (!user || user.role !== 'user') return;
+    try {
+      const verif = await dbService.getVerificationStatus(user.id);
+      if (verif?.status === 'auth_required') {
+        handleSessionExpired();
+        return;
+      }
+      const vStatus: VerificationStatus = (verif?.status as VerificationStatus) ?? 'none';
+      setVerifStatus(vStatus);
+      setVerifRejectionReason(verif?.rejectionReason);
+      if (verif?.status && verif.status !== 'unavailable' && verif.status !== 'auth_required') {
+        cacheVerificationStatus(vStatus, verif?.rejectionReason);
+      }
+      if (vStatus === 'verified') {
+        const profile = await dbService.getProfile(user.id);
+        if (profile) {
+          setBrandProfile(profile);
+          navigateView(readRestorableView('user') || ViewState.CALENDAR);
+        } else {
+          navigateView(ViewState.SURVEY);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not refresh verification status:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'user') return;
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && isStoredTokenExpired()) {
+        handleSessionExpired();
+      }
+    };
+
+    const unsubVerif = supportRealtime.onVerificationUpdated(() => {
+      refreshVerificationStatus();
+    });
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      unsubVerif();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role]);
+
+  // Load brand profile when a verified user lands on app views without profile in state
+  useEffect(() => {
+    if (!user || user.role !== 'user' || brandProfile || verifStatus !== 'verified') return;
+    const needsProfile = [
+      ViewState.CALENDAR,
+      ViewState.SETTINGS,
+      ViewState.INSIGHTS,
+      ViewState.BILLING,
+    ].includes(view);
+    if (!needsProfile) return;
+
+    let cancelled = false;
+    (async () => {
+      const profile = await dbService.getProfile(user.id);
+      if (!cancelled && profile) setBrandProfile(profile);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role, brandProfile, verifStatus, view, dbService]);
 
   const handleSurveyComplete = async (profileData: BrandProfile) => {
     if (!user) return;
@@ -244,6 +373,7 @@ const App: React.FC = () => {
 
   const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN];
   const isAuthView = authViews.includes(view);
+  const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
 
   return (
     <div className="min-h-screen flex flex-col transition-colors font-sans" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
@@ -357,7 +487,7 @@ const App: React.FC = () => {
           (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
           'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
         }`}>
-          {isHydrating ? (
+          {blockForHydration ? (
             <AppHydrationLoader />
           ) : (
           <Routes>
@@ -375,11 +505,13 @@ const App: React.FC = () => {
                   case ViewState.VERIFICATION:
                     return (
                       <VerificationStatusScreen
+                        userId={user?.id}
                         status={verifStatus}
                         rejectionReason={verifRejectionReason}
                         businessName={user?.businessName}
                         onLogout={handleLogout}
                         onResubmit={handleVerifResubmit}
+                        onSessionExpired={handleSessionExpired}
                       />
                     );
                   case ViewState.SURVEY:
@@ -405,7 +537,13 @@ const App: React.FC = () => {
                         </div>
                       );
                     }
-                    return (user && brandProfile) ? <ContentCalendar profile={brandProfile} userId={user.id} /> : <AppHydrationLoader />;
+                    return (user && brandProfile) ? (
+                      <ContentCalendar profile={brandProfile} userId={user.id} />
+                    ) : user ? (
+                      <AppHydrationLoader />
+                    ) : (
+                      <AppHydrationLoader />
+                    );
                   case ViewState.SETTINGS:
                     return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
                   case ViewState.INSIGHTS:

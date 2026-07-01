@@ -100,6 +100,11 @@ const broadcastCallsChanged = () => {
   io.to('support-staff').emit('calls:changed');
 };
 
+const broadcastVerificationChanged = (userId) => {
+  io.to('support-staff').emit('verification:updated');
+  if (userId) io.to(`user-${userId}`).emit('verification:updated');
+};
+
 // Trust proxy (required for Codespaces/Heroku/etc to get correct protocol/host)
 app.set('trust proxy', true);
 
@@ -188,13 +193,15 @@ app.post('/api/auth/register', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
+  const normalizedEmail = String(email).trim().toLowerCase();
+
   const accountRole = role || 'user';
   if (accountRole === 'user' && !acceptedTerms) {
     return res.status(400).json({ error: 'You must accept the Terms of Service to register.' });
   }
 
   try {
-    const user = await dbService.createUser(email, password, accountRole, businessName, {
+    const user = await dbService.createUser(normalizedEmail, password, accountRole, businessName, {
       acceptedTerms: !!acceptedTerms,
       termsVersion: termsVersion || '1.0',
     });
@@ -203,7 +210,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
     
     // Auto login
-    const result = await dbService.loginUser(email, password);
+    const result = await dbService.loginUser(normalizedEmail, password);
     res.status(201).json(result);
   } catch (error) {
     logger.error('Registration error', { error: error.message });
@@ -218,8 +225,10 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
+  const normalizedEmail = String(email).trim().toLowerCase();
+
   try {
-    const result = await dbService.loginUser(email, password);
+    const result = await dbService.loginUser(normalizedEmail, password);
     if (!result) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -933,6 +942,7 @@ app.post('/api/verification/submit', authenticateToken, uploadVerifDoc.single('d
     }
 
     await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, req.file.filename);
+    broadcastVerificationChanged(userId);
     res.status(201).json({ message: 'Verification submitted', status: 'pending' });
   } catch (error) {
     logger.error('Verification submit error', { error: error.message });
@@ -978,6 +988,7 @@ app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single(
     } else {
       await dbService.resubmitVerification(userId, req.file.originalname, req.file.filename);
     }
+    broadcastVerificationChanged(userId);
     res.json({ message: 'Submitted for review', status: 'pending' });
   } catch (error) {
     logger.error('Verification resubmit error', { error: error.message });
@@ -1000,7 +1011,9 @@ app.get('/api/admin/verifications', authenticateToken, requireAdmin, async (req,
 app.post('/api/admin/verifications/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
+    const verif = await dbService.getVerificationById(id);
     await dbService.approveVerification(id, req.user.userId);
+    broadcastVerificationChanged(verif?.userId);
     res.json({ message: 'Verification approved' });
   } catch (error) {
     logger.error('Approve verification error', { error: error.message });
@@ -1013,7 +1026,9 @@ app.post('/api/admin/verifications/:id/reject', authenticateToken, requireAdmin,
   const { id } = req.params;
   const { reason } = req.body;
   try {
+    const verif = await dbService.getVerificationById(id);
     await dbService.rejectVerification(id, req.user.userId, reason || '');
+    broadcastVerificationChanged(verif?.userId);
     res.json({ message: 'Verification rejected' });
   } catch (error) {
     logger.error('Reject verification error', { error: error.message });
