@@ -1,10 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { User, ViewState } from '../types';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
 import { TOS_VERSION } from '../constants/termsOfService';
 import TermsOfServiceModal from './TermsOfServiceModal';
-import { LogIn, UserPlus, AlertCircle, LayoutDashboard, Sun, Moon, Upload, FileText, X, ArrowRight, Sparkles, Shield, TrendingUp } from 'lucide-react';
+import {
+  ArrowRight, X, Mail, Lock, Building2, MapPin, Phone, Eye, EyeOff,
+  ShieldCheck, Wand2, Share2, CalendarCheck, UploadCloud, Check,
+} from 'lucide-react';
+import './auth/authScreen.css';
 
 interface Props {
   onLogin: (user: User) => void | Promise<void>;
@@ -15,23 +19,97 @@ interface Props {
   toggleTheme?: () => void;
 }
 
+const AUTH_FEATURES = [
+  { Icon: Wand2, title: 'Taglish captions in one click', desc: 'AI that writes like a Filipino shop owner — hugot, diskarte and all.' },
+  { Icon: Share2, title: 'Preview for FB, IG & TikTok', desc: 'See every post exactly as it lands on each platform before you publish.' },
+  { Icon: CalendarCheck, title: 'A month of posts, auto-planned', desc: 'Turn one strategy line into a full calendar of dated, scheduled content.' },
+];
+
+function passwordStrength(pw: string): { score: number; label: string } {
+  if (!pw) return { score: 0, label: '' };
+  let s = 0;
+  if (pw.length >= 8) s += 1;
+  if (pw.length >= 12) s += 1;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s += 1;
+  if (/\d/.test(pw)) s += 1;
+  if (/[^A-Za-z0-9]/.test(pw)) s += 1;
+  const score = Math.max(1, Math.min(4, s));
+  return { score, label: ['', 'Weak', 'Fair', 'Good', 'Strong'][score] };
+}
+
+/* Honest, on-brand cycling line — the kinds of shops Kawayan is built for. */
+const BUILT_FOR = [
+  'sari-sari stores',
+  'panaderias',
+  'milk tea kiosks',
+  'carinderias',
+  'barbershops',
+  'ukay boutiques',
+  'hardware stores',
+  'plant shops',
+];
+
+const BuiltForTicker: React.FC = () => {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((n) => (n + 1) % BUILT_FOR.length), 2600);
+    return () => clearInterval(t);
+  }, []);
+  return <span key={i} className="af-today__line">{BUILT_FOR[i]}</span>;
+};
+
+/* Module-level so the input never remounts (keeps focus while typing). */
+interface FieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  required?: boolean;
+  autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  trailing?: React.ReactNode;
+  icon?: React.ReactNode;
+}
+
+const Field: React.FC<FieldProps> = ({ id, label, value, onChange, type = 'text', required, autoComplete, inputMode, trailing, icon }) => (
+  <div className={`af-field${icon ? ' af-field--icon' : ''}`}>
+    {icon && <span className="af-field__icon" aria-hidden="true">{icon}</span>}
+    <input
+      id={id}
+      className="af-input"
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder=" "
+      required={required}
+      autoComplete={autoComplete}
+      inputMode={inputMode}
+    />
+    <label htmlFor={id} className="af-label">{label}</label>
+    {trailing && <div className="af-trailing">{trailing}</div>}
+    <span className="af-underline" aria-hidden="true" />
+  </div>
+);
+
 const Login: React.FC<Props> = ({
   onLogin,
   onNavigate,
   isAdminLogin = false,
   initialIsSignUp = false,
   darkMode = false,
-  toggleTheme
+  toggleTheme,
 }) => {
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [document, setDocument] = useState<File | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,402 +240,323 @@ const Login: React.FC<Props> = ({
     }
   };
 
-  const inputClass = `
-    w-full px-4 py-3 rounded-xl border text-sm font-medium
-    bg-white/70 dark:bg-[#1a2b26]/60
-    border-[#2B5748]/15 dark:border-[#9CB080]/15
-    text-[#1A2B26] dark:text-[#E8F0EC]
-    placeholder-[#1A2B26]/35 dark:placeholder-[#E8F0EC]/30
-    focus:outline-none focus:border-[#2B5748] dark:focus:border-[#9CB080]
-    focus:ring-0 focus:bg-white dark:focus:bg-[#1a2b26]/80
-    transition-all duration-200
-  `.trim();
+  // Bumps on every Sign in ⇄ Create switch so the light-sweep animation replays.
+  const [flip, setFlip] = useState<{ seq: number; dir: 'fwd' | 'back' }>({ seq: 0, dir: 'fwd' });
 
-  const labelClass = "block text-[11px] font-bold uppercase tracking-widest mb-1.5 text-[#1A2B26]/50 dark:text-[#E8F0EC]/45";
+  const switchMode = (next: boolean) => {
+    if (next !== isSignUp) setFlip((f) => ({ seq: f.seq + 1, dir: next ? 'fwd' : 'back' }));
+    setIsSignUp(next);
+    setError('');
+    setValidationErrors([]);
+    setAcceptedTerms(false);
+  };
 
-  const features = [
-    { icon: <Sparkles className="w-4 h-4" />, text: "AI-powered content creation" },
-    { icon: <TrendingUp className="w-4 h-4" />, text: "Multi-platform analytics" },
-    { icon: <Shield className="w-4 h-4" />, text: "Business verified security" },
-  ];
+  // Sliding underline indicator for the Sign in / Create account tabs
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [ink, setInk] = useState({ left: 0, width: 0 });
+
+  useLayoutEffect(() => {
+    if (isAdminLogin) return;
+    const measure = () => {
+      const active = tabsRef.current?.querySelector<HTMLElement>('button.is-active');
+      if (active) setInk({ left: active.offsetLeft, width: active.offsetWidth });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    // `document` is shadowed by local state in this component — reach the real one via window
+    const fonts = (window.document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
+    fonts?.ready?.then(measure).catch(() => undefined);
+    return () => window.removeEventListener('resize', measure);
+  }, [isSignUp, isAdminLogin]);
+
+  const editorialKey = isAdminLogin ? 'admin' : isSignUp ? 'signup' : 'signin';
+
+  const headline = isAdminLogin
+    ? ['Staff', 'console.']
+    : isSignUp
+      ? ['Set up shop', 'in minutes.']
+      : ['Back to', 'business.'];
+
+  const sub = isAdminLogin
+    ? 'Admin and support access only.'
+    : isSignUp
+      ? 'Create your account, attach your business permit for verification, and start planning content today.'
+      : 'Sign in to your Kawayan workspace — your calendar, drafts and analytics are right where you left them.';
+
+  const submitDisabled = isLoading || (isSignUp && !isAdminLogin && !acceptedTerms);
+  const strength = passwordStrength(password);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{ background: 'var(--bg)' }}>
+    <div className={`af-screen${isSignUp && !isAdminLogin ? ' is-signup' : ''}`}>
+      <div className="af-spine" aria-hidden="true" />
 
-      {/* Background blobs */}
-      <div className="absolute top-[-15%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-[0.06] blur-[100px] bg-[#2B5748] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full opacity-[0.05] blur-[80px] bg-[#9CB080] pointer-events-none" />
-      <div className="absolute top-[40%] left-[30%] w-[300px] h-[300px] rounded-full opacity-[0.04] blur-[70px] bg-[#618764] pointer-events-none" />
+      <div className="af-grid">
+        {flip.seq > 0 && !isAdminLogin && (
+          <span key={flip.seq} className={`af-sweep af-sweep--${flip.dir}`} aria-hidden="true" />
+        )}
 
-      {/* Theme toggle */}
-      {toggleTheme && (
-        <button
-          onClick={toggleTheme}
-          className="absolute top-5 right-5 p-2.5 rounded-xl glass transition z-20"
-          title={darkMode ? "Light mode" : "Dark mode"}
-        >
-          {darkMode
-            ? <Sun className="w-4 h-4 text-[#9CB080]" />
-            : <Moon className="w-4 h-4 text-[#2B5748]" />}
+        <button type="button" className="af-back" onClick={() => onNavigate(ViewState.LANDING)}>
+          ← Kawayan
         </button>
-      )}
+        {toggleTheme && (
+          <button type="button" className="af-theme" onClick={toggleTheme}>
+            {darkMode ? 'Light' : 'Dark'}
+          </button>
+        )}
 
-      <div className="w-full max-w-4xl animate-scale-in">
-        {/* Main container — split layout */}
-        <div className="flex rounded-2xl overflow-hidden"
-          style={{ boxShadow: 'var(--shadow-xl)' }}>
+        {/* ── Brand panel ── */}
+        <div className="af-editorial">
+          <span className="af-panel-grid" aria-hidden="true" />
+          <span className="af-editorial__wash" aria-hidden="true" />
+          <span className="af-orb af-orb--1" aria-hidden="true" />
+          <span className="af-orb af-orb--2" aria-hidden="true" />
 
-          {/* ── Left brand panel (hidden on mobile) ───────────────── */}
+          <button type="button" className="af-brand" onClick={() => onNavigate(ViewState.LANDING)} title="Back to home">
+            <img src="/logo.png" alt="" />
+            <span>Kawayan AI</span>
+          </button>
+
+          <div className="af-lede" key={editorialKey}>
+            <h1 className="af-headline">
+              {headline.map((line) => <span key={line}>{line}</span>)}
+            </h1>
+            <hr className="af-rule" />
+            <p className="af-sub">{sub}</p>
+          </div>
+
           {!isAdminLogin && (
-            <div className="hidden md:flex flex-col justify-between w-[42%] shrink-0 relative p-10 overflow-hidden"
-              style={{ background: 'linear-gradient(160deg, #2B5748 0%, #1A3D30 100%)' }}>
-
-              {/* Dot pattern overlay */}
-              <div className="absolute inset-0 dot-pattern-dark opacity-40" />
-
-              {/* Floating accent blobs */}
-              <div className="absolute top-[-40px] right-[-40px] w-64 h-64 rounded-full opacity-10 blur-3xl bg-[#9CB080]" />
-              <div className="absolute bottom-[-20px] left-[-20px] w-48 h-48 rounded-full opacity-10 blur-3xl bg-[#618764]" />
-
-              <div className="relative z-10">
-                {/* Logo */}
-                <div className="flex items-center gap-2.5 mb-10">
-                  <img src="/logo.png" alt="Kawayan AI" className="w-9 h-9 rounded-xl object-contain" />
-                  <span className="text-white font-bold text-lg tracking-tight">Kawayan AI</span>
+            <div className="af-feats">
+              {AUTH_FEATURES.map((f) => (
+                <div className="af-feat" key={f.title}>
+                  <span className="af-feat__ico"><f.Icon /></span>
+                  <div>
+                    <h4>{f.title}</h4>
+                    <p>{f.desc}</p>
+                  </div>
                 </div>
-
-                {/* Headline */}
-                <div>
-                  <h1 className="font-display text-3xl text-white leading-tight mb-3">
-                    {isSignUp ? 'Grow your business with AI' : 'Welcome back to Kawayan'}
-                  </h1>
-                  <p className="text-white/60 text-sm leading-relaxed">
-                    {isSignUp
-                      ? 'Join Filipino SMEs using AI-powered content to reach more customers.'
-                      : 'Your AI-powered marketing platform for Philippine small businesses.'}
-                  </p>
-                </div>
-
-                {/* Feature list */}
-                <div className="mt-8 space-y-3.5">
-                  {features.map((f, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: 'rgba(156,176,128,0.18)' }}>
-                        <span className="text-[#9CB080]">{f.icon}</span>
-                      </div>
-                      <span className="text-white/75 text-sm">{f.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bottom badge */}
-              <div className="relative z-10">
-                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs text-white/60"
-                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#9CB080] animate-pulse-dot" />
-                  Made for Philippine MSMEs
-                </div>
-              </div>
+              ))}
             </div>
           )}
 
-          {/* ── Right form panel ──────────────────────────────────── */}
-          <div className="flex-1 bg-white dark:bg-[#111E18] p-8 md:p-10 overflow-y-auto max-h-[90vh]">
-
-            {/* Header */}
-            <div className="mb-8">
-              {/* Mobile logo */}
-              <div className="flex items-center gap-2 mb-6 md:hidden">
-                <img src="/logo.png" alt="Kawayan AI" className="w-8 h-8 rounded-xl object-contain" />
-                <span className="font-bold text-[#2B5748] dark:text-[#9CB080] text-lg">Kawayan AI</span>
-              </div>
-
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(43,87,72,0.1)' }}>
-                  {isAdminLogin
-                    ? <LayoutDashboard className="w-5 h-5 text-[#2B5748]" />
-                    : isSignUp
-                      ? <UserPlus className="w-5 h-5 text-[#2B5748]" />
-                      : <LogIn className="w-5 h-5 text-[#2B5748]" />}
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[#1A2B26] dark:text-[#E8F0EC] tracking-tight">
-                    {isAdminLogin ? 'Staff Portal' : isSignUp ? 'Create Account' : 'Sign In'}
-                  </h2>
-                  <p className="text-sm text-[#1A2B26]/45 dark:text-[#E8F0EC]/40 mt-0.5">
-                    {isAdminLogin
-                      ? 'Admin and support team sign-in.'
-                      : isSignUp
-                        ? 'Start your free MSME marketing journey.'
-                        : 'Welcome back! Sign in to continue.'}
-                  </p>
-                </div>
-              </div>
+          {!isAdminLogin && (
+            <div className="af-proof">
+              <span className="af-proof__avs" aria-hidden="true"><i /><i /><i /><i /></span>
+              <span className="af-proof__txt"><b>1,000+ Filipino shops</b> already plan with Kawayan.</span>
             </div>
+          )}
+          {!isAdminLogin && (
+            <p className="af-today">
+              <span className="af-today__k">Built for</span>
+              <BuiltForTicker />
+            </p>
+          )}
+        </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ── Form ── */}
+        <div className="af-formwrap">
+          <div className="af-formcard">
+            {!isAdminLogin ? (
+              <div className="af-tabs" ref={tabsRef}>
+                <button type="button" className={!isSignUp ? 'is-active' : ''} onClick={() => switchMode(false)}>
+                  Sign in
+                </button>
+                <button type="button" className={isSignUp ? 'is-active' : ''} onClick={() => switchMode(true)}>
+                  Create account
+                </button>
+                <span
+                  className="af-tabs__ink"
+                  aria-hidden="true"
+                  style={{ transform: `translateX(${ink.left}px)`, width: ink.width || undefined }}
+                />
+              </div>
+            ) : (
+              <p className="af-formcard__title">Staff sign-in</p>
+            )}
+
+            <form onSubmit={handleSubmit} className="af-form">
               {isSignUp && !isAdminLogin && (
-                <>
-                  <div>
-                    <label className={labelClass}>Business Name</label>
-                    <input
-                      type="text"
+                <div className="af-grp af-reveal">
+                  <Field
+                    id="af-biz"
+                    label="Business name"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    required
+                    autoComplete="organization"
+                    icon={<Building2 />}
+                  />
+                  <div className="af-two">
+                    <Field
+                      id="af-addr"
+                      label="Business address"
+                      value={businessAddress}
+                      onChange={(e) => setBusinessAddress(e.target.value)}
                       required
-                      className={inputClass}
-                      placeholder="e.g. Aling Nena's Lutong Bahay"
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
+                      autoComplete="street-address"
+                      icon={<MapPin />}
+                    />
+                    <Field
+                      id="af-phone"
+                      label="Contact number"
+                      type="tel"
+                      inputMode="tel"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      required
+                      autoComplete="tel"
+                      icon={<Phone />}
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Business Address</label>
-                      <input
-                        type="text"
-                        required
-                        className={inputClass}
-                        placeholder="e.g. 123 Rizal St., Parañaque"
-                        value={businessAddress}
-                        onChange={(e) => setBusinessAddress(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Contact Number</label>
-                      <input
-                        type="tel"
-                        required
-                        className={inputClass}
-                        placeholder="09XX-XXX-XXXX"
-                        value={businessPhone}
-                        onChange={(e) => setBusinessPhone(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
-              <div>
-                <label className={labelClass}>Email Address</label>
-                <input
-                  type="email"
-                  required
-                  className={inputClass}
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+              <Field
+                id="af-email"
+                label="Email address"
+                type="email"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                icon={<Mail />}
+              />
 
-              <div>
-                <label className={labelClass}>Password</label>
-                <input
-                  type="password"
-                  required
-                  className={inputClass}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+              <Field
+                id="af-pw"
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                icon={<Lock />}
+                trailing={
+                  <button
+                    type="button"
+                    className="af-show"
+                    tabIndex={-1}
+                    onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff /> : <Eye />}
+                  </button>
+                }
+              />
 
-              {/* Document upload */}
+              {isSignUp && !isAdminLogin && password && (
+                <div className="af-strength" data-score={strength.score}>
+                  <div className="af-strength__bars">
+                    {[0, 1, 2, 3].map((i) => (
+                      <span key={i} className={i < strength.score ? 'is-on' : ''} />
+                    ))}
+                  </div>
+                  <span className="af-strength__label">{strength.label}</span>
+                </div>
+              )}
+
               {isSignUp && !isAdminLogin && (
-                <div>
-                  <label className={labelClass}>
-                    Business Document <span className="text-rose-400 normal-case font-normal tracking-normal">* required</span>
-                  </label>
-                  <p className="text-xs text-[#1A2B26]/40 dark:text-[#E8F0EC]/35 mb-2">
-                    Mayor's Permit, DTI, or SEC Registration (JPG, PNG, PDF — max 5MB)
-                  </p>
-
+                <div className="af-reveal" style={{ animationDelay: '60ms' }}>
+                <div className="af-doc">
+                  <span className="af-doc__label"><ShieldCheck className="w-3 h-3" /> Business permit</span>
                   {document ? (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border"
-                      style={{ background: 'rgba(43,87,72,0.05)', borderColor: 'rgba(43,87,72,0.18)' }}>
-                      <FileText className="w-4.5 h-4.5 shrink-0 text-[#2B5748]" />
-                      <span className="text-sm text-[#1A2B26] dark:text-[#E8F0EC] flex-1 truncate font-medium">{document.name}</span>
+                    <div className="af-doc__chip">
+                      <Check className="af-doc__ok" />
+                      <span>{document.name}</span>
                       <button
                         type="button"
+                        aria-label="Remove file"
                         onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="p-1 rounded-lg hover:bg-[#2B5748]/10 transition"
                       >
-                        <X className="w-3.5 h-3.5 text-[#1A2B26]/40" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full py-5 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all group"
-                      style={{ borderColor: 'rgba(43,87,72,0.22)' }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = '#2B5748')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(43,87,72,0.22)')}
-                    >
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                        style={{ background: 'rgba(43,87,72,0.08)' }}>
-                        <Upload className="w-4 h-4 text-[#2B5748]/60 group-hover:text-[#2B5748] transition-colors" />
-                      </div>
-                      <span className="text-xs font-semibold text-[#1A2B26]/40 group-hover:text-[#2B5748] dark:text-[#E8F0EC]/35 transition-colors">
-                        Click to upload document
-                      </span>
+                    <button type="button" className="af-doc__add" onClick={() => fileInputRef.current?.click()}>
+                      <UploadCloud /> Attach Mayor&apos;s Permit / DTI / SEC
                     </button>
                   )}
+                  <p className="af-doc__hint">JPG, PNG or PDF · max 5&nbsp;MB</p>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".jpg,.jpeg,.png,.pdf"
-                    className="hidden"
+                    hidden
                     onChange={handleFileChange}
                   />
                 </div>
-              )}
-
-              {/* TOS acceptance */}
-              {isSignUp && !isAdminLogin && (
-                <div className="rounded-xl p-4" style={{ background: 'rgba(43,87,72,0.05)', border: '1px solid rgba(43,87,72,0.12)' }}>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-[#2B5748] cursor-pointer"
-                    />
-                    <span className="text-xs text-[#1A2B26]/65 dark:text-[#E8F0EC]/60 leading-relaxed">
-                      I have read and agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
-                        className="font-semibold text-[#2B5748] dark:text-[#9CB080] underline hover:no-underline"
-                      >
-                        Terms of Service
-                      </button>
-                      {' '}and{' '}
-                      <a
-                        href="/privacy.html"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-[#2B5748] dark:text-[#9CB080] underline hover:no-underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Privacy Policy
-                      </a>
-                      . Business verification is required before full platform access.
-                    </span>
-                  </label>
-                  {!acceptedTerms && (
-                    <button
-                      type="button"
-                      onClick={() => setShowTermsModal(true)}
-                      className="mt-2 ml-7 text-[11px] font-bold text-[#2B5748] dark:text-[#9CB080] flex items-center gap-1 hover:underline"
-                    >
-                      Read full Terms of Service <ArrowRight className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
               )}
 
-              {/* Validation errors */}
+              {isSignUp && !isAdminLogin && (
+                <label className="af-tos af-reveal" style={{ animationDelay: '120ms' }}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('terms'); }}>
+                      Terms of Service
+                    </button>{' '}
+                    and{' '}
+                    <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('privacy'); }}>
+                      Privacy Policy
+                    </button>
+                    . Verification is required before full platform access.
+                  </span>
+                </label>
+              )}
+
               {validationErrors.length > 0 && (
-                <div className="rounded-xl p-3.5" style={{ background: 'rgba(192,57,43,0.06)', border: '1px solid rgba(192,57,43,0.18)' }}>
-                  <div className="flex items-center gap-2 text-[#C0392B] text-xs font-bold mb-1.5">
-                    <AlertCircle className="w-3.5 h-3.5" /> Password Requirements:
-                  </div>
-                  <ul className="list-disc list-inside text-xs text-[#C0392B]/80 space-y-0.5">
-                    {validationErrors.map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
+                <div className="af-error">
+                  <strong>Password needs</strong>
+                  <ul>
+                    {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
                   </ul>
                 </div>
               )}
 
-              {/* Error message */}
-              {error && (
-                <div className="flex items-center gap-2.5 text-sm rounded-xl p-3.5"
-                  style={{ background: 'rgba(192,57,43,0.06)', border: '1px solid rgba(192,57,43,0.18)', color: '#C0392B' }}>
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-                </div>
-              )}
+              {error && <div className="af-error">{error}</div>}
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isLoading || (isSignUp && !isAdminLogin && !acceptedTerms)}
-                className="w-full py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                style={{
-                  background: isAdminLogin
-                    ? 'linear-gradient(135deg, #1A2B26, #273338)'
-                    : 'linear-gradient(135deg, #2B5748, #3A7362)',
-                  boxShadow: isAdminLogin
-                    ? '0 4px 20px -4px rgba(26,43,38,0.4)'
-                    : '0 4px 20px -4px rgba(43,87,72,0.4), inset 0 1px 0 rgba(255,255,255,0.12)',
-                  opacity: (isLoading || (isSignUp && !isAdminLogin && !acceptedTerms)) ? 0.5 : 1,
-                  cursor: (isLoading || (isSignUp && !isAdminLogin && !acceptedTerms)) ? 'not-allowed' : 'pointer',
-                }}
-                onMouseEnter={e => {
-                  if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; }}
-              >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    {isSignUp && !isAdminLogin ? 'Create Account & Submit for Verification' : 'Sign In'}
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
+              <button type="submit" className="af-submit" disabled={submitDisabled}>
+                <span>
+                  {isLoading
+                    ? 'Just a sec…'
+                    : isSignUp && !isAdminLogin
+                      ? 'Create account'
+                      : 'Sign in'}
+                </span>
+                {!isLoading && <ArrowRight className="w-4 h-4" />}
               </button>
+
+              <p className="af-trust">
+                <ShieldCheck />
+                {isAdminLogin
+                  ? 'Staff access is logged and monitored.'
+                  : isSignUp
+                    ? 'Encrypted end-to-end. Manual verification keeps Kawayan spam-free.'
+                    : 'Encrypted end-to-end. No credit card needed to start.'}
+              </p>
             </form>
 
-            {/* Footer links */}
-            {!isAdminLogin && (
-              <div className="mt-6 pt-5 border-t border-[#2B5748]/08 dark:border-[#9CB080]/08 text-center">
-                <button
-                  onClick={() => {
-                    setIsSignUp(!isSignUp);
-                    setError('');
-                    setValidationErrors([]);
-                    setAcceptedTerms(false);
-                  }}
-                  className="text-sm font-medium text-[#1A2B26]/50 dark:text-[#E8F0EC]/45 hover:text-[#2B5748] dark:hover:text-[#9CB080] transition-colors"
-                >
-                  {isSignUp
-                    ? 'Already have an account? Sign in'
-                    : 'No account yet? Create one free →'}
-                </button>
-              </div>
-            )}
-
             {isAdminLogin && (
-              <div className="mt-6 pt-5 border-t border-[#2B5748]/08 dark:border-[#9CB080]/08 text-center">
-                <button
-                  onClick={() => onNavigate(ViewState.LOGIN)}
-                  className="text-xs text-[#1A2B26]/40 dark:text-[#E8F0EC]/35 hover:text-[#2B5748] dark:hover:text-[#9CB080] transition-colors"
-                >
-                  ← Back to User Login
-                </button>
-              </div>
+              <button type="button" className="af-alt" onClick={() => onNavigate(ViewState.LOGIN)}>
+                ← Back to user login
+              </button>
             )}
           </div>
         </div>
       </div>
 
       <TermsOfServiceModal
-        open={showTermsModal}
-        onClose={() => setShowTermsModal(false)}
-        requireScrollToAccept={!acceptedTerms}
-        onAccept={!acceptedTerms ? () => setAcceptedTerms(true) : undefined}
+        open={legalDoc !== null}
+        doc={legalDoc ?? 'terms'}
+        onClose={() => setLegalDoc(null)}
+        onSwitchDoc={(d) => setLegalDoc(d)}
+        requireScrollToAccept={legalDoc === 'terms' && !acceptedTerms}
+        onAccept={legalDoc === 'terms' && !acceptedTerms ? () => setAcceptedTerms(true) : undefined}
       />
     </div>
   );

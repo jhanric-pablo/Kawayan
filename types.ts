@@ -98,7 +98,6 @@ export enum ViewState {
   BILLING = 'BILLING',
   SUPPORT_DASHBOARD = 'SUPPORT_DASHBOARD',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',
-  DEMO = 'DEMO'
 }
 
 export interface ChartData {

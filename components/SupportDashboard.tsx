@@ -295,7 +295,7 @@ const SupportDashboard: React.FC = () => {
            >
              <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
            </button>
-           <div className="flex gap-1 p-1 bg-[#273338]/5 dark:bg-[#2B5748]/40 rounded-2xl overflow-x-auto border border-[#273338]/10 dark:border-[#9CB080]/20">
+           <div className="flex gap-1 p-1 bg-[#1C2320]/5 dark:bg-[#2B5748]/40 rounded-2xl overflow-x-auto border border-[#1C2320]/10 dark:border-[#9CB080]/20">
               {[ 
                 { id: 'overview', label: 'Overview', icon: History },
                 { id: 'tickets', label: 'Tickets', icon: MessageSquare },
@@ -320,7 +320,7 @@ const SupportDashboard: React.FC = () => {
 
       {activeTab === 'overview' && (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 overflow-y-auto pr-2 scrollbar-hide">
-          <div className="rounded-[2rem] p-8 text-white relative overflow-hidden" style={{ background: '#273338', boxShadow: '0 12px 40px -8px rgba(0,0,0,0.25)' }}>
+          <div className="rounded-[2rem] p-8 text-white relative overflow-hidden" style={{ background: '#1C2320', boxShadow: '0 12px 40px -8px rgba(0,0,0,0.25)' }}>
              <div className="absolute inset-0 dot-pattern-dark opacity-50 rounded-[2rem]"></div>
              <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl opacity-15" style={{ background: "#2B5748", transform: 'translate(20%, -20%)' }}></div>
              <div className="relative z-10">
@@ -424,7 +424,7 @@ const SupportDashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => { setActiveTab('tickets'); setSelectedTicket(t); }}
-                        className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-[#9CB080]/20 hover:bg-slate-50 dark:hover:bg-[#273338]/30 transition flex justify-between items-center gap-2"
+                        className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-[#9CB080]/20 hover:bg-slate-50 dark:hover:bg-[#1C2320]/30 transition flex justify-between items-center gap-2"
                       >
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 dark:text-white truncate">#{t.ticketNum} — {t.subject}</p>
@@ -478,7 +478,7 @@ const SupportDashboard: React.FC = () => {
            </div>
 
            <div className="lg:col-span-8 flex flex-col bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-[#9CB080]/20 flex justify-between items-center bg-slate-50 dark:bg-[#273338]/20">
+              <div className="p-6 border-b border-slate-100 dark:border-[#9CB080]/20 flex justify-between items-center bg-slate-50 dark:bg-[#1C2320]/20">
                  <div className="flex items-center gap-3">
                     <History className="w-5 h-5 text-slate-400" />
                     <h3 className="font-bold text-slate-800 dark:text-white">Recent Call Logs</h3>
@@ -486,7 +486,7 @@ const SupportDashboard: React.FC = () => {
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-hide">
                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-slate-50 dark:bg-[#273338] z-10 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-[#9CB080]/20">
+                    <thead className="sticky top-0 bg-slate-50 dark:bg-[#1C2320] z-10 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-[#9CB080]/20">
                        <tr>
                           <th className="px-6 py-4">User</th>
                           <th className="px-6 py-4">Date</th>
@@ -523,24 +523,24 @@ const SupportDashboard: React.FC = () => {
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden ${activeTab !== 'tickets' ? 'hidden' : ''}`}>
          <div className={`lg:col-span-4 flex flex-col gap-6 overflow-hidden ${selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
             <div className="flex-1 flex flex-col bg-white dark:bg-[#2B5748]/40 rounded-2xl border border-slate-200 dark:border-[#9CB080]/20 shadow-sm overflow-hidden min-h-0">
-               <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 space-y-4 bg-slate-50/50 dark:bg-[#273338]/20">
+               <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 space-y-4 bg-slate-50/50 dark:bg-[#1C2320]/20">
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                      {(['All', 'Open', 'Resolved'] as const).map(f => (
-                       <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${filter === f ? 'bg-[#2B5748] dark:bg-[#9CB080] text-white dark:text-[#273338]' : 'bg-[#273338]/5 dark:bg-[#273338] text-slate-400 hover:text-slate-600'}`} style={filter === f ? { boxShadow: '0 4px 12px -3px rgba(43, 87, 72,0.3)' } : {}}>
+                       <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${filter === f ? 'bg-[#2B5748] dark:bg-[#9CB080] text-white dark:text-[#1C2320]' : 'bg-[#1C2320]/5 dark:bg-[#1C2320] text-slate-400 hover:text-slate-600'}`} style={filter === f ? { boxShadow: '0 4px 12px -3px rgba(43, 87, 72,0.3)' } : {}}>
                          {f}
                        </button>
                      ))}
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                      {(['All', 'Technical', 'Billing', 'General'] as const).map(c => (
-                       <button key={c} onClick={() => setCategoryFilter(c)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition whitespace-nowrap ${categoryFilter === c ? 'bg-[#618764] text-white' : 'bg-[#273338]/5 dark:bg-[#273338] text-slate-400'}`}>
+                       <button key={c} onClick={() => setCategoryFilter(c)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition whitespace-nowrap ${categoryFilter === c ? 'bg-[#618764] text-white' : 'bg-[#1C2320]/5 dark:bg-[#1C2320] text-slate-400'}`}>
                          {c === 'All' ? 'All Types' : c}
                        </button>
                      ))}
                   </div>
                   <div className="relative">
                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-[#273338] border border-transparent focus:border-[#2B5748] rounded-xl text-sm outline-none transition-all" />
+                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-[#1C2320] border border-transparent focus:border-[#2B5748] rounded-xl text-sm outline-none transition-all" />
                   </div>
                </div>
 
@@ -553,7 +553,7 @@ const SupportDashboard: React.FC = () => {
                      <div className="py-20 text-center text-slate-400 text-sm italic px-10">No tickets found.</div>
                   ) : (
                      processedTickets.map(ticket => (
-                        <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} className={`p-4 cursor-pointer transition relative group border-l-4 ${selectedTicket?.id === ticket.id ? 'bg-[#2B5748]/5 dark:bg-[#2B5748]/8' : 'hover:bg-[#273338]/5 dark:hover:bg-[#2B5748]/50/30 border-l-transparent'}`} style={selectedTicket?.id === ticket.id ? { borderLeftColor: '#2B5748' } : {}}>
+                        <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} className={`p-4 cursor-pointer transition relative group border-l-4 ${selectedTicket?.id === ticket.id ? 'bg-[#2B5748]/5 dark:bg-[#2B5748]/8' : 'hover:bg-[#1C2320]/5 dark:hover:bg-[#2B5748]/50/30 border-l-transparent'}`} style={selectedTicket?.id === ticket.id ? { borderLeftColor: '#2B5748' } : {}}>
                            <div className="flex justify-between items-start mb-1">
                               <span className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[150px]">{ticket.userEmail}</span>
                               <span className="text-[10px] text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
@@ -595,7 +595,7 @@ const SupportDashboard: React.FC = () => {
             {selectedTicket ? (
                <div className="flex flex-1 overflow-hidden">
                   <div className="flex-1 flex flex-col min-w-0">
-                     <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#273338] flex justify-between items-center shrink-0">
+                     <div className="p-4 border-b border-slate-100 dark:border-[#9CB080]/20 bg-slate-50 dark:bg-[#1C2320] flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-3">
                            <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1.5 hover:bg-slate-200 dark:hover:bg-[#2B5748]/50 rounded-lg transition"><ArrowLeft className="w-5 h-5" /></button>
                            <div>
@@ -620,10 +620,10 @@ const SupportDashboard: React.FC = () => {
                         </div>
                      </div>
 
-                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-[#273338]/30 scrollbar-hide">
+                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-[#1C2320]/30 scrollbar-hide">
                         {selectedTicket.messages?.map((msg, idx) => (
                            <div key={idx} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${msg.sender === 'agent' ? 'text-white rounded-tr-none' : 'bg-white dark:bg-[#2B5748]/50 text-slate-800 dark:text-white border border-[#273338]/10 dark:border-[#9CB080]/20 rounded-tl-none'}`} style={msg.sender === 'agent' ? { background: '#2B5748' } : {}}>
+                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${msg.sender === 'agent' ? 'text-white rounded-tr-none' : 'bg-white dark:bg-[#2B5748]/50 text-slate-800 dark:text-white border border-[#1C2320]/10 dark:border-[#9CB080]/20 rounded-tl-none'}`} style={msg.sender === 'agent' ? { background: '#2B5748' } : {}}>
                                  {msg.text}
                               </div>
                            </div>
@@ -634,11 +634,11 @@ const SupportDashboard: React.FC = () => {
                         <div className="p-4 bg-white dark:bg-[#2B5748]/40 border-t border-slate-100 dark:border-[#9CB080]/20 shrink-0 space-y-3">
                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                               {[{ label: 'Greeting', text: 'Mabuhay! How can I help you?' }, { label: 'Checking', text: 'Wait lang po, let me check.' }, { label: 'Resolved', text: 'Resolved na po!' }].map((qr, i) => (
-                                 <button key={i} onClick={() => setReply(qr.text)} className="px-2 py-1 bg-slate-100 dark:bg-[#273338] text-slate-500 rounded-md text-[10px] font-bold hover:bg-emerald-50 transition whitespace-nowrap">{qr.label}</button>
+                                 <button key={i} onClick={() => setReply(qr.text)} className="px-2 py-1 bg-slate-100 dark:bg-[#1C2320] text-slate-500 rounded-md text-[10px] font-bold hover:bg-emerald-50 transition whitespace-nowrap">{qr.label}</button>
                               ))}
                            </div>
                            <form onSubmit={handleSendReply} className="flex gap-3">
-                              <textarea rows={1} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type reply..." className="flex-1 bg-slate-100 dark:bg-[#273338] border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                              <textarea rows={1} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type reply..." className="flex-1 bg-slate-100 dark:bg-[#1C2320] border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
                               <button type="submit" disabled={isSending || !reply.trim()} className="bg-emerald-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm hover:bg-emerald-700 transition shadow-lg flex items-center gap-2 disabled:opacity-50">
                                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                  <span className="hidden sm:inline">Reply</span>
@@ -648,7 +648,7 @@ const SupportDashboard: React.FC = () => {
                      )}
                   </div>
 
-                  <div className="hidden xl:flex w-72 border-l border-slate-100 dark:border-[#9CB080]/20 flex-col bg-slate-50 dark:bg-[#273338]/10">
+                  <div className="hidden xl:flex w-72 border-l border-slate-100 dark:border-[#9CB080]/20 flex-col bg-slate-50 dark:bg-[#1C2320]/10">
                      <div className="p-6 border-b border-slate-100 dark:border-[#9CB080]/20 text-center">
                         <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner"><UserIcon className="w-8 h-8" /></div>
                         <h4 className="font-bold text-slate-800 dark:text-white truncate">{userProfile?.businessName || 'Anonymous'}</h4>

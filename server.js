@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
-import { DatabaseService } from './services/databaseService.ts';
+import { SupabaseService } from './services/supabaseService.ts';
 import { JWTService } from './services/jwtService.ts';
 import { logger } from './utils/logger.ts';
 
@@ -131,7 +131,21 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Initialize Database Service
-const dbService = new DatabaseService();
+const dbService = new SupabaseService();
+
+// ── Process-level safety net ─────────────────────────────────────────
+// A thrown error in an un-awaited promise used to take the whole server
+// down (→ ECONNREFUSED for the client). Log and keep serving instead.
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', { reason: reason?.message || String(reason) });
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception (server kept alive)', { error: err?.message, stack: err?.stack });
+});
+
+// Wrap async route handlers so a rejected promise becomes a clean 500
+// instead of an unhandled rejection.
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
@@ -1438,10 +1452,14 @@ app.post('/api/ai/local', async (req, res) => {
 
 // --- Unsloth AI Proxy ---
 app.post('/api/ai/unsloth', async (req, res) => {
-  try {
-    const url = process.env.UNSLOTH_API_URL || 'https://sharp-spies-doubt.loca.lt/v1/chat/completions';
-    const token = process.env.UNSLOTH_API_KEY || 'sk-unsloth-2ac78b9fd6f6d5f70b0b3f752a73ba60';
+  const url = process.env.UNSLOTH_API_URL || 'https://sharp-spies-doubt.loca.lt/v1/chat/completions';
+  const token = process.env.UNSLOTH_API_KEY || 'sk-unsloth-2ac78b9fd6f6d5f70b0b3f752a73ba60';
 
+  // Fail fast: a dead tunnel used to hang the request (and the caller's UI).
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.UNSLOTH_TIMEOUT_MS) || 20000);
+
+  try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -1449,60 +1467,68 @@ app.post('/api/ai/unsloth', async (req, res) => {
         'Authorization': `Bearer ${token}`,
         'Bypass-Tunnel-Reminder': 'true'
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(req.body),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      const errText = await response.text();
+      const errText = await response.text().catch(() => '');
       throw new Error(`Unsloth API Error: ${response.status} - ${errText}`);
     }
 
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    console.error("Unsloth AI Proxy failed:", error);
-    res.status(503).json({ error: "Unsloth AI currently unavailable" });
+    const aborted = error?.name === 'AbortError';
+    logger.warn('Unsloth AI proxy unavailable', { aborted, message: error?.message });
+    // 503 is correct here; the client already has offline fallbacks.
+    res.status(503).json({ error: aborted ? 'AI request timed out' : 'AI service unavailable', degraded: true });
+  } finally {
+    clearTimeout(timeout);
   }
 });
 
-// API 404 Handler - Must be before the React catch-all
-
-
-
+// API 404 handler — must be before the React catch-all
 app.use('/api', (req, res) => {
-
-
-
   res.status(404).json({ error: 'API endpoint not found' });
-
-
-
 });
 
-
-
-// The "catchall" handler: for any request that doesn't
-
-// match one above, send back React's index.html file.
-
+// The "catchall" handler: any non-API request → React's index.html
 app.use((req, res) => {
-
-
-
   res.sendFile(path.join(__dirname, 'dist/index.html'));
-
-
-
 });
 
+// ── Global error handler ─────────────────────────────────────────────
+// Anything a route (or the wrap() helper) forwards via next(err) lands
+// here as a clean JSON response instead of a hung / crashed request.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const locked = /SQLITE_BUSY|database is locked/i.test(err?.message || '');
+  logger.error('Unhandled request error', { path: req.originalUrl, message: err?.message, locked });
+  if (res.headersSent) return;
+  res.status(locked ? 503 : 500).json({
+    error: locked ? 'The database is busy, please retry.' : 'Internal server error',
+    retryable: locked,
+  });
+});
 
-
-
-
-
-
-// Start Server
+// ── Start + graceful shutdown ────────────────────────────────────────
 httpServer.listen(port, () => {
   logger.info(`Server running on port ${port}`);
   console.log(`Server running on http://localhost:${port}`);
 });
+
+let shuttingDown = false;
+const shutdown = (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`${signal} received — shutting down gracefully`);
+  httpServer.close(() => {
+    try { dbService.close(); } catch (e) { logger.error('DB close failed', { error: e?.message }); }
+    process.exit(0);
+  });
+  // Don't hang forever if a connection is stuck.
+  setTimeout(() => process.exit(0), 5000).unref();
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

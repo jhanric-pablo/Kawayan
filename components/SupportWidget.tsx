@@ -168,9 +168,9 @@ const SupportWidget: React.FC = () => {
       
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-4">
         {isOpen && (
-          <div className="bg-white dark:bg-[#1E293B]/40 w-80 max-h-[min(560px,85vh)] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#4D7CFF]/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <div className="bg-white dark:bg-[#161D1A]/40 w-80 max-h-[min(560px,85vh)] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#9CB080]/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
             {/* Header */}
-            <div className="bg-slate-900 dark:bg-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
+            <div className="bg-[#2B5748] dark:bg-[#2B5748] p-4 flex justify-between items-center text-white shrink-0">
               <div className="flex items-center gap-2 overflow-hidden">
                 {(mode !== 'menu') && (
                   <button onClick={() => setMode('menu')} className="mr-1 hover:text-slate-300 transition-colors">
@@ -197,12 +197,12 @@ const SupportWidget: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col relative">
               
               {mode === 'menu' && (
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-50 dark:bg-[#0F172A]/50">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-50 dark:bg-[#0C110F]/50">
                   <p className="text-center text-sm text-slate-500 dark:text-slate-400 shrink-0">How can we help you today?</p>
                   
                   <button 
                     onClick={() => setMode('chat')}
-                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#161D1A]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#9CB080]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
                     <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
                       <Bot className="w-4 h-4" />
@@ -215,7 +215,7 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => setMode('call')}
-                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border-2 border-purple-200 dark:border-purple-500/40 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all group text-left shrink-0"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#161D1A]/40 rounded-xl shadow-sm border-2 border-purple-200 dark:border-purple-500/40 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
                     <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shrink-0">
                       <Headset className="w-4 h-4" />
@@ -228,7 +228,7 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => { setTicketCategory('Technical'); setMode('ticket'); }}
-                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-md transition-all group text-left shrink-0"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#161D1A]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#9CB080]/20 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
                     <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0">
                       <Bot className="w-4 h-4" />
@@ -241,7 +241,7 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => { setTicketCategory('Billing'); setMode('ticket'); }}
-                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#161D1A]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#9CB080]/20 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
                     <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
                       <FileText className="w-4 h-4" />
@@ -254,7 +254,7 @@ const SupportWidget: React.FC = () => {
 
                   <button 
                     onClick={() => { setTicketCategory('General'); setMode('ticket'); }}
-                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#1E293B]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all group text-left shrink-0"
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-[#161D1A]/40 rounded-xl shadow-sm border border-slate-200 dark:border-[#9CB080]/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all group text-left shrink-0"
                   >
                     <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform shrink-0">
                       <FileText className="w-4 h-4" />
@@ -269,7 +269,7 @@ const SupportWidget: React.FC = () => {
 
               {mode === 'chat' && (
                 <>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-[#0F172A]/50">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-[#0C110F]/50">
                     {!activeTicketId && chatHistory.length === 0 && (
                       <div className="text-center mt-6 opacity-70 px-2">
                         <Bot className="w-12 h-12 mx-auto mb-2 text-emerald-500"/>
@@ -298,14 +298,14 @@ const SupportWidget: React.FC = () => {
                             <div className="flex flex-col items-start max-w-[85%]">
                               <button 
                                 onClick={() => toggleThinking(idx)}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-100 dark:bg-[#1E293B]/40 text-[10px] text-slate-500 hover:text-emerald-600 transition-colors border border-slate-200 dark:border-[#4D7CFF]/20"
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-100 dark:bg-[#161D1A]/40 text-[10px] text-slate-500 hover:text-emerald-600 transition-colors border border-slate-200 dark:border-[#9CB080]/20"
                               >
                                 <Brain className="w-3 h-3" />
                                 <span>AI Thinking...</span>
                                 {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
                               </button>
                               {isExpanded && (
-                                <div className="mt-1 p-2 bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-[#4D7CFF]/20 rounded-xl text-[10px] text-slate-500 italic leading-relaxed animate-in fade-in slide-in-from-top-1">
+                                <div className="mt-1 p-2 bg-slate-50 dark:bg-[#0C110F] border border-slate-200 dark:border-[#9CB080]/20 rounded-xl text-[10px] text-slate-500 italic leading-relaxed animate-in fade-in slide-in-from-top-1">
                                   {reasoning}
                                 </div>
                               )}
@@ -318,7 +318,7 @@ const SupportWidget: React.FC = () => {
                               ? 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 italic text-center w-full'
                               : msg.sender === 'agent'
                               ? 'bg-slate-900 dark:bg-emerald-700 text-white rounded-bl-none shadow-md border-l-4 border-emerald-400'
-                              : 'bg-white dark:bg-[#1E293B]/50 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#4D7CFF]/20 rounded-bl-none shadow-sm'
+                              : 'bg-white dark:bg-[#161D1A]/50 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#9CB080]/20 rounded-bl-none shadow-sm'
                           }`}>
                             {content}
                           </div>
@@ -327,20 +327,20 @@ const SupportWidget: React.FC = () => {
                     })}
                     {isTyping && (
                       <div className="flex justify-start">
-                        <div className="bg-white dark:bg-[#1E293B]/50 p-2 rounded-2xl rounded-bl-none shadow-sm border border-slate-200 dark:border-[#4D7CFF]/20">
+                        <div className="bg-white dark:bg-[#161D1A]/50 p-2 rounded-2xl rounded-bl-none shadow-sm border border-slate-200 dark:border-[#9CB080]/20">
                           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
                         </div>
                       </div>
                     )}
                   </div>
-                  <form onSubmit={handleSend} className="p-3 bg-white dark:bg-[#1E293B]/40 border-t border-slate-100 dark:border-[#4D7CFF]/20 flex gap-2">
+                  <form onSubmit={handleSend} className="p-3 bg-white dark:bg-[#161D1A]/40 border-t border-slate-100 dark:border-[#9CB080]/20 flex gap-2">
                     <input 
                       type="text" 
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder={activeTicketId ? "Message support agent..." : "Ask the AI assistant..."}
                       disabled={isTyping}
-                      className="flex-1 text-sm bg-slate-100 dark:bg-[#0F172A] border-none rounded-full px-4 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white disabled:opacity-50"
+                      className="flex-1 text-sm bg-slate-100 dark:bg-[#0C110F] border-none rounded-full px-4 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white disabled:opacity-50"
                     />
                     <button type="submit" disabled={isTyping} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition shadow-md disabled:opacity-50">
                       <Send className="w-4 h-4" />
@@ -350,10 +350,10 @@ const SupportWidget: React.FC = () => {
               )}
 
               {mode === 'ticket' && (
-                <form onSubmit={handleSubmitTicket} className="flex-1 p-4 space-y-4 bg-white dark:bg-[#1E293B]/40 overflow-y-auto">
+                <form onSubmit={handleSubmitTicket} className="flex-1 p-4 space-y-4 bg-white dark:bg-[#161D1A]/40 overflow-y-auto">
                    <div>
                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                     <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value as typeof ticketCategory)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm">
+                     <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value as typeof ticketCategory)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#0C110F] dark:text-white text-sm">
                        <option value="Technical">Technical</option>
                        <option value="Billing">Billing</option>
                        <option value="General">General</option>
@@ -361,11 +361,11 @@ const SupportWidget: React.FC = () => {
                    </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Subject</label>
-                     <input required type="text" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm" placeholder="Brief summary of issue" />
+                     <input required type="text" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#0C110F] dark:text-white text-sm" placeholder="Brief summary of issue" />
                    </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Priority</label>
-                     <select value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm">
+                     <select value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#0C110F] dark:text-white text-sm">
                        <option>Low</option>
                        <option>Medium</option>
                        <option>High</option>
@@ -377,7 +377,7 @@ const SupportWidget: React.FC = () => {
               )}
 
               {mode === 'call' && (
-                <form onSubmit={handleStartCall} className="flex-1 p-4 space-y-4 bg-white dark:bg-[#1E293B]/40 overflow-y-auto">
+                <form onSubmit={handleStartCall} className="flex-1 p-4 space-y-4 bg-white dark:bg-[#161D1A]/40 overflow-y-auto">
                    <div className="text-center py-4">
                       <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><Phone className="w-8 h-8 text-emerald-600" /></div>
                       <h4 className="font-bold text-slate-900 dark:text-white">Request Live Support</h4>
@@ -385,7 +385,7 @@ const SupportWidget: React.FC = () => {
                    </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">What do you need help with?</label>
-                     <textarea required value={callReason} onChange={(e) => setCallReason(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#4D7CFF]/20 dark:bg-[#0F172A] dark:text-white text-sm resize-none" rows={3} placeholder="e.g. Account issues, billing..." />
+                     <textarea required value={callReason} onChange={(e) => setCallReason(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-[#9CB080]/20 dark:bg-[#0C110F] dark:text-white text-sm resize-none" rows={3} placeholder="e.g. Account issues, billing..." />
                    </div>
                    <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 shadow-lg transition transform active:scale-95">Start Call Bridge</button>
                 </form>
@@ -394,7 +394,7 @@ const SupportWidget: React.FC = () => {
 
           </div>
         )}
-        <button onClick={() => setIsOpen(!isOpen)} className="group relative flex items-center justify-center w-14 h-14 bg-slate-900 dark:bg-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+        <button onClick={() => setIsOpen(!isOpen)} className="group relative flex items-center justify-center w-14 h-14 bg-[#2B5748] dark:bg-[#2B5748] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
           {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         </button>
       </div>

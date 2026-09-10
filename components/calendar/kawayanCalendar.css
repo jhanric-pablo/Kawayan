@@ -1,0 +1,445 @@
+/* ═══════════════════════════════════════════════════════════════
+   Kawayan content planner — TOAST UI Calendar skin + agenda view
+   Brand: forest green · sage · cream · dark forest
+   ═══════════════════════════════════════════════════════════════ */
+
+.kw-cal {
+  height: clamp(430px, 58vh, 680px);
+  width: 100%;
+  font-family: var(--font-ui);
+  color: var(--fg);
+}
+
+/* ── TOAST layout reset (no `theme` prop is passed — see KawayanCalendar.tsx) ── */
+.kw-cal .toastui-calendar-layout {
+  height: 100% !important;
+  background: transparent !important;
+  font-family: var(--font-ui);
+}
+
+.kw-cal .toastui-calendar-month {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--card);
+}
+
+/* Neutralise TOAST's hard-coded default borders / colours */
+.kw-cal .toastui-calendar-daygrid-cell + .toastui-calendar-daygrid-cell,
+.kw-cal .toastui-calendar-month-daygrid .toastui-calendar-month-week-item > div[style] {
+  border-color: var(--border) !important;
+}
+.kw-cal .toastui-calendar-month-week-item > div {
+  border-top-color: var(--border) !important;
+}
+.kw-cal .toastui-calendar-daygrid-cell[style] {
+  background-color: transparent !important;
+}
+.kw-cal .toastui-calendar-weekday-grid-date,
+.kw-cal .toastui-calendar-grid-cell-date span[style] {
+  color: var(--fg-muted) !important;
+}
+
+/* Weekday header row */
+.kw-cal .toastui-calendar-day-names.toastui-calendar-month {
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+.kw-cal .toastui-calendar-day-name-item.toastui-calendar-month {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted) !important;
+  text-align: center !important;
+  width: calc(100% / 7);
+  padding: 0;
+}
+.kw-cal .toastui-calendar-day-name-item.toastui-calendar-month span {
+  color: inherit !important;
+}
+
+/* ── Day cells ────────────────────────────────────────────────── */
+.kw-cal .toastui-calendar-daygrid-cell {
+  transition: background-color 0.15s ease;
+}
+.kw-cal .toastui-calendar-daygrid-cell:hover {
+  background: rgba(43, 87, 72, 0.04);
+}
+.dark .kw-cal .toastui-calendar-daygrid-cell:hover {
+  background: rgba(156, 176, 128, 0.06);
+}
+.kw-cal .toastui-calendar-daygrid-cell.kw-cell-selected {
+  background: rgba(43, 87, 72, 0.08);
+  box-shadow: inset 0 0 0 2px var(--kw-green);
+}
+.dark .kw-cal .toastui-calendar-daygrid-cell.kw-cell-selected {
+  background: rgba(156, 176, 128, 0.12);
+  box-shadow: inset 0 0 0 2px var(--kw-sage);
+}
+
+/* Date number (custom monthGridHeader template) */
+.kw-cal .toastui-calendar-grid-cell-date {
+  width: auto !important;
+  height: auto !important;
+  text-align: left !important;
+  padding: 5px 0 0 7px;
+}
+.kw-cal .kw-daynum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  border-radius: var(--r-pill);
+  line-height: 1;
+}
+.kw-cal .kw-daynum--today {
+  background: var(--kw-green);
+  color: #fff;
+  font-weight: 800;
+}
+.dark .kw-cal .kw-daynum--today {
+  background: var(--kw-sage);
+  color: var(--kw-forest);
+}
+.kw-cal .kw-daynum--other {
+  opacity: 0.4;
+}
+
+/* ── Event chips ──────────────────────────────────────────────── */
+.kw-cal .toastui-calendar-weekday-event {
+  border-radius: 7px !important;
+  border: 1px solid var(--border) !important;
+  border-left-width: 3px !important;
+  box-shadow: none !important;
+  height: 22px !important;
+  margin-top: 1px;
+}
+.kw-cal .toastui-calendar-weekday-event-title {
+  padding: 0 8px !important;
+  font-weight: 600 !important;
+  line-height: 20px !important;
+}
+.dark .kw-cal .toastui-calendar-weekday-event { border-color: var(--border-strong) !important; }
+.kw-cal .kw-evt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.kw-cal .kw-evt__tag {
+  flex-shrink: 0;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.kw-cal .kw-evt__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* "+N" more-events control */
+.kw-cal .toastui-calendar-grid-cell-more-events,
+.kw-cal .kw-more {
+  color: var(--fg-muted) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+}
+.kw-cal .toastui-calendar-grid-cell-more-events:hover {
+  color: var(--primary) !important;
+}
+
+/* See-more popup */
+.kw-cal-popup-safe .toastui-calendar-see-more-container,
+.toastui-calendar-see-more-container {
+  z-index: 60;
+}
+.toastui-calendar-see-more {
+  border-radius: var(--r-md) !important;
+  font-family: var(--font-ui);
+}
+.toastui-calendar-see-more-header .toastui-calendar-more-title-date,
+.toastui-calendar-see-more-header .toastui-calendar-more-title-day {
+  color: var(--fg) !important;
+  font-weight: 700;
+}
+.kw-more-close {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+
+/* Grid-selection flash — override TOAST's default blue (we clear it fast) */
+.kw-cal .toastui-calendar-grid-selection {
+  border-radius: 4px;
+  background-color: rgba(43, 87, 72, 0.08) !important;
+  border: 1px solid var(--kw-green) !important;
+}
+.dark .kw-cal .toastui-calendar-grid-selection {
+  background-color: rgba(156, 176, 128, 0.12) !important;
+  border-color: var(--kw-sage) !important;
+}
+.kw-cal .toastui-calendar-grid-selection-label {
+  display: none;
+}
+
+/* Weekend cells (TOAST default fills them grey) */
+.kw-cal .toastui-calendar-daygrid-cell:first-child[style],
+.kw-cal .toastui-calendar-daygrid-cell:last-child[style] {
+  background-color: rgba(43, 87, 72, 0.022) !important;
+}
+.dark .kw-cal .toastui-calendar-daygrid-cell:first-child[style],
+.dark .kw-cal .toastui-calendar-daygrid-cell:last-child[style] {
+  background-color: rgba(156, 176, 128, 0.04) !important;
+}
+
+/* "More events" popup */
+.kw-cal-popup,
+.toastui-calendar-see-more {
+  background: var(--card) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Agenda / list view
+   ═══════════════════════════════════════════════════════════════ */
+.kw-agenda {
+  height: 100%;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kw-agenda__day {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  padding: 12px 10px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+}
+.kw-agenda__day + .kw-agenda__day {
+  border-top: 1px solid var(--border);
+}
+.kw-agenda__day.is-selected {
+  background: rgba(43, 87, 72, 0.06);
+  border-color: var(--kw-green);
+}
+.dark .kw-agenda__day.is-selected {
+  background: rgba(156, 176, 128, 0.12);
+  border-color: var(--kw-sage);
+}
+
+.kw-agenda__date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.kw-agenda__date:hover {
+  background: rgba(43, 87, 72, 0.06);
+}
+.kw-agenda__date-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fg);
+  line-height: 1;
+}
+.kw-agenda__date-dow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+
+.kw-agenda__items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.kw-agenda__chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-alt);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.kw-agenda__chip:hover {
+  border-color: var(--border-strong);
+  background: var(--card-hover);
+}
+.kw-agenda__chip:focus-visible {
+  outline: 2px solid var(--kw-green);
+  outline-offset: 1px;
+}
+.kw-agenda__chip-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.kw-agenda__chip-format {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+}
+
+.kw-agenda--empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--fg-muted);
+  gap: 8px;
+  padding: 40px 20px;
+}
+.kw-agenda__empty-title {
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0;
+}
+.kw-agenda__empty-hint {
+  font-size: 12px;
+  margin: 0;
+  max-width: 320px;
+}
+
+/* ── Status pills (shared: agenda + legend) ───────────────────── */
+.kw-chip-status {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+}
+.kw-chip-status--idea {
+  background: #FBF0E4;
+  color: #7A4A1E;
+  border-color: rgba(224, 123, 42, 0.35);
+}
+.kw-chip-status--draft {
+  background: #EDF1EF;
+  color: #3A473F;
+  border-color: rgba(124, 143, 121, 0.4);
+}
+.kw-chip-status--scheduled {
+  background: #E4EEE8;
+  color: #1A3D30;
+  border-color: rgba(43, 87, 72, 0.35);
+}
+.kw-chip-status--published {
+  background: #E1F0E5;
+  color: #14603B;
+  border-color: rgba(34, 165, 94, 0.4);
+}
+.dark .kw-chip-status--idea {
+  background: rgba(224, 123, 42, 0.16);
+  color: #F3CBA0;
+  border-color: rgba(233, 162, 100, 0.4);
+}
+.dark .kw-chip-status--draft {
+  background: rgba(156, 176, 128, 0.14);
+  color: #CBD8C1;
+  border-color: rgba(156, 176, 128, 0.4);
+}
+.dark .kw-chip-status--scheduled {
+  background: rgba(43, 87, 72, 0.42);
+  color: #E3EFE8;
+  border-color: rgba(156, 176, 128, 0.4);
+}
+.dark .kw-chip-status--published {
+  background: rgba(34, 165, 94, 0.22);
+  color: #BEEBCF;
+  border-color: rgba(78, 216, 138, 0.45);
+}
+
+/* ── Legend ──────────────────────────────────────────────────── */
+.kw-cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+}
+.kw-cal-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.kw-cal-legend__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.kw-cal-legend__dot--idea { background: #E07B2A; }
+.kw-cal-legend__dot--draft { background: #7C8F79; }
+.kw-cal-legend__dot--scheduled { background: #2B5748; }
+.kw-cal-legend__dot--published { background: #22A55E; }
+.dark .kw-cal-legend__dot--scheduled { background: #9CB080; }
+.dark .kw-cal-legend__dot--published { background: #4ED88A; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .kw-cal {
+    height: clamp(420px, 64vh, 620px);
+  }
+  .kw-cal .kw-evt__tag {
+    display: none;
+  }
+  .kw-cal .kw-daynum {
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+  .kw-agenda__day {
+    grid-template-columns: 44px 1fr;
+    gap: 10px;
+  }
+}

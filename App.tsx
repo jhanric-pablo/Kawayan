@@ -6,13 +6,14 @@ import ContentCalendar from './components/ContentCalendar';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './components/Login';
 import LandingPage from './components/LandingPage';
+import LandingNav from './components/landing/LandingNav';
 import Settings from './components/Settings';
 import SupportWidget from './components/SupportWidget';
 import InsightsDashboard from './components/InsightsDashboard';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
-import DemoPage from './components/DemoPage';
 import VerificationStatusScreen from './components/VerificationStatus';
+import TermsOfServiceModal from './components/TermsOfServiceModal';
 import AppHydrationLoader from './components/AppHydrationLoader';
 import { useOrganicDialog } from './components/OrganicDialog';
 import UniversalDatabaseService from './services/universalDatabaseService';
@@ -36,6 +37,7 @@ const App: React.FC = () => {
     if (hasPersistedSession()) {
       return readRestorableView() ?? ViewState.CALENDAR;
     }
+    // Logged-out visitors always begin at the public home page.
     return ViewState.LANDING;
   });
   const [user, setUser] = useState<User | null>(() => {
@@ -47,14 +49,18 @@ const App: React.FC = () => {
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
+  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const loginInProgressRef = useRef(false);
   const sessionRestoredRef = useRef(false);
   const handleLoginRef = useRef<(user: User, initialView?: ViewState) => Promise<void>>(async () => {});
+  const viewRef = useRef(view);
 
   const navigateView = (next: ViewState) => {
     setView(next);
     writeStoredView(next);
   };
+
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   const continueAsUser = useCallback(async (loggedInUser: User, initialView?: ViewState) => {
     try {
@@ -251,6 +257,32 @@ const App: React.FC = () => {
     navigateView(ViewState.LOGIN);
   };
 
+  // Route a verified user onward. When they are sitting on the verification
+  // screen this is invoked by that screen *after* its approval animation, so the
+  // transition feels intentional instead of an abrupt jump.
+  const handleVerified = useCallback(async () => {
+    if (!user || user.role !== 'user') return;
+    setVerifStatus('verified');
+    setVerifRejectionReason(undefined);
+    cacheVerificationStatus('verified', undefined);
+    try {
+      const profile = await dbService.getProfile(user.id);
+      if (profile) {
+        setBrandProfile(profile);
+        // Never bounce back to the onboarding screens we're leaving.
+        const restored = readRestorableView('user');
+        const target = restored && restored !== ViewState.VERIFICATION && restored !== ViewState.SURVEY
+          ? restored
+          : ViewState.CALENDAR;
+        navigateView(target);
+      } else {
+        navigateView(ViewState.SURVEY);
+      }
+    } catch {
+      navigateView(ViewState.SURVEY);
+    }
+  }, [user, dbService]);
+
   const refreshVerificationStatus = async () => {
     if (!user || user.role !== 'user') return;
     try {
@@ -266,13 +298,10 @@ const App: React.FC = () => {
         cacheVerificationStatus(vStatus, verif?.rejectionReason);
       }
       if (vStatus === 'verified') {
-        const profile = await dbService.getProfile(user.id);
-        if (profile) {
-          setBrandProfile(profile);
-          navigateView(readRestorableView('user') || ViewState.CALENDAR);
-        } else {
-          navigateView(ViewState.SURVEY);
-        }
+        // On the verification screen, let it play its approval animation and
+        // call handleVerified when done. Anywhere else, route immediately.
+        if (viewRef.current === ViewState.VERIFICATION) return;
+        await handleVerified();
       }
     } catch (e) {
       console.warn('Could not refresh verification status:', e);
@@ -378,7 +407,14 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col transition-colors font-sans" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
       {/* ── Navigation ────────────────────────────────────────────── */}
-      {!isAuthView && (
+      {!isAuthView && view === ViewState.LANDING && !isLoggedIn && (
+        <LandingNav
+          onNavigate={navigateView}
+          darkMode={darkMode}
+          toggleTheme={() => updateTheme(!darkMode)}
+        />
+      )}
+      {!isAuthView && !(view === ViewState.LANDING && !isLoggedIn) && (
       <nav className="glass-panel sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-15" style={{ height: '3.75rem' }}>
@@ -406,8 +442,8 @@ const App: React.FC = () => {
                 <>
                   {/* Business name chip (calendar view) */}
                   {view === ViewState.CALENDAR && user?.businessName && (
-                    <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium mr-1"
-                      style={{ background: 'var(--muted)', color: 'var(--fg-muted)' }}>
+                    <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold mr-1 border"
+                      style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)', color: 'var(--fg-muted)' }}>
                       <LayoutDashboard className="w-3.5 h-3.5" />
                       {user.businessName}
                     </div>
@@ -415,8 +451,8 @@ const App: React.FC = () => {
 
                   {/* Role-based nav pills */}
                   {user?.role !== 'admin' && (
-                    <div className="flex items-center p-1 rounded-2xl gap-0.5"
-                      style={{ background: 'rgba(43,87,72,0.06)', border: '1px solid rgba(43,87,72,0.1)' }}>
+                    <div className="flex items-center p-1 rounded-xl gap-0.5 border"
+                      style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
                       {[
                         { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
                         { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
@@ -426,8 +462,8 @@ const App: React.FC = () => {
                         <button
                           key={item.id}
                           onClick={() => navigateView(item.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                            view === item.id ? 'nav-item-active' : ''
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            view === item.id ? 'nav-item-active' : 'hover:text-[var(--fg)]'
                           }`}
                           style={view !== item.id ? { color: 'var(--fg-muted)' } : {}}
                         >
@@ -438,13 +474,13 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="w-px h-5 mx-1" style={{ background: 'var(--border-strong)' }} />
+                  <div className="w-px h-5 mx-1" style={{ background: 'var(--border)' }} />
 
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                     style={{ color: 'var(--fg-muted)' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#C0392B'; e.currentTarget.style.background = 'rgba(192,57,43,0.06)'; }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 8%, transparent)'; }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = ''; }}
                   >
                     <LogOut className="w-3.5 h-3.5" />
@@ -454,6 +490,26 @@ const App: React.FC = () => {
               ) : (
                 view === ViewState.LANDING && (
                   <div className="flex items-center gap-2">
+                    <div className="hidden md:flex items-center gap-1 mr-2">
+                      <a
+                        href="#features"
+                        className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        style={{ color: 'var(--fg-muted)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
+                      >
+                        Features
+                      </a>
+                      <a
+                        href="#pricing"
+                        className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        style={{ color: 'var(--fg-muted)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
+                      >
+                        Pricing
+                      </a>
+                    </div>
                     <button
                       onClick={() => navigateView(ViewState.LOGIN)}
                       className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
@@ -512,6 +568,7 @@ const App: React.FC = () => {
                         onLogout={handleLogout}
                         onResubmit={handleVerifResubmit}
                         onSessionExpired={handleSessionExpired}
+                        onVerified={handleVerified}
                       />
                     );
                   case ViewState.SURVEY:
@@ -552,8 +609,6 @@ const App: React.FC = () => {
                     return <Billing />;
                   case ViewState.SUPPORT_DASHBOARD:
                     return <SupportDashboard />;
-                  case ViewState.DEMO:
-                    return <DemoPage onNavigate={navigateView} />;
                   case ViewState.ADMIN_DASHBOARD:
                     return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} /> : (
                       <div className="flex items-center justify-center min-h-[60vh]">
@@ -586,8 +641,8 @@ const App: React.FC = () => {
               <span className="text-xs" style={{ color: 'var(--fg-subtle)' }}>© 2025 Built for Philippine MSMEs</span>
             </div>
             <div className="flex items-center gap-5 text-xs" style={{ color: 'var(--fg-muted)' }}>
-              <a href="/privacy.html" target="_blank" className="hover:text-[#2B5748] transition-colors">Privacy</a>
-              <a href="/terms.html" target="_blank" className="hover:text-[#2B5748] transition-colors">Terms</a>
+              <button type="button" onClick={() => setLegalDoc('privacy')} className="hover:text-[#2B5748] transition-colors">Privacy</button>
+              <button type="button" onClick={() => setLegalDoc('terms')} className="hover:text-[#2B5748] transition-colors">Terms</button>
               {!user && (
                 <button
                   onClick={() => navigateView(ViewState.ADMIN_LOGIN)}
@@ -600,6 +655,13 @@ const App: React.FC = () => {
           </div>
         </footer>
       )}
+
+      <TermsOfServiceModal
+        open={legalDoc !== null}
+        doc={legalDoc ?? 'terms'}
+        onClose={() => setLegalDoc(null)}
+        onSwitchDoc={(d) => setLegalDoc(d)}
+      />
     </div>
   );
 };

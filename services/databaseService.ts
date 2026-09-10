@@ -7,12 +7,17 @@ import { normalizeEmail, sanitizeUserForSession } from '../utils/authSession';
 
 export class DatabaseService {
   private dbConfig: DatabaseConfig;
-  
+
   constructor() {
     this.dbConfig = new DatabaseConfig();
     this.initializeDefaultAdmin();
   }
-  
+
+  /** Force a WAL checkpoint (used by the periodic keep-alive / health checks). */
+  checkpoint(): void {
+    this.dbConfig.checkpoint();
+  }
+
   // --- Users (Auth) ---
   async createUser(
     email: string,

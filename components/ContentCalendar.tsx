@@ -3,13 +3,14 @@ import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
 import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, getTrendingTopicsPH } from '../services/geminiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
-import { 
-  Loader2, Wand2, Image as ImageIcon, RefreshCcw, Flame, 
-  ThumbsUp, MessageCircle, Share2, MoreHorizontal, LayoutList, LayoutGrid, 
-  Save, ChevronLeft, ChevronRight, X, Upload, Layers
+import {
+  LayoutList, LayoutGrid, ChevronLeft, ChevronRight, X, Layers
 } from 'lucide-react';
-import ScheduleXCalendarView from './calendar/ScheduleXCalendarView';
+import KawayanCalendar from './calendar/KawayanCalendar';
+import PostComposer from './calendar/PostComposer';
+import PlanningModal from './calendar/PlanningModal';
 import { useOrganicDialog } from './OrganicDialog';
+import { useToast } from './ui/Toast';
 import {
   countPostsInMonth,
   getBatchLimitForSubscription,
@@ -30,9 +31,11 @@ interface Props {
 
 const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   const dialog = useOrganicDialog();
+  const toast = useToast();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [batchStrategy, setBatchStrategy] = useState('');
   const [showBatchIdeas, setShowBatchIdeas] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
   const [currentDate, setCurrentDate] = useState(new Date()); 
   const [dateInputValue, setDateInputValue] = useState("");
   const [loadingPlan, setLoadingPlan] = useState(false);
@@ -210,34 +213,42 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   }, [currentDate]);
 
   const loadData = async () => {
-    try {
-      console.log('Loading calendar data for user:', userId);
-      const trends = await getTrendingTopicsPH(profile.industry);
-      setTrendingTopics(trends);
-      
-      const savedPosts = await dbService.getUserPosts(userId);
-      setPosts(savedPosts);
+    const monthName = currentDate.toLocaleString('default', { month: 'long' });
 
-      const monthName = currentDate.toLocaleString('default', { month: 'long' });
-      const savedPlan = await dbService.getPlan(userId, monthName);
-      if (savedPlan) {
-        const range = getScheduleDayRange(currentDate);
-        const normalized = normalizeIdeasToBatchCount(
-          savedPlan,
-          Math.max(savedPlan.length, 1),
-          range
-        );
-        setIdeas(normalized);
-        if (normalized.length > 0) setShowBatchIdeas(true);
-      } else {
-        setIdeas([]);
-      }
-      
-      console.log('Loaded posts:', savedPosts.length);
-      setCalendarDataVersion((v) => v + 1);
-    } catch (error) {
-      console.error('Error loading calendar data:', error);
+    // Trending topics come from the (sometimes slow / offline) AI proxy — never
+    // let it block the calendar. Fire it separately, apply whenever it lands.
+    getTrendingTopicsPH(profile.industry)
+      .then(setTrendingTopics)
+      .catch(() => undefined);
+
+    // Posts + saved plan are what the calendar actually renders — load them
+    // independently so one failing does not blank the other.
+    const [postsRes, planRes] = await Promise.allSettled([
+      dbService.getUserPosts(userId),
+      dbService.getPlan(userId, monthName),
+    ]);
+
+    if (postsRes.status === 'fulfilled') {
+      setPosts(postsRes.value);
+    } else {
+      console.error('Error loading posts:', postsRes.reason);
+      toast.error('Could not load your calendar — retrying may help.');
     }
+
+    if (planRes.status === 'fulfilled' && planRes.value) {
+      const range = getScheduleDayRange(currentDate);
+      const normalized = normalizeIdeasToBatchCount(
+        planRes.value,
+        Math.max(planRes.value.length, 1),
+        range
+      );
+      setIdeas(normalized);
+      if (normalized.length > 0) setShowBatchIdeas(true);
+    } else if (planRes.status === 'fulfilled') {
+      setIdeas([]);
+    }
+
+    setCalendarDataVersion((v) => v + 1);
   };
 
   const handleGeneratePlan = async () => {
@@ -254,6 +265,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       newIdeas = normalizeIdeasToBatchCount(newIdeas, batchPostCount, getScheduleDayRange(currentDate));
       setIdeas(newIdeas);
       setShowBatchIdeas(true);
+      setPlanningOpen(true);
       await dbService.savePlan(userId, monthName, newIdeas);
     } catch (e: any) {
       if (e.message.includes('quota')) {
@@ -502,13 +514,11 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     const target = postToSave || generatedContent;
     if (!target) return;
     try {
-      console.log('Saving post:', target.id, target.status);
       await persistPost(target);
-      console.log('Post saved successfully');
-      if (!postToSave) await dialog.alert({ message: 'Post Saved to Database!', title: 'Saved' });
+      if (!postToSave) toast.success('Draft saved');
     } catch (error) {
       console.error('Error saving post:', error);
-      await dialog.alert('Failed to save post. Please try again.');
+      toast.error('Could not save the post — please retry.');
     }
   };
 
@@ -632,57 +642,65 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
+  const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const STATUS_LEGEND: { key: string; label: string }[] = [
+    { key: 'idea', label: 'Idea' },
+    { key: 'draft', label: 'Draft' },
+    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'published', label: 'Published' },
+  ];
+
   return (
-    <div className="relative w-full min-h-[85vh] flex flex-col gap-6 font-sans text-[#273338] dark:text-white organic-calendar-root">
-      
+    <div className="relative w-full flex flex-col gap-4 pb-16 font-sans text-[var(--fg)]">
+
       {/* Post Modal */}
       {showPostModal && (
-        <div className="fixed inset-0 bg-[#273338]/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#FFFFFF] dark:bg-[#273338] rounded-tl-[2.5rem] rounded-br-[2.5rem] rounded-[1.5rem] p-6 w-full max-w-sm shadow-float border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display text-xl font-bold text-[#273338] dark:text-white">Post to...</h3>
-              <button onClick={() => setShowPostModal(false)} className="rounded-full p-2 hover:bg-slate-900/5 dark:hover:bg-white/5 transition-colors">
-                <X className="w-5 h-5 text-[#273338] dark:text-white" />
+        <div className="kw-overlay" onClick={() => setShowPostModal(false)}>
+          <div className="kw-sheet p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-display text-lg font-bold text-[var(--fg)]">Post to…</h3>
+              <button onClick={() => setShowPostModal(false)} className="rounded-lg p-1.5 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-alt)] transition-colors">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="space-y-3">
-              <button 
+
+            <div className="space-y-2.5">
+              <button
                 onClick={() => handlePostNow('tiktok')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
               >
                 <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
                 </div>
                 <div className="text-left">
-                  <span className="block font-bold text-[#273338] dark:text-white">TikTok</span>
-                  <span className="text-xs text-[#273338]/70 dark:text-white/60">Auto-fill caption supported</span>
+                  <span className="block font-bold text-[var(--fg)]">TikTok</span>
+                  <span className="text-xs text-[var(--fg-muted)]">Auto-fill caption supported</span>
                 </div>
               </button>
 
               <button 
                 onClick={() => handlePostNow('facebook')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
               >
                 <div className="w-10 h-10 bg-[#1877F2] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                 </div>
                 <div className="text-left">
-                  <span className="block font-bold text-[#273338] dark:text-white">Facebook</span>
-                  <span className="text-xs text-[#273338]/70 dark:text-white/60">Opens Creator Studio</span>
+                  <span className="block font-bold text-[var(--fg)]">Facebook</span>
+                  <span className="text-xs text-[var(--fg-muted)]">Opens Creator Studio</span>
                 </div>
               </button>
 
               <button 
                 onClick={() => handlePostNow('instagram')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
               >
                 <div className="w-10 h-10 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
                 </div>
                 <div className="text-left">
-                  <span className="block font-bold text-[#273338] dark:text-white">Instagram</span>
-                  <span className="text-xs text-[#273338]/70 dark:text-white/60">Opens Create Post</span>
+                  <span className="block font-bold text-[var(--fg)]">Instagram</span>
+                  <span className="text-xs text-[var(--fg-muted)]">Opens Create Post</span>
                 </div>
               </button>
             </div>
@@ -690,140 +708,38 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         </div>
       )}
 
-      {/* Batch ideation — fluid organic strip */}
-      <section className="w-full rounded-[2rem] bg-[#FFFFFF]/90 dark:bg-[#273338]/40 p-6 sm:p-8 shadow-soft backdrop-blur-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] flex items-center justify-center">
-              <Layers className="w-5 h-5 text-[var(--primary)]" />
-            </div>
-            <div>
-              <h2 className="font-display text-lg font-bold text-[#273338] dark:text-white">
-                {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })} Content Strategy
-              </h2>
-              <p className="text-xs text-[#273338]/70 dark:text-white/60">
-                {subscription === 'PRO' || subscription === 'ENTERPRISE' ? 'Pro' : 'Trial'} plan · batch up to{' '}
-                <span className="font-semibold text-[var(--primary)]">{batchPostCount} posts</span>
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] px-3 py-1.5 rounded-full">
-            {monthlyPostCount}/{batchPostCount} posts this month
-          </span>
-        </div>
-
-        {trialLimitReached && (
-          <p className="text-xs text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.1)] border border-[var(--border-strong)] dark:border-[rgba(156,176,128,0.22)] rounded-full px-4 py-2 mb-3 transition-all duration-300">
-            Trial limit reached for this month. Upgrade to Pro to keep creating.
-          </p>
-        )}
-
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#273338]/80 dark:text-white/70 mb-2">
-          Describe this month&apos;s overall content strategy
-        </label>
-        <textarea
-          value={batchStrategy}
-          onChange={(e) => setBatchStrategy(e.target.value)}
-          placeholder='e.g. "Holiday Sale Promotion" or "Local organic bakery items launch"'
-          rows={2}
-          className="w-full rounded-[1rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] bg-white dark:bg-[#273338] px-4 py-3 text-sm text-[#273338] dark:text-white placeholder:text-[#273338]/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] resize-none font-[Nunito,Quicksand,sans-serif]"
-        />
-
-        <div className="flex flex-wrap gap-2 mt-4">
-          <button
-            onClick={handleGeneratePlan}
-            disabled={loadingPlan}
-            className="text-xs flex items-center gap-1.5 bg-white dark:bg-[#273338] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-[#273338] dark:text-white font-bold hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.08)] px-4 py-2 rounded-full transition-all duration-300 disabled:opacity-60"
-          >
-            {loadingPlan ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
-            Plan Month
-          </button>
-          <button
-            onClick={handleBatchGenerate}
-            disabled={loadingPlan || ideas.length === 0 || trialLimitReached}
-            className="text-xs flex items-center gap-2 text-white font-bold px-5 py-2.5 rounded-full transition-all duration-300 disabled:opacity-60 shadow-accent-sm organic-btn-primary"
-          >
-            {loadingPlan ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                {batchProgress
-                  ? `Generating ${batchProgress.current}/${batchProgress.total}…`
-                  : 'Starting batch…'}
-              </>
-            ) : (
-              <>
-                <Wand2 className="w-3.5 h-3.5" />
-                Batch Create {batchPostCount} Posts
-              </>
-            )}
-          </button>
-          {ideas.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowBatchIdeas((v) => !v)}
-              className="text-xs flex items-center gap-1.5 text-[var(--primary)] font-bold px-4 py-2 rounded-full border border-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all"
-            >
-              {showBatchIdeas ? 'Hide' : 'Review'} {ideas.length} Ideas
-            </button>
-          )}
-        </div>
-
-        {/* Live editable batch idea cards */}
-        {showBatchIdeas && ideas.length > 0 && (
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {ideas.map((idea, index) => (
-              <div
-                key={`${idea.day}-${index}`}
-                className="rounded-[1rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] bg-[#273338]/[0.03] dark:bg-white/[0.04] p-3 space-y-2"
+      {/* ─────────────  Calendar workspace (primary)  ───────────── */}
+      <section className="w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm p-3 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-[var(--fg)] tracking-tight mr-1">
+              {monthLabel}
+            </h1>
+            <div className="flex items-center rounded-lg border border-[var(--border-strong)] overflow-hidden">
+              <button
+                type="button"
+                aria-label="Previous month"
+                className="p-2 text-[var(--fg-muted)] hover:text-[var(--primary)] hover:bg-[var(--bg-alt)] transition-colors"
+                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
-                    Day {idea.day}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDayClick(idea.day)}
-                    className="text-[10px] font-semibold text-[var(--fg-muted)] hover:underline"
-                  >
-                    Open
-                  </button>
-                </div>
-                <input
-                  value={idea.title}
-                  onChange={(e) => handleUpdateIdea(index, 'title', e.target.value)}
-                  className="w-full text-xs font-semibold bg-transparent border-b border-dashed border-[#273338]/20 dark:border-[rgba(156,176,128,0.25)] pb-1 text-[#273338] dark:text-white focus:outline-none"
-                  placeholder="Heading"
-                />
-                <textarea
-                  value={idea.topic}
-                  onChange={(e) => handleUpdateIdea(index, 'topic', e.target.value)}
-                  rows={2}
-                  className="w-full text-xs bg-white/60 dark:bg-[#273338]/80 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-lg p-2 text-[#273338] dark:text-white resize-none focus:outline-none focus:ring-1 focus:ring-[rgba(43,87,72,0.18)]"
-                  placeholder="Topic / angle"
-                />
-                <select
-                  value={idea.format}
-                  onChange={(e) => handleUpdateIdea(index, 'format', e.target.value)}
-                  className="w-full text-[10px] font-bold uppercase tracking-wide bg-transparent border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-full px-2 py-1 text-[#273338] dark:text-white"
-                >
-                  <option value="Image">Image</option>
-                  <option value="Video">Video</option>
-                  <option value="Carousel">Carousel</option>
-                  <option value="Text">Text</option>
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Full-screen calendar workspace */}
-      <section className="w-full flex-1 flex flex-col min-h-[85vh] organic-calendar-canvas rounded-[2rem] overflow-hidden">
-        <div className="flex flex-wrap gap-4 justify-between items-center mb-5 px-2 sm:px-4 pt-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--fg)] tracking-tight">
-              {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-            </h2>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                className="px-2.5 py-1.5 text-xs font-semibold text-[var(--fg-muted)] hover:text-[var(--primary)] border-x border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors"
+                onClick={() => setCurrentDate(new Date())}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                aria-label="Next month"
+                className="p-2 text-[var(--fg-muted)] hover:text-[var(--primary)] hover:bg-[var(--bg-alt)] transition-colors"
+                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             <div className="relative group hidden sm:block">
               <input
                 type="text"
@@ -831,55 +747,55 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                 onChange={(e) => setDateInputValue(e.target.value)}
                 onBlur={handleDateInputBlur}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                placeholder="Jump to date..."
-                className="text-sm text-[var(--fg-muted)] bg-[var(--bg-alt)] dark:bg-[rgba(26,43,38,0.55)] border border-[var(--border-strong)] rounded-lg px-3 py-1.5 w-40 outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] focus:border-[var(--primary)] placeholder:text-[var(--fg-subtle)]"
+                placeholder="Jump to date…"
+                aria-label="Jump to date"
+                className="text-sm text-[var(--fg-muted)] bg-[var(--bg-alt)] border border-[var(--border-strong)] rounded-lg px-3 py-1.5 w-36 outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] focus:border-[var(--primary)] placeholder:text-[var(--fg-subtle)]"
               />
               <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[var(--kw-forest)] text-white text-[10px] px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
               </div>
             </div>
-            <div className="flex gap-1 ml-1">
-              <button
-                type="button"
-                aria-label="Previous month"
-                className="rounded-full p-2 text-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 hover:scale-110 active:scale-95"
-                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-              >
-                <ChevronLeft className="w-4 h-4"/>
-              </button>
-              <button
-                type="button"
-                aria-label="Next month"
-                className="rounded-full p-2 text-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 hover:scale-110 active:scale-95"
-                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-              >
-                <ChevronRight className="w-4 h-4"/>
-              </button>
-            </div>
-            <div className="flex gap-0.5 p-1 bg-[var(--bg-alt)] dark:bg-[rgba(26,43,38,0.55)] rounded-xl border border-[var(--border-strong)]">
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] px-2.5 py-1 rounded-full">
+              {monthlyPostCount}/{batchPostCount} this month
+            </span>
+            <div className="flex gap-0.5 p-0.5 bg-[var(--bg-alt)] rounded-lg border border-[var(--border-strong)]">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'grid' ? 'bg-white dark:bg-[rgba(43,87,72,0.4)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)]'}`}
+                aria-pressed={viewMode === 'grid'}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-[var(--card)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]'}`}
                 title="Month grid"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'list' ? 'bg-white dark:bg-[rgba(43,87,72,0.4)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)]'}`}
+                aria-pressed={viewMode === 'list'}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-[var(--card)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]'}`}
                 title="Month list"
               >
-                <LayoutList className="w-3.5 h-3.5" />
+                <LayoutList className="w-4 h-4" />
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setPlanningOpen(true)}
+              className="btn btn-primary btn-sm"
+              title="AI content planning"
+            >
+              <Layers className="w-4 h-4" />
+              <span className="hidden sm:inline">Plan month</span>
+              {ideas.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-white/25 text-[10px] font-black">
+                  {ideas.length}
+                </span>
+              )}
+            </button>
           </div>
-          <p className="text-sm font-medium text-[var(--fg-muted)] max-w-md text-right hidden md:block leading-relaxed">
-            Click any day to preview or generate · tap <span className="font-bold text-[var(--primary)]">+</span> on empty cells for ₱{ADDON_POST_PRICE_PHP} add-on
-          </p>
         </div>
 
-        <div className="flex-1 min-h-0 px-1 sm:px-2 pb-4">
-        <ScheduleXCalendarView
+        <KawayanCalendar
           currentDate={currentDate}
           posts={posts}
           ideas={ideas}
@@ -890,293 +806,74 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           onMonthChange={handleMonthChange}
           onAddOn={handleAddOn}
         />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-[var(--border)]">
+          <div className="kw-cal-legend">
+            {STATUS_LEGEND.map((s) => (
+              <span key={s.key} className="kw-cal-legend__item">
+                <span className={`kw-cal-legend__dot kw-cal-legend__dot--${s.key}`} />
+                {s.label}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--fg-muted)] hidden md:block">
+            Click a day to preview, draft, or add a ₱{ADDON_POST_PRICE_PHP} single post
+          </p>
         </div>
       </section>
 
-      {/* Dim backdrop when preview drawer is open */}
-      {selectedDay !== null && (
-        <button
-          type="button"
-          aria-label="Close preview"
-          className="fixed inset-0 bg-[#273338]/25 dark:bg-black/40 z-40 transition-opacity duration-300 backdrop-blur-[2px]"
-          onClick={handleClosePanel}
-        />
-      )}
+      {/* ── AI content-planning dialog (opened from the toolbar) ── */}
+      <PlanningModal
+        open={planningOpen}
+        onClose={() => setPlanningOpen(false)}
+        monthLabel={monthLabel}
+        planLabel={subscription === 'PRO' || subscription === 'ENTERPRISE' ? 'Pro' : 'Trial'}
+        batchPostCount={batchPostCount}
+        monthlyPostCount={monthlyPostCount}
+        trialLimitReached={trialLimitReached}
+        batchStrategy={batchStrategy}
+        onStrategyChange={setBatchStrategy}
+        loadingPlan={loadingPlan}
+        batchProgress={batchProgress}
+        ideas={ideas}
+        showBatchIdeas={showBatchIdeas}
+        onToggleIdeas={() => setShowBatchIdeas((v) => !v)}
+        onGeneratePlan={handleGeneratePlan}
+        onBatchGenerate={handleBatchGenerate}
+        onUpdateIdea={handleUpdateIdea}
+        onOpenDay={handleDayClick}
+      />
 
-      {/* Sliding right preview panel */}
-      <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[450px] bg-[#FFFFFF] dark:bg-[#273338] border-l border-[var(--border)] dark:border-[rgba(156,176,128,0.2)] p-8 shadow-float z-50 transition-transform duration-300 flex flex-col ${
-          selectedDay !== null ? 'translate-x-0' : 'translate-x-full pointer-events-none'
-        }`}
-        aria-hidden={selectedDay === null}
-      >
-        {selectedDay !== null && (
-          <>
-            <div className="flex justify-between items-start mb-6 shrink-0 gap-4">
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--primary)]">
-                  {currentDate.toLocaleString('default', { month: 'long' })} {selectedDay}
-                </span>
-                <h3
-                  className="font-display text-xl font-bold text-[#273338] dark:text-white truncate mt-1"
-                  title={posts.find(p => new Date(p.date).getDate() === selectedDay)?.topic || ideas.find(i => i.day === selectedDay)?.title || 'Create Post'}
-                >
-                  {posts.find(p => new Date(p.date).getDate() === selectedDay)?.topic || ideas.find(i => i.day === selectedDay)?.title || 'Create Post'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={handleClosePanel}
-                className="rounded-full p-3 bg-[var(--kw-green-pale)] dark:bg-white/8 hover:bg-[rgba(43,87,72,0.12)] dark:hover:bg-white/12 border border-[var(--border-strong)] dark:border-[rgba(156,176,128,0.25)] transition-all duration-300 hover:scale-105 active:scale-95 shrink-0"
-                aria-label="Close preview panel"
-              >
-                <X className="w-6 h-6 text-[var(--primary)]" />
-              </button>
-            </div>
+      {/* ── Post creation studio ── */}
+      <PostComposer
+        open={selectedDay !== null}
+        selectedDay={selectedDay}
+        currentDate={currentDate}
+        profile={profile}
+        posts={posts}
+        ideas={ideas}
+        generatedContent={generatedContent}
+        setGeneratedContent={setGeneratedContent}
+        generatingPost={generatingPost}
+        loadingImage={loadingImage}
+        addOnPrice={ADDON_POST_PRICE_PHP}
+        photoInputRef={photoInputRef}
+        onClose={handleClosePanel}
+        onGeneratePost={handleGeneratePost}
+        onAddOn={handleAddOn}
+        onGenerateImage={handleGenerateImage}
+        onSavePost={handleSavePost}
+        onPhotoUpload={handlePhotoUpload}
+        onPostNow={() => { if (generatedContent) setShowPostModal(true); }}
+        onSchedule={async () => {
+          if (generatedContent) {
+            const updated = { ...generatedContent, status: 'Scheduled' as const };
+            await handleSavePost(updated);
+            toast.success('Post scheduled 🚀');
+          }
+        }}
+      />
 
-            <div className="flex justify-end mb-4 shrink-0">
-              <button
-                className="text-white text-xs px-4 py-2 rounded-full font-bold transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-1.5 disabled:opacity-60 disabled:transform-none shadow-accent-sm organic-btn-primary"
-                onClick={() => {
-                  const idea = ideas.find(i => i.day === selectedDay);
-                  const fallbackIdea: ContentIdea = { day: selectedDay, title: 'Custom Post', topic: 'General Update', format: 'Image' };
-                  handleGeneratePost(idea || fallbackIdea);
-                }}
-                disabled={generatingPost}
-              >
-                {generatingPost ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (generatedContent ? <><RefreshCcw className="w-3 h-3"/> Rewrite</> : <><Wand2 className="w-3 h-3"/> AI Draft</>)}
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto -mx-2 px-2">
-              {!generatedContent ? (
-                <div className="flex flex-col items-center justify-center min-h-[40vh] text-center p-4">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-accent organic-btn-primary">
-                    <Wand2 className="w-8 h-8 text-white" />
-                  </div>
-                  <h4 className="font-display text-lg text-[#273338] dark:text-white">Ready to create?</h4>
-                  <p className="text-[#273338]/70 dark:text-white/60 text-sm max-w-[260px] mt-2 leading-relaxed">
-                    {ideas.find(i => i.day === selectedDay)
-                      ? `Idea: "${ideas.find(i => i.day === selectedDay)?.topic}"`
-                      : "Hit 'AI Draft' to generate Taglish content for this day."}
-                    <span className="block mt-2 text-[11px] text-[var(--fg-muted)]">
-                      Empty days show a <span className="font-semibold">+</span> control (₱{ADDON_POST_PRICE_PHP} single-post add-on).
-                    </span>
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full max-w-sm mx-auto space-y-6 pb-6">
-                  <div className="bg-white/80 dark:bg-white/5 rounded-[2rem] p-4 shadow-soft border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-[#273338]/70 dark:text-white/60 uppercase flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-[var(--primary)]"/> Virality Potential
-                      </span>
-                      <span className={`text-lg font-black ${
-                        (generatedContent.viralityScore || 0) > 75 ? 'text-[var(--primary)]' :
-                        (generatedContent.viralityScore || 0) > 50 ? 'text-[var(--primary)]' : 'text-[var(--fg-subtle)]'
-                      }`}>
-                        {generatedContent.viralityScore}/100
-                      </span>
-                    </div>
-                    <div className="w-full bg-[var(--kw-green-pale)] dark:bg-[rgba(43,87,72,0.4)] rounded-full h-2 mb-3">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-1000 ${
-                          (generatedContent.viralityScore || 0) > 75 ? 'bg-gradient-to-r from-[var(--kw-green)] to-[var(--kw-forest)]' : 'bg-gradient-to-r from-[var(--secondary)] to-[var(--kw-green)]'
-                        }`}
-                        style={{ width: `${generatedContent.viralityScore}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-[#273338]/80 dark:text-white/70 italic leading-relaxed">
-                      &ldquo;{generatedContent.viralityReason}&rdquo;
-                    </p>
-                  </div>
-
-                  {generatedContent.history && generatedContent.history.length > 0 && (
-                    <div>
-                      <p className="text-xs font-bold text-[#273338]/70 dark:text-white/60 uppercase mb-2">Previous Versions</p>
-                      <div className="space-y-2">
-                        {generatedContent.history.map((h, i) => (
-                          <div key={i} className="p-3 bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-[1rem] relative overflow-hidden group">
-                            <div className="blur-[3px] opacity-50 select-none text-xs text-[#273338] dark:text-white/70">
-                              {h.caption.substring(0, 50)}...
-                            </div>
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/10 dark:bg-black/10 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                              <span className="text-[10px] font-bold bg-[#273338] text-white px-2 py-1 rounded-full">Archived</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4 rounded-[2rem] bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-xs text-[#273338]/70 dark:text-white/60">
-                    <p className="font-bold mb-2 uppercase text-[10px] flex justify-between items-center">
-                      <span>Image Prompt Used:</span>
-                      <span className="text-[9px] font-normal opacity-50 italic">Editable</span>
-                    </p>
-                    <textarea
-                      className="w-full bg-[var(--bg-alt)] dark:bg-[#273338] border-none rounded-[1rem] p-3 text-xs italic focus:ring-1 focus:ring-[var(--primary)] transition-all resize-none text-[var(--fg)]"
-                      rows={3}
-                      value={generatedContent.imagePrompt}
-                      onChange={(e) => setGeneratedContent({...generatedContent, imagePrompt: e.target.value})}
-                      placeholder="Describe the image you want..."
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-[#273338]/70 dark:text-white/60 uppercase mb-2 tracking-wider">Your Photo</p>
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      className="w-full py-5 rounded-[1.5rem] border-2 border-dashed border-[var(--primary)] bg-white/40 dark:bg-white/5 flex flex-col items-center gap-2 hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 group"
-                    >
-                      <Upload className="w-5 h-5 text-[var(--primary)]" />
-                      <span className="text-xs text-[#273338] dark:text-white font-medium">
-                        Drop or click to upload your photo
-                      </span>
-                      <span className="text-[10px] text-[#273338]/50 dark:text-white/40">JPG or PNG · replaces AI visual</span>
-                    </button>
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      className="hidden"
-                      onChange={handlePhotoUpload}
-                    />
-                  </div>
-
-                  <div className="bg-white dark:bg-black rounded-[2rem] border-[6px] border-[#273338] dark:border-[rgba(156,176,128,0.25)] shadow-float overflow-hidden relative mx-auto w-full">
-                    <div className="h-6 bg-[#273338] w-full flex justify-between px-6 items-center">
-                      <div className="w-12 h-3 bg-black dark:bg-[rgba(43,87,72,0.5)] rounded-full" />
-                      <div className="flex gap-1">
-                        <div className="w-3 h-3 bg-[#273338] rounded-full" />
-                        <div className="w-3 h-3 bg-[#273338] rounded-full" />
-                      </div>
-                    </div>
-
-                    <div className="p-3 border-b border-[var(--border)] dark:border-[rgba(156,176,128,0.2)] flex items-center gap-3 bg-white dark:bg-black">
-                      <div className="w-8 h-8 rounded-full bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] flex items-center justify-center text-[var(--primary)] font-bold text-xs border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
-                        {profile.businessName.substring(0,2).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-bold text-[#273338] dark:text-white">{profile.businessName}</p>
-                        <p className="text-[10px] text-[#273338]/50 dark:text-white/50">Sponsored · Kawayan AI</p>
-                      </div>
-                      <MoreHorizontal className="w-4 h-4 text-[#273338] dark:text-white/60" />
-                    </div>
-
-                    <div className="aspect-square bg-[var(--bg-alt)] dark:bg-[#273338] relative overflow-hidden">
-                      {generatedContent.imageUrl ? (
-                        <div className="w-full h-full overflow-hidden relative">
-                          <img
-                            key={generatedContent.imageUrl}
-                            src={generatedContent.imageUrl}
-                            alt="Post visual"
-                            className="w-full h-full object-cover"
-                          />
-                          {loadingImage && (
-                            <div className="absolute inset-0 bg-[#273338]/40 flex items-center justify-center">
-                              <Loader2 className="w-8 h-8 animate-spin text-white" />
-                            </div>
-                          )}
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-                            <button
-                              type="button"
-                              onClick={handleGenerateImage}
-                              disabled={loadingImage}
-                              className="rounded-full px-3 py-1.5 text-xs font-bold border border-[var(--primary)] text-[var(--primary)] bg-white/95 dark:bg-[#273338]/95 backdrop-blur-sm flex items-center gap-1.5 hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all disabled:opacity-60 shadow-soft"
-                            >
-                              {loadingImage ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <RefreshCcw className="w-3 h-3" />
-                              )}
-                              Regenerate Image
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                          <ImageIcon className="w-8 h-8 text-[var(--primary)] mb-2" />
-                          <p className="text-xs text-[#273338]/60 dark:text-white/50 mb-4 line-clamp-3">{generatedContent.imagePrompt}</p>
-                          <button
-                            type="button"
-                            onClick={handleGenerateImage}
-                            disabled={loadingImage}
-                            className="organic-btn-primary text-xs px-4 py-2 rounded-full flex items-center gap-2"
-                          >
-                            {loadingImage ? <Loader2 className="w-3 h-3 animate-spin"/> : <Wand2 className="w-3 h-3"/>}
-                            Generate Visual
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3 flex justify-between items-center text-[#273338] dark:text-white/70 bg-white dark:bg-black">
-                      <div className="flex gap-4">
-                        <ThumbsUp className="w-5 h-5" />
-                        <MessageCircle className="w-5 h-5" />
-                        <Share2 className="w-5 h-5" />
-                      </div>
-                    </div>
-
-                    <div className="px-3 pb-6 bg-white dark:bg-black">
-                      <p className="text-sm text-[#273338] dark:text-white font-bold mb-1">{Math.floor(Math.random() * 500) + 10} likes</p>
-                      <div className="text-xs text-[#273338] dark:text-white/90 leading-relaxed whitespace-pre-wrap">
-                        <span className="font-bold mr-1">{profile.businessName}</span>
-                        <textarea
-                          className="w-full bg-transparent border-none p-0 resize-none focus:ring-0 text-[#273338] dark:text-white"
-                          rows={4}
-                          value={generatedContent.caption}
-                          onChange={(e) => setGeneratedContent({...generatedContent, caption: e.target.value})}
-                        />
-                      </div>
-                      <p className="text-[10px] text-[#273338]/50 dark:text-white/40 mt-2 uppercase">View all comments</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 mt-4 border-t border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] flex gap-3 shrink-0">
-              <button
-                onClick={() => handleSavePost()}
-                disabled={!generatedContent}
-                className="flex-1 py-3 rounded-full border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-[#273338] dark:text-white font-semibold hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.08)] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4"/> Save Draft
-              </button>
-              <button
-                disabled={!generatedContent || generatedContent.status === 'Scheduled'}
-                className={`flex-1 py-3 rounded-full font-semibold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                  generatedContent?.status === 'Scheduled'
-                    ? 'bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] text-[var(--primary)] cursor-default'
-                    : 'organic-btn-primary'
-                }`}
-                onClick={async () => {
-                  if (generatedContent) {
-                    const updated = {...generatedContent, status: 'Scheduled' as const};
-                    await handleSavePost(updated);
-                    await dialog.alert({ message: 'Post Scheduled Successfully! 🚀', title: 'Scheduled' });
-                  }
-                }}
-              >
-                {generatedContent?.status === 'Scheduled' ? 'Scheduled' : 'Schedule'}
-              </button>
-              <button
-                onClick={() => {
-                  if (!generatedContent) return;
-                  setShowPostModal(true);
-                }}
-                disabled={!generatedContent}
-                className="flex-1 py-3 rounded-full border border-[var(--border-strong)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] text-[var(--primary)] font-semibold hover:bg-[rgba(43,87,72,0.12)] dark:hover:bg-[rgba(156,176,128,0.18)] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Share2 className="w-4 h-4"/> Post Now
-              </button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 };

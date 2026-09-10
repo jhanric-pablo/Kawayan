@@ -64,3 +64,36 @@ export const TERMS_SECTIONS = [
     body: `For questions about these Terms, contact Kawayan AI Support through the in-app Help Desk or your designated capstone support channel.`,
   },
 ] as const;
+
+export const PRIVACY_EFFECTIVE_DATE = 'January 2026';
+
+export const PRIVACY_SECTIONS = [
+  {
+    title: '1. Data We Collect',
+    body: `We collect information you provide directly to us — your email, business name, address, contact number, and the business registration document you upload for verification. When you explicitly connect a social platform (Facebook, Instagram, TikTok) through our browser extension, we also collect the engagement metrics you authorize.`,
+  },
+  {
+    title: '2. How We Use Your Data',
+    body: `Your data is used to verify your business, generate content plans and captions, provide analytics insights, process wallet top-ups and subscription billing through Xendit, and operate your account and support requests. We do not sell your personal data.`,
+  },
+  {
+    title: '3. AI Processing',
+    body: `Your brand profile (industry, audience, voice, themes) and post topics are sent to our AI generation service to produce Taglish captions, image prompts and schedules. Generated content is stored against your account so you can edit and reuse it.`,
+  },
+  {
+    title: '4. Storage & Retention',
+    body: `Account data, generated content and transaction records are retained for as long as your account is active and as needed to meet legal, billing and audit obligations. Verification documents are stored securely and are visible only to authorised admin reviewers.`,
+  },
+  {
+    title: '5. Your Controls',
+    body: `You can disconnect any social platform at any time from the Settings dashboard, which stops all data syncing immediately. You may request a copy of your data or account closure through the in-app Help Desk.`,
+  },
+  {
+    title: '6. Security',
+    body: `Passwords are hashed, access is governed by Role-Based Access Control (RBAC), and privileged actions are written to an audit log. No online service can be guaranteed perfectly secure, but we work to protect your information using industry-standard measures.`,
+  },
+  {
+    title: '7. Changes',
+    body: `We may update this Privacy Policy to reflect system or legal changes. Material changes will be communicated through the platform.`,
+  },
+] as const;

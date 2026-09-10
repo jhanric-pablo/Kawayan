@@ -6,6 +6,7 @@ import 'temporal-polyfill/global';
 import './styles/accessibility.css';
 import App from './App';
 import OrganicDialogProvider from './components/OrganicDialog';
+import { ToastProvider } from './components/ui/Toast';
 import AccessibilityWidget from './components/AccessibilityWidget';
 import { initAccessibility } from './utils/accessibility';
 
@@ -26,10 +27,12 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <BrowserRouter>
-      <OrganicDialogProvider>
-        <App />
-        <AccessibilityWidget />
-      </OrganicDialogProvider>
+      <ToastProvider>
+        <OrganicDialogProvider>
+          <App />
+          <AccessibilityWidget />
+        </OrganicDialogProvider>
+      </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

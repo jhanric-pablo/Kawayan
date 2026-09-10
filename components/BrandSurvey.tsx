@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrandProfile } from '../types';
 import { ArrowRight, ArrowLeft, Store, Users, MessageCircle, PenTool, Check, Sparkles } from 'lucide-react';
+import './onboarding.css';
 
 interface Props {
   onComplete: (profile: BrandProfile) => void;
@@ -40,240 +41,253 @@ const BrandSurvey: React.FC<Props> = ({ onComplete }) => {
     { num: 4, icon: PenTool, label: 'Themes' },
   ];
 
-  const inputClass = `
-    w-full px-4 py-3 rounded-xl border text-sm
-    bg-white/70 dark:bg-[#111E18]/60
-    border-[#2B5748]/15 dark:border-[#9CB080]/15
-    text-[#1A2B26] dark:text-[#E8F0EC]
-    placeholder-[#1A2B26]/35 dark:placeholder-[#E8F0EC]/25
-    focus:outline-none focus:border-[#2B5748] dark:focus:border-[#9CB080]
-    focus:ring-0 focus:bg-white dark:focus:bg-[#111E18]/80
-    transition-all duration-200
-  `.trim();
+  const sections = [
+    { icon: Store, title: 'Business Basics', sub: 'Tell us about your business' },
+    { icon: Users, title: 'Target Audience', sub: 'Who are your ideal customers?' },
+    { icon: MessageCircle, title: 'Brand Voice', sub: 'How should your brand sound?' },
+    { icon: PenTool, title: 'Content Themes', sub: 'Key topics you want to cover' },
+  ];
+  const SectionIcon = sections[step - 1].icon;
+
+  const industrySuggestions = ['Food & Beverage', 'Fashion & Apparel', 'Beauty & Wellness', 'Hardware & Home', 'Services'];
+  const audienceSuggestions = ['Gen Z students', 'Working moms', 'Titas of Manila', 'Small business owners', 'OFW families'];
+  const themeSuggestions = ['Product launches', 'Behind the scenes', 'Customer testimonials', 'Promos & sales', 'Tips & how-tos', 'Memes'];
+
+  const appendTag = (field: keyof BrandProfile, tag: string) => {
+    setProfile(prev => {
+      const current = (prev[field] || '').trim();
+      if (current.toLowerCase().includes(tag.toLowerCase())) return prev;
+      return { ...prev, [field]: current ? `${current}, ${tag}` : tag };
+    });
+  };
+
+  // ── live preview copy keyed to the chosen brand voice ──
+  const previewPost = (() => {
+    const name = profile.businessName.trim() || 'your brand';
+    switch (profile.brandVoice) {
+      case 'Professional & Trustworthy':
+        return `Introducing the latest from ${name}. Crafted with care, built to deliver. Learn more today.`;
+      case 'Makulit & Fun (Kwelang Pinoy)':
+        return `GRABE guys, may bago na naman kami sa ${name}! 🤯 Type mo? Comment ng "AKO NA" 👇`;
+      case 'Inspirational (Hugot)':
+        return `Sa bawat simula, may kwento. ${name} is here for yours. Keep going. ✨`;
+      case 'Premium & Minimalist':
+        return `${name}. Less, but better.`;
+      case 'Friendly Tita':
+        return `Anak, tara na! Bagong labas sa ${name} — subukan mo, promise sulit. 💚`;
+      default:
+        return `Hi there! Something new just dropped at ${name} — come check it out. 😊`;
+    }
+  })();
+
+  const themeTags = profile.keyThemes.split(',').map(t => t.trim()).filter(Boolean).slice(0, 4);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
-      {/* Background blobs */}
-      <div className="fixed top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full opacity-[0.05] blur-[100px] bg-[#2B5748] pointer-events-none" />
-      <div className="fixed bottom-[10%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-[0.04] blur-[80px] bg-[#9CB080] pointer-events-none" />
+    <div className="ob-screen">
+      <div className="ob-orb ob-orb--1" />
+      <div className="ob-orb ob-orb--2" />
 
-      <div className="w-full max-w-2xl animate-scale-in">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4 text-xs font-semibold"
-            style={{ background: 'rgba(43,87,72,0.09)', border: '1px solid rgba(43,87,72,0.14)', color: '#2B5748' }}>
-            <Sparkles className="w-3.5 h-3.5" />
-            Brand DNA Setup
+      <div className="ob-inner bs-wrap">
+        {/* ─────────── main column ─────────── */}
+        <div>
+          <div className="bs-head">
+            <span className="bs-eyebrow"><Sparkles /> Brand DNA Setup</span>
+            <h1>Let&apos;s set up your brand</h1>
+            <p>This helps Kawayan AI create content that truly sounds like you.</p>
           </div>
-          <h1 className="font-display text-3xl font-bold mb-2" style={{ color: 'var(--fg)' }}>
-            Let's set up your brand
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-            This helps Kawayan AI create content that truly sounds like you.
-          </p>
-        </div>
 
-        {/* Step indicators */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {steps.map((s, i) => {
-            const Icon = s.icon;
-            const done = s.num < step;
-            const active = s.num === step;
-            return (
-              <React.Fragment key={s.num}>
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-xs font-semibold ${
-                  active ? 'text-white' : done ? 'text-[#2B5748]' : ''
-                }`}
-                  style={{
-                    background: active
-                      ? 'linear-gradient(135deg, #2B5748, #3A7362)'
-                      : done ? 'rgba(43,87,72,0.1)' : 'rgba(26,43,38,0.05)',
-                    color: active ? 'white' : done ? '#2B5748' : 'var(--fg-subtle)',
-                    boxShadow: active ? '0 4px 12px -3px rgba(43,87,72,0.35)' : undefined,
-                  }}>
-                  {done ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
-                  <span className="hidden sm:inline">{s.label}</span>
+          {/* stepper */}
+          <div className="bs-steps">
+            {steps.map((s) => {
+              const Icon = s.icon;
+              const done = s.num < step;
+              const active = s.num === step;
+              return (
+                <div key={s.num} className={`bs-step${active ? ' is-active' : done ? ' is-done' : ''}`}>
+                  {done ? <Check /> : <Icon />}
+                  <span className="bs-step__label">{s.label}</span>
                 </div>
-                {i < steps.length - 1 && (
-                  <div className="w-8 h-px" style={{ background: done ? '#2B5748' : 'var(--border)' }} />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Progress bar */}
-        <div className="h-1 w-full rounded-full mb-8 overflow-hidden" style={{ background: 'var(--border)' }}>
-          <div
-            className="h-full rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${(step / 4) * 100}%`, background: 'linear-gradient(90deg, #2B5748, #3A7362)' }}
-          />
-        </div>
+          {/* progress */}
+          <div className="bs-progress">
+            <b style={{ width: `${(step / 4) * 100}%` }} />
+          </div>
 
-        {/* Card */}
-        <div className="glass-card p-8 md:p-10" style={{ minHeight: '360px' }}>
-
-          {step === 1 && (
-            <div className="animate-slide-up">
-              <div className="flex items-center gap-3.5 mb-7">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(43,87,72,0.1)' }}>
-                  <Store className="w-5 h-5 text-[#2B5748]" />
-                </div>
+          {/* card */}
+          <div className="bs-card">
+            <div className="bs-slide" key={step}>
+              <div className="bs-sec-head">
+                <div className="bs-sec-head__ico"><SectionIcon /></div>
                 <div>
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--fg)' }}>Business Basics</h2>
-                  <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Tell us about your business</p>
+                  <h2>{sections[step - 1].title}</h2>
+                  <p>{sections[step - 1].sub}</p>
                 </div>
               </div>
-              <div className="space-y-5">
+
+              {step === 1 && (
+                <div className="space-y-5">
+                  <div>
+                    <label className="bs-label">Business Name</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g., Aling Nena's Pastries"
+                      value={profile.businessName}
+                      onChange={(e) => handleChange('businessName', e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="bs-label">Industry / Niche</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g., Food & Beverage, Fashion, Hardware"
+                      value={profile.industry}
+                      onChange={(e) => handleChange('industry', e.target.value)}
+                    />
+                    <div className="bs-chips">
+                      {industrySuggestions.map((s) => (
+                        <button
+                          type="button"
+                          key={s}
+                          className={`bs-chip${profile.industry.trim().toLowerCase() === s.toLowerCase() ? ' is-active' : ''}`}
+                          onClick={() => handleChange('industry', s)}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--fg-subtle)' }}>Business Name</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="e.g., Aling Nena's Pastries"
-                    value={profile.businessName}
-                    onChange={(e) => handleChange('businessName', e.target.value)}
+                  <label className="bs-label">Describe your audience</label>
+                  <textarea
+                    className="input h-40 resize-none"
+                    placeholder="e.g., Gen Z students in Manila, working moms looking for quick meals, titas of Manila..."
+                    value={profile.targetAudience}
+                    onChange={(e) => handleChange('targetAudience', e.target.value)}
                     autoFocus
                   />
+                  <div className="bs-chips">
+                    {audienceSuggestions.map((s) => (
+                      <button type="button" key={s} className="bs-chip" onClick={() => appendTag('targetAudience', s)}>
+                        + {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {step === 3 && (
+                <div className="bs-voice">
+                  {tones.map((t) => {
+                    const active = profile.brandVoice === t.label;
+                    return (
+                      <button
+                        key={t.label}
+                        type="button"
+                        onClick={() => handleChange('brandVoice', t.label)}
+                        className={`bs-voice__opt${active ? ' is-active' : ''}`}
+                      >
+                        <div className="bs-voice__t">{t.label}</div>
+                        <div className="bs-voice__d">{t.desc}</div>
+                        {active && <span className="bs-voice__check"><Check /></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {step === 4 && (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--fg-subtle)' }}>Industry / Niche</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="e.g., Food & Beverage, Fashion, Hardware"
-                    value={profile.industry}
-                    onChange={(e) => handleChange('industry', e.target.value)}
+                  <label className="bs-label">Key content themes</label>
+                  <textarea
+                    className="input h-40 resize-none"
+                    placeholder="e.g., Product launches, behind the scenes, customer testimonials, funny memes..."
+                    value={profile.keyThemes}
+                    onChange={(e) => handleChange('keyThemes', e.target.value)}
+                    autoFocus
                   />
+                  <div className="bs-chips">
+                    {themeSuggestions.map((s) => (
+                      <button type="button" key={s} className="bs-chip" onClick={() => appendTag('keyThemes', s)}>
+                        + {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
 
-          {step === 2 && (
-            <div className="animate-slide-up">
-              <div className="flex items-center gap-3.5 mb-7">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(43,87,72,0.1)' }}>
-                  <Users className="w-5 h-5 text-[#2B5748]" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--fg)' }}>Target Audience</h2>
-                  <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Who are your ideal customers?</p>
-                </div>
+            {/* navigation */}
+            <div className="bs-nav">
+              <button
+                type="button"
+                onClick={() => step > 1 && setStep(step - 1)}
+                className={`btn btn-outline ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+
+              <div className="bs-dots">
+                {[1, 2, 3, 4].map((n) => (
+                  <i key={n} className={`${n <= step ? 'is-on' : ''} ${n === step ? 'is-cur' : ''}`} />
+                ))}
               </div>
-              <textarea
-                className={`${inputClass} h-44 resize-none rounded-xl`}
-                placeholder="e.g., Gen Z students in Manila, Working Moms looking for quick meals, titas of Manila..."
-                value={profile.targetAudience}
-                onChange={(e) => handleChange('targetAudience', e.target.value)}
-                autoFocus
-              />
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={step === 1 && !profile.businessName.trim()}
+                className="btn btn-primary"
+              >
+                {step === 4 ? 'Finish Setup' : 'Next Step'}
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-          )}
-
-          {step === 3 && (
-            <div className="animate-slide-up">
-              <div className="flex items-center gap-3.5 mb-7">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(43,87,72,0.1)' }}>
-                  <MessageCircle className="w-5 h-5 text-[#2B5748]" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--fg)' }}>Brand Voice</h2>
-                  <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>How should your brand sound?</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {tones.map((t) => {
-                  const active = profile.brandVoice === t.label;
-                  return (
-                    <button
-                      key={t.label}
-                      onClick={() => handleChange('brandVoice', t.label)}
-                      className="p-4 rounded-xl border text-left transition-all relative"
-                      style={{
-                        background: active ? 'rgba(43,87,72,0.07)' : 'var(--card)',
-                        borderColor: active ? '#2B5748' : 'var(--border)',
-                        boxShadow: active ? '0 0 0 2px rgba(43,87,72,0.15)' : undefined,
-                      }}
-                    >
-                      <div className="text-sm font-semibold mb-0.5" style={{ color: active ? '#2B5748' : 'var(--fg)' }}>
-                        {t.label}
-                      </div>
-                      <div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.desc}</div>
-                      {active && (
-                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center bg-[#2B5748]">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="animate-slide-up">
-              <div className="flex items-center gap-3.5 mb-7">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(43,87,72,0.1)' }}>
-                  <PenTool className="w-5 h-5 text-[#2B5748]" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold" style={{ color: 'var(--fg)' }}>Content Themes</h2>
-                  <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Key topics you want to cover</p>
-                </div>
-              </div>
-              <textarea
-                className={`${inputClass} h-44 resize-none rounded-xl`}
-                placeholder="e.g., Product launches, Behind the scenes, Customer testimonials, Funny memes..."
-                value={profile.keyThemes}
-                onChange={(e) => handleChange('keyThemes', e.target.value)}
-                autoFocus
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <div className="flex justify-between items-center mt-6">
-          <button
-            onClick={() => step > 1 && setStep(step - 1)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              step === 1 ? 'opacity-0 pointer-events-none' : ''
-            }`}
-            style={{ color: 'var(--fg-muted)', border: '1.5px solid var(--border)' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--fg)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)'; }}
-          >
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map(n => (
-              <div key={n} className="w-2 h-2 rounded-full transition-all"
-                style={{ background: n <= step ? '#2B5748' : 'var(--border)' }} />
-            ))}
           </div>
-
-          <button
-            onClick={handleNext}
-            disabled={step === 1 && !profile.businessName.trim()}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: 'linear-gradient(135deg, #2B5748, #3A7362)',
-              boxShadow: '0 4px 16px -4px rgba(43,87,72,0.4)',
-            }}
-            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; }}
-          >
-            {step === 4 ? 'Finish Setup' : 'Next Step'}
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
+
+        {/* ─────────── live preview ─────────── */}
+        <aside className="bs-preview">
+          <div className="bs-preview__label"><b /> Live preview</div>
+          <div className="bs-preview__card">
+            <div className="bs-preview__top">
+              <div className="bs-preview__logo">
+                {(profile.businessName.trim()[0] || 'K').toUpperCase()}
+              </div>
+              <div>
+                <div className="bs-preview__name">{profile.businessName.trim() || 'Your Business'}</div>
+                <div className="bs-preview__ind">{profile.industry.trim() || 'Your industry'}</div>
+              </div>
+            </div>
+
+            <div className="bs-preview__row">
+              <span className="bs-preview__tag">{profile.brandVoice}</span>
+              {themeTags.map((t) => (
+                <span key={t} className="bs-preview__tag">{t}</span>
+              ))}
+            </div>
+
+            <div className="bs-preview__post">
+              <div className="bs-preview__post-k">Sample caption</div>
+              <div className="bs-preview__post-t">{previewPost}</div>
+            </div>
+
+            <div className="bs-preview__foot">
+              {profile.targetAudience.trim()
+                ? `Speaking to: ${profile.targetAudience.trim().slice(0, 70)}${profile.targetAudience.trim().length > 70 ? '…' : ''}`
+                : 'Add your audience to sharpen the tone'}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );

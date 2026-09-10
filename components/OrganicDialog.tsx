@@ -77,32 +77,32 @@ const OrganicDialogModal: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 bg-[#0F172A]/10 dark:bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-all duration-300 animate-in fade-in"
+      className="kw-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="organic-dialog-title"
       onClick={onCancel}
     >
       <div
-        className="bg-white dark:bg-[#0F172A] border border-[#0F172A]/10 dark:border-[#4D7CFF]/20 rounded-[2rem] p-8 max-w-md w-full shadow-[0_10px_40px_-10px_rgba(0,82,255,0.15)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] mx-4 animate-in zoom-in-95 duration-300"
+        className="kw-sheet p-6 sm:p-7 max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="organic-dialog-title"
-          className="font-display text-lg font-semibold text-[#0F172A] dark:text-white mb-3 leading-snug"
-          style={{ fontWeight: 600 }}
+          className="font-display text-lg font-semibold mb-2 leading-snug"
+          style={{ color: 'var(--fg)' }}
         >
           {isPrompt ? options.message : title}
         </h2>
 
         {!isPrompt && (
-          <p className="font-sans text-sm text-[#0F172A]/70 dark:text-white/80 leading-relaxed whitespace-pre-wrap mb-6">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap mb-6" style={{ color: 'var(--fg-muted)' }}>
             {options.message}
           </p>
         )}
 
         {isPrompt && options.title && (
-          <p className="font-sans text-xs text-[#0F172A] mb-4">{options.title}</p>
+          <p className="text-xs mb-4" style={{ color: 'var(--fg-muted)' }}>{options.title}</p>
         )}
 
         {isPrompt && (
@@ -118,26 +118,18 @@ const OrganicDialogModal: React.FC<{
               }
             }}
             placeholder={options.placeholder ?? 'Type here…'}
-            className="rounded-full bg-white/40 dark:bg-black/20 border border-[#0F172A]/10 dark:border-[#4D7CFF]/20 px-6 py-3 text-sm text-[#0F172A] dark:text-white placeholder:text-[#0F172A]/45 dark:placeholder:text-white/40 focus-visible:ring-2 focus-visible:ring-[#64748B]/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0F172A] outline-none w-full transition-all duration-300 font-sans mb-6"
+            className="input mb-6"
             aria-label={options.message}
           />
         )}
 
-        <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-2.5">
           {showCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-full border-2 border-[#64748B]/50 dark:border-[#4D7CFF]/40 text-[#64748B] dark:text-[#4D7CFF] px-6 py-2.5 text-sm font-semibold hover:bg-[#64748B]/5 dark:hover:bg-[#4D7CFF]/10 transition-all duration-300"
-            >
+            <button type="button" onClick={onCancel} className="btn btn-outline">
               {options.cancelLabel ?? 'Cancel'}
             </button>
           )}
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="organic-btn-primary rounded-full px-6 py-2.5 text-sm font-semibold hover:scale-105 active:scale-95 transition-all duration-300 ease-out"
-          >
+          <button type="button" onClick={onConfirm} className="btn btn-primary">
             {confirmLabel}
           </button>
         </div>

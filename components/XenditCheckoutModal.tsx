@@ -94,8 +94,8 @@ const XenditCheckoutModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#273338]/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-[#FFFFFF] dark:bg-[#273338] w-full max-w-md rounded-[2rem] shadow-float border border-[#273338]/10 dark:border-[#9CB080]/20 overflow-hidden relative">
+    <div className="fixed inset-0 bg-[#1C2320]/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-[#FFFFFF] dark:bg-[#1C2320] w-full max-w-md rounded-[2rem] shadow-float border border-[#1C2320]/10 dark:border-[#9CB080]/20 overflow-hidden relative">
         <div className="h-1 bg-gradient-to-r from-[#2B5748] via-[#618764] to-[#9CB080]" />
 
         <div className="p-6">
@@ -104,16 +104,16 @@ const XenditCheckoutModal: React.FC<Props> = ({
               <p className="text-[10px] font-bold uppercase tracking-widest text-[#618764] mb-1 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" /> Secured by Xendit
               </p>
-              <h3 className="font-display text-xl font-bold text-[#273338] dark:text-white">{title}</h3>
+              <h3 className="font-display text-xl font-bold text-[#1C2320] dark:text-white">{title}</h3>
             </div>
             {step !== 'processing' && (
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full p-2 hover:bg-[#273338]/5 dark:hover:bg-white/5 transition"
+                className="rounded-full p-2 hover:bg-[#1C2320]/5 dark:hover:bg-white/5 transition"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-[#273338] dark:text-white" />
+                <X className="w-5 h-5 text-[#1C2320] dark:text-white" />
               </button>
             )}
           </div>
@@ -121,7 +121,7 @@ const XenditCheckoutModal: React.FC<Props> = ({
           {step === 'method' && (
             <>
               <div className="rounded-[1.25rem] bg-[#2B5748]/5 dark:bg-white/5 border border-[#2B5748]/15 p-4 mb-5 text-center">
-                <p className="text-xs text-[#273338]/60 dark:text-white/50 uppercase tracking-wider">Amount due</p>
+                <p className="text-xs text-[#1C2320]/60 dark:text-white/50 uppercase tracking-wider">Amount due</p>
                 <p className="font-display text-3xl font-black text-[#2B5748] dark:text-[#9CB080] mt-1">
                   ₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
@@ -130,7 +130,7 @@ const XenditCheckoutModal: React.FC<Props> = ({
                 )}
               </div>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-[#273338]/70 dark:text-white/60 mb-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#1C2320]/70 dark:text-white/60 mb-3">
                 Pay with
               </p>
               <div className="space-y-2 mb-5">
@@ -142,7 +142,7 @@ const XenditCheckoutModal: React.FC<Props> = ({
                     className={`w-full flex items-center gap-3 p-3 rounded-[1rem] border transition-all text-left ${
                       method === m.id
                         ? 'border-[#2B5748] dark:border-[#9CB080] bg-[#2B5748]/5 dark:bg-[#9CB080]/10'
-                        : 'border-[#273338]/10 dark:border-[#9CB080]/20 hover:border-[#618764]/40'
+                        : 'border-[#1C2320]/10 dark:border-[#9CB080]/20 hover:border-[#618764]/40'
                     }`}
                   >
                     <div
@@ -152,8 +152,8 @@ const XenditCheckoutModal: React.FC<Props> = ({
                       {m.id === 'CARD' ? <CreditCard className="w-5 h-5" /> : <Smartphone className="w-5 h-5" />}
                     </div>
                     <div>
-                      <p className="font-bold text-sm text-[#273338] dark:text-white">{m.label}</p>
-                      <p className="text-[11px] text-[#273338]/50 dark:text-white/50">{m.sub}</p>
+                      <p className="font-bold text-sm text-[#1C2320] dark:text-white">{m.label}</p>
+                      <p className="text-[11px] text-[#1C2320]/50 dark:text-white/50">{m.sub}</p>
                     </div>
                   </button>
                 ))}
@@ -172,7 +172,7 @@ const XenditCheckoutModal: React.FC<Props> = ({
               >
                 Pay ₱{amount.toFixed(2)}
               </button>
-              <p className="text-[10px] text-center text-[#273338]/40 dark:text-white/40 mt-3 leading-relaxed">
+              <p className="text-[10px] text-center text-[#1C2320]/40 dark:text-white/40 mt-3 leading-relaxed">
                 Payments are processed through Xendit (GCash, Maya, cards, and QR).
               </p>
             </>
@@ -183,7 +183,7 @@ const XenditCheckoutModal: React.FC<Props> = ({
               <div className="w-16 h-16 rounded-full bg-[#2B5748]/10 flex items-center justify-center mb-5">
                 <Loader2 className="w-8 h-8 text-[#2B5748] dark:text-[#9CB080] animate-spin" />
               </div>
-              <p className="font-display text-lg text-[#273338] dark:text-white">Processing payment…</p>
+              <p className="font-display text-lg text-[#1C2320] dark:text-white">Processing payment…</p>
               <p className="text-sm text-[#618764] mt-2 animate-pulse">{processingLabel}</p>
             </div>
           )}
@@ -193,29 +193,29 @@ const XenditCheckoutModal: React.FC<Props> = ({
               <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-9 h-9 text-emerald-600" />
               </div>
-              <h4 className="font-display text-xl font-bold text-[#273338] dark:text-white">Payment Successful</h4>
-              <p className="text-sm text-[#273338]/60 dark:text-white/60 mt-1 mb-5">
+              <h4 className="font-display text-xl font-bold text-[#1C2320] dark:text-white">Payment Successful</h4>
+              <p className="text-sm text-[#1C2320]/60 dark:text-white/60 mt-1 mb-5">
                 {mode === 'topup' ? 'Your wallet has been credited.' : 'Pro subscription is now active.'}
               </p>
 
-              <div className="rounded-[1.25rem] border border-dashed border-[#618764]/40 bg-[#273338]/[0.03] dark:bg-white/[0.04] p-4 text-left space-y-2 mb-5">
+              <div className="rounded-[1.25rem] border border-dashed border-[#618764]/40 bg-[#1C2320]/[0.03] dark:bg-white/[0.04] p-4 text-left space-y-2 mb-5">
                 <div className="flex items-center gap-2 text-[#2B5748] dark:text-[#9CB080] font-bold text-xs uppercase tracking-wider">
                   <Receipt className="w-4 h-4" /> Xendit Receipt
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-[#273338]/50 dark:text-white/50">Invoice ref</span>
-                  <span className="font-mono font-bold text-[#273338] dark:text-white text-[10px]">{receipt.referenceId}</span>
+                  <span className="text-[#1C2320]/50 dark:text-white/50">Invoice ref</span>
+                  <span className="font-mono font-bold text-[#1C2320] dark:text-white text-[10px]">{receipt.referenceId}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-[#273338]/50 dark:text-white/50">Channel</span>
-                  <span className="font-semibold text-[#273338] dark:text-white">{receipt.method}</span>
+                  <span className="text-[#1C2320]/50 dark:text-white/50">Channel</span>
+                  <span className="font-semibold text-[#1C2320] dark:text-white">{receipt.method}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-[#273338]/50 dark:text-white/50">Amount</span>
+                  <span className="text-[#1C2320]/50 dark:text-white/50">Amount</span>
                   <span className="font-bold text-emerald-600">₱{receipt.amount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-[#273338]/50 dark:text-white/50">Status</span>
+                  <span className="text-[#1C2320]/50 dark:text-white/50">Status</span>
                   <span className="font-bold text-emerald-600">PAID</span>
                 </div>
               </div>

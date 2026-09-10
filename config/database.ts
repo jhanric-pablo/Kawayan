@@ -4,7 +4,8 @@ import fs from 'fs';
 
 export class DatabaseConfig {
   private db: Database.Database;
-  
+  private checkpointTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(dbPath: string = process.env.DB_PATH || './kawayan.db') {
     // Ensure directory exists
     const dbDir = path.dirname(dbPath);
@@ -13,9 +14,29 @@ export class DatabaseConfig {
     }
     
     this.db = new Database(dbPath);
+
+    // ── Reliability pragmas ──────────────────────────────────────────
+    // WAL + a real busy timeout so concurrent access (seed script, the
+    // dev server, parallel API calls) waits for the lock instead of
+    // throwing SQLITE_BUSY. NORMAL sync is safe under WAL and far faster.
     this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 8000');
+    this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
+    this.db.pragma('wal_autocheckpoint = 512');
+    this.db.pragma('cache_size = -16000'); // ~16 MB page cache
+    this.db.pragma('temp_store = MEMORY');
+
+    // Shrink any oversized WAL left over from a previous crash / long run.
+    try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* first boot */ }
+
     this.initializeSchema();
+
+    // Keep the WAL small during long-running sessions.
+    this.checkpointTimer = setInterval(() => {
+      try { this.db.pragma('wal_checkpoint(PASSIVE)'); } catch { /* ignore */ }
+    }, 5 * 60 * 1000);
+    (this.checkpointTimer as any).unref?.();
   }
   
   private initializeSchema() {
@@ -382,7 +403,14 @@ export class DatabaseConfig {
     return this.db;
   }
   
+  /** Flush the WAL back into the main db file (call before shutdown / backup). */
+  checkpoint() {
+    try { this.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
+  }
+
   close() {
+    if (this.checkpointTimer) clearInterval(this.checkpointTimer);
+    this.checkpoint();
     this.db.close();
   }
   

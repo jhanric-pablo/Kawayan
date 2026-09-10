@@ -1,7 +1,12 @@
-import React, { useRef, useState } from 'react';
-import { Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut, Shield, ArrowRight } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut,
+  Shield, ArrowRight, Check, Sparkles, Send,
+} from 'lucide-react';
 import { VerificationStatus as VStatus } from '../types';
 import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
+import { supportRealtime } from '../services/supportRealtime';
+import './onboarding.css';
 
 interface Props {
   userId?: string;
@@ -11,7 +16,48 @@ interface Props {
   onLogout: () => void;
   onResubmit?: () => void;
   onSessionExpired?: () => void;
+  /** Fired after the on-screen approval animation so the parent can route on. */
+  onVerified?: () => void;
 }
+
+type MetaKey = 'pending' | 'verified' | 'rejected' | 'none';
+
+const META: Record<MetaKey, {
+  accent: string;
+  icon: React.ReactNode;
+  badge: string;
+  title: string;
+  body: string;
+}> = {
+  pending: {
+    accent: '#D97706',
+    icon: <Clock />,
+    badge: 'Under Review',
+    title: 'Verification in progress',
+    body: "Our team is reviewing your business documents. This usually takes 1–2 business days — you don't need to keep this page open, we'll let you in automatically.",
+  },
+  verified: {
+    accent: 'var(--success)',
+    icon: <CheckCircle />,
+    badge: 'Verified',
+    title: 'Business verified',
+    body: 'Your business has been verified. You now have full access to the Kawayan AI workspace.',
+  },
+  rejected: {
+    accent: 'var(--danger)',
+    icon: <XCircle />,
+    badge: 'Action needed',
+    title: "We couldn't verify this yet",
+    body: "The document submitted wasn't accepted. Upload a valid business registration — Mayor's Permit, DTI, or SEC Registration — to try again.",
+  },
+  none: {
+    accent: 'var(--primary)',
+    icon: <Shield />,
+    badge: 'Verification required',
+    title: 'Verify your business',
+    body: 'Submit your business registration document to unlock the full Kawayan AI workspace.',
+  },
+};
 
 const VerificationStatus: React.FC<Props> = ({
   userId: userIdProp,
@@ -21,6 +67,7 @@ const VerificationStatus: React.FC<Props> = ({
   onLogout,
   onResubmit,
   onSessionExpired,
+  onVerified,
 }) => {
   const [document, setDocument] = useState<File | null>(null);
   const [businessAddress, setBusinessAddress] = useState('');
@@ -28,17 +75,76 @@ const VerificationStatus: React.FC<Props> = ({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [resubmitted, setResubmitted] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [approved, setApproved] = useState(status === 'verified');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isFirstSubmit = status === 'none';
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // ── real-time approval: react to the parent prop flipping to "verified" ──
+  useEffect(() => {
+    if (status === 'verified') setApproved(true);
+  }, [status]);
+
+  // ── real-time approval: component-level socket + polling fallback ──
+  const shouldWatch = !approved && (status === 'pending' || status === 'rejected');
+  useEffect(() => {
+    if (!shouldWatch) return;
+    let cancelled = false;
+
+    const check = async () => {
+      const uid = userIdProp || getStoredUserId();
+      const token = getStoredToken();
+      if (!uid || !token) return;
+      try {
+        const res = await fetch(`/api/verification/status/${uid}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (isAuthResponse(res.status)) { onSessionExpired?.(); return; }
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!cancelled && data?.status === 'verified') setApproved(true);
+      } catch {
+        /* network hiccup — the next tick will retry */
+      }
+    };
+
+    supportRealtime.connect();
+    const unsub = supportRealtime.onVerificationUpdated(check);
+    const iv = window.setInterval(check, 15000);
+    check();
+
+    return () => { cancelled = true; unsub(); window.clearInterval(iv); };
+  }, [shouldWatch, userIdProp, onSessionExpired]);
+
+  // ── hand back to the parent once the celebration has played ──
+  const onVerifiedRef = useRef(onVerified);
+  useEffect(() => { onVerifiedRef.current = onVerified; });
+  useEffect(() => {
+    if (!approved) return;
+    const t = window.setTimeout(() => {
+      if (onVerifiedRef.current) onVerifiedRef.current();
+      else window.location.reload();
+    }, 2600);
+    return () => window.clearTimeout(t);
+  }, [approved]);
+
+  const validateAndSetFile = (file: File | undefined | null) => {
     if (!file) return;
     const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
     if (!allowed.includes(file.type)) { setUploadError('Only JPG, PNG, or PDF files are accepted.'); return; }
     if (file.size > 5 * 1024 * 1024) { setUploadError('File must be smaller than 5MB.'); return; }
     setUploadError('');
     setDocument(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    validateAndSetFile(e.target.files?.[0]);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    validateAndSetFile(e.dataTransfer.files?.[0]);
   };
 
   const handleSubmitDocument = async () => {
@@ -95,212 +201,193 @@ const VerificationStatus: React.FC<Props> = ({
     }
   };
 
-  const statusConfig = {
-    pending: {
-      icon: <Clock className="w-7 h-7" />,
-      iconBg: 'rgba(245,158,11,0.12)',
-      iconColor: '#D97706',
-      accentBar: '#F59E0B',
-      title: 'Verification Pending',
-      body: 'Your document is under review by our admin team. This usually takes 1–2 business days.',
-      badgeBg: 'rgba(245,158,11,0.1)',
-      badgeColor: '#B45309',
-      badgeText: 'Under Review',
-    },
-    verified: {
-      icon: <CheckCircle className="w-7 h-7" />,
-      iconBg: 'rgba(34,197,94,0.1)',
-      iconColor: '#16A34A',
-      accentBar: '#22C55E',
-      title: 'Business Verified',
-      body: 'Your business has been verified. You now have full access to Kawayan AI.',
-      badgeBg: 'rgba(34,197,94,0.1)',
-      badgeColor: '#15803D',
-      badgeText: 'Verified',
-    },
-    rejected: {
-      icon: <XCircle className="w-7 h-7" />,
-      iconBg: 'rgba(239,68,68,0.1)',
-      iconColor: '#DC2626',
-      accentBar: '#EF4444',
-      title: 'Verification Failed',
-      body: "Your submitted document was not accepted. Please upload a valid business registration document (Mayor's Permit, DTI, or SEC Registration).",
-      badgeBg: 'rgba(239,68,68,0.1)',
-      badgeColor: '#B91C1C',
-      badgeText: 'Not Approved',
-    },
-    none: {
-      icon: <Shield className="w-7 h-7" />,
-      iconBg: 'rgba(43,87,72,0.1)',
-      iconColor: '#2B5748',
-      accentBar: '#2B5748',
-      title: 'Verification Required',
-      body: 'Please submit your business registration document to unlock full access to Kawayan AI.',
-      badgeBg: 'rgba(43,87,72,0.09)',
-      badgeColor: '#2B5748',
-      badgeText: 'Action Needed',
-    },
-  };
+  const fmtSize = (bytes: number) =>
+    bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
 
-  const cfg = statusConfig[status] ?? statusConfig.none;
+  const Brand = (
+    <div className="ob-brand">
+      <img src="/logo.png" alt="Kawayan" />
+      <span>Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span></span>
+    </div>
+  );
 
-  const inputClass = `
-    w-full px-4 py-3 rounded-xl border text-sm
-    bg-white/70 dark:bg-[#111E18]/60
-    border-[#2B5748]/15 dark:border-[#9CB080]/15
-    text-[#1A2B26] dark:text-[#E8F0EC]
-    placeholder-[#1A2B26]/35 dark:placeholder-[#E8F0EC]/25
-    focus:outline-none focus:border-[#2B5748] dark:focus:border-[#9CB080]
-    transition-all duration-200
-  `.trim();
+  // ═══════════════════ Approval celebration ═══════════════════
+  if (approved) {
+    return (
+      <div className="ob-screen" style={{ ['--vs-accent' as any]: 'var(--success)' }}>
+        <div className="ob-orb ob-orb--1" />
+        <div className="ob-orb ob-orb--2" />
+        <div className="ob-inner vs-inner">
+          {Brand}
+          <div className="vs-card">
+            <div className="vs-card__accent" style={{ background: 'var(--success)' }} />
+            <div className="vs-celebrate">
+              <div className="vs-burst">
+                <span className="vs-burst__ring" />
+                <span className="vs-burst__check"><CheckCircle /></span>
+                <i /><i /><i /><i /><i /><i />
+              </div>
+              <h2>You&apos;re verified!</h2>
+              <p>
+                {businessName ? <><strong>{businessName}</strong> is approved. </> : 'Your business is approved. '}
+                Taking you to your workspace&hellip;
+              </p>
+              <div className="vs-proceed"><b /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const meta = META[(status as MetaKey)] ?? META.none;
+  const showForm = (status === 'rejected' || status === 'none') && !resubmitted;
+
+  // review timeline states
+  const tl: { label: string; state: 'done' | 'current' | 'todo' | 'fail'; icon: React.ReactNode }[] =
+    status === 'rejected'
+      ? [
+          { label: 'Submitted', state: 'done', icon: <Check /> },
+          { label: 'Reviewed', state: 'done', icon: <Check /> },
+          { label: 'Not approved', state: 'fail', icon: <X /> },
+        ]
+      : [
+          { label: 'Submitted', state: 'done', icon: <Check /> },
+          { label: 'Under review', state: 'current', icon: <Clock /> },
+          { label: 'Approved', state: 'todo', icon: <Sparkles /> },
+        ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
-      {/* Background blobs */}
-      <div className="fixed top-[5%] right-[5%] w-[400px] h-[400px] rounded-full opacity-[0.05] blur-[80px] pointer-events-none"
-        style={{ background: cfg.accentBar }} />
-      <div className="fixed bottom-[5%] left-[5%] w-[300px] h-[300px] rounded-full opacity-[0.04] blur-[70px] bg-[#2B5748] pointer-events-none" />
+    <div className="ob-screen" style={{ ['--vs-accent' as any]: meta.accent }}>
+      <div className="ob-orb ob-orb--1" />
+      <div className="ob-orb ob-orb--2" />
 
-      <div className="w-full max-w-md animate-scale-in">
-        {/* Kawayan brand header */}
-        <div className="flex items-center justify-center gap-2 mb-7">
-          <img src="/logo.png" alt="Kawayan" className="w-8 h-8 rounded-xl opacity-80" />
-          <span className="font-display text-lg font-bold" style={{ color: 'var(--fg)' }}>
-            Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span>
-          </span>
-        </div>
+      <div className="ob-inner vs-inner">
+        {Brand}
 
-        {/* Main card */}
-        <div className="glass-card overflow-hidden">
-          {/* Accent top bar */}
-          <div className="h-1" style={{ background: `linear-gradient(90deg, ${cfg.accentBar}, ${cfg.accentBar}88)` }} />
+        <div className="vs-card">
+          <div className="vs-card__accent" />
 
-          <div className="p-7 text-center">
-            {/* Status icon */}
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
-              style={{ background: cfg.iconBg }}>
-              <span style={{ color: cfg.iconColor }}>{cfg.icon}</span>
-            </div>
+          <div className="vs-card__body">
+            <div className={`vs-icon${status === 'pending' ? ' vs-icon--pulse' : ''}`}>{meta.icon}</div>
 
-            {/* Status badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-4"
-              style={{ background: cfg.badgeBg, color: cfg.badgeColor }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot" style={{ background: cfg.accentBar }} />
-              {cfg.badgeText}
-            </div>
+            <div className="vs-badge"><b />{meta.badge}</div>
 
-            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--fg)' }}>{cfg.title}</h2>
+            <h1 className="vs-title">{meta.title}</h1>
+            {businessName && <p className="vs-biz">{businessName}</p>}
+            <p className="vs-body">{meta.body}</p>
 
-            {businessName && (
-              <p className="text-sm font-semibold mb-2" style={{ color: cfg.iconColor }}>{businessName}</p>
-            )}
-
-            <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--fg-muted)' }}>{cfg.body}</p>
-
-            {/* Rejection reason */}
-            {status === 'rejected' && rejectionReason && (
-              <div className="text-left p-3.5 rounded-xl mb-5"
-                style={{ background: 'rgba(192,57,43,0.06)', border: '1px solid rgba(192,57,43,0.16)' }}>
-                <p className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: '#B91C1C' }}>Admin Note:</p>
-                <p className="text-xs" style={{ color: '#C0392B' }}>{rejectionReason}</p>
+            {(status === 'pending' || status === 'rejected') && (
+              <div className="vs-timeline">
+                {tl.map((s) => (
+                  <div
+                    key={s.label}
+                    className={`vs-tl__step ${
+                      s.state === 'done' ? 'is-done' : s.state === 'current' ? 'is-current' : s.state === 'fail' ? 'is-fail' : ''
+                    }`}
+                  >
+                    <span className="vs-tl__dot">{s.icon}</span>
+                    <span className="vs-tl__label">{s.label}</span>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Resubmit UI */}
-            {(status === 'rejected' || status === 'none') && !resubmitted && (
-              <div className="text-left space-y-3.5 mb-5">
-                <div className="h-px" style={{ background: 'var(--border)' }} />
+            {status === 'pending' && (
+              <div className="vs-live"><b />Live &mdash; this page updates the moment you&apos;re approved</div>
+            )}
 
-                <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fg-subtle)' }}>
-                  {isFirstSubmit ? 'Submit Verification' : 'Upload New Document'}
-                </p>
+            {/* Rejection note */}
+            {status === 'rejected' && rejectionReason && (
+              <div className="vs-note">
+                <XCircle />
+                <span><strong>Admin note:</strong> {rejectionReason}</span>
+              </div>
+            )}
+
+            {/* Submit / resubmit form */}
+            {showForm && (
+              <div className="vs-form">
+                <div className="vs-form__divider" />
+                <p className="vs-form__head">{isFirstSubmit ? 'Submit verification' : 'Upload a new document'}</p>
 
                 {isFirstSubmit && (
-                  <div className="space-y-3">
+                  <>
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--fg-subtle)' }}>
-                        Business Address
-                      </label>
+                      <label className="vs-label">Business Address</label>
                       <input
                         type="text"
+                        className="input"
                         value={businessAddress}
                         onChange={(e) => setBusinessAddress(e.target.value)}
                         placeholder="e.g. 123 Rizal St, Quezon City"
-                        className={inputClass}
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--fg-subtle)' }}>
-                        Contact Number
-                      </label>
+                      <label className="vs-label">Contact Number</label>
                       <input
                         type="tel"
+                        className="input"
                         value={businessPhone}
                         onChange={(e) => setBusinessPhone(e.target.value)}
                         placeholder="e.g. 09171234567"
-                        className={inputClass}
                       />
                     </div>
-                  </div>
+                  </>
                 )}
 
-                <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>
-                  Mayor's Permit, DTI, or SEC Registration (JPG, PNG, PDF — max 5MB)
-                </p>
+                <div>
+                  <label className="vs-label">Registration Document</label>
+                  <p className="vs-hint">Mayor&apos;s Permit, DTI, or SEC Registration — JPG, PNG or PDF, max 5MB</p>
+                </div>
 
                 {document ? (
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                    style={{ background: 'rgba(43,87,72,0.06)', border: '1px solid rgba(43,87,72,0.15)' }}>
-                    <FileText className="w-4 h-4 shrink-0 text-[#2B5748]" />
-                    <span className="text-sm flex-1 truncate font-medium" style={{ color: 'var(--fg)' }}>{document.name}</span>
-                    <button type="button"
+                  <div className="vs-file">
+                    <FileText className="vs-file__ico" />
+                    <div className="vs-file__meta">
+                      <div className="vs-file__name">{document.name}</div>
+                      <div className="vs-file__size">{fmtSize(document.size)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="vs-file__x"
+                      aria-label="Remove file"
                       onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                      className="p-1 rounded-lg transition"
-                      style={{ color: 'var(--fg-muted)' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-                      onMouseLeave={e => e.currentTarget.style.background = ''}>
+                    >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ) : (
                   <button
                     type="button"
+                    className={`vs-drop${dragging ? ' is-drag' : ''}`}
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-5 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all group"
-                    style={{ borderColor: 'rgba(43,87,72,0.2)' }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = '#2B5748'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(43,87,72,0.2)'}
+                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={handleDrop}
                   >
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                      style={{ background: 'rgba(43,87,72,0.08)' }}>
-                      <Upload className="w-4 h-4 text-[#2B5748]/60 group-hover:text-[#2B5748] transition-colors" />
-                    </div>
-                    <span className="text-xs font-semibold group-hover:text-[#2B5748] transition-colors"
-                      style={{ color: 'var(--fg-subtle)' }}>
-                      Click to upload document
-                    </span>
+                    <span className="vs-drop__ico"><Upload /></span>
+                    <span className="vs-drop__t">Click to upload{dragging ? '' : ' or drag & drop'}</span>
+                    <span className="vs-drop__s">Your document is only shared with our verification team</span>
                   </button>
                 )}
 
-                <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf" className="hidden" onChange={handleFileChange} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
 
-                {uploadError && (
-                  <p className="text-xs font-medium" style={{ color: '#C0392B' }}>{uploadError}</p>
-                )}
+                {uploadError && <p className="vs-err">{uploadError}</p>}
 
                 {document && (
-                  <button
-                    onClick={handleSubmitDocument}
-                    disabled={uploading}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, #2B5748, #3A7362)', boxShadow: '0 4px 16px -4px rgba(43,87,72,0.35)' }}
-                    onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ''; }}
-                  >
+                  <button onClick={handleSubmitDocument} disabled={uploading} className="btn btn-primary w-full">
                     {uploading ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting...</>
+                      <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting&hellip;</>
                     ) : isFirstSubmit ? (
-                      <><ArrowRight className="w-4 h-4" /> Submit for Review</>
+                      <><Send className="w-4 h-4" /> Submit for Review</>
                     ) : (
                       <><ArrowRight className="w-4 h-4" /> Resubmit for Review</>
                     )}
@@ -310,32 +397,20 @@ const VerificationStatus: React.FC<Props> = ({
             )}
 
             {resubmitted && (
-              <div className="flex items-center gap-2.5 justify-center p-4 rounded-xl mb-5"
-                style={{ background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
-                <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                  Document submitted — now pending review.
-                </span>
+              <div className="vs-note">
+                <Clock />
+                <span>Document submitted &mdash; your account is now pending review.</span>
               </div>
             )}
 
-            {status === 'pending' && (
-              <div className="flex items-center gap-2.5 justify-center p-4 rounded-xl mb-5"
-                style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                <Clock className="w-4 h-4 animate-pulse text-amber-600" />
-                <span className="text-xs text-amber-700 dark:text-amber-400">
-                  You'll receive access once our admin reviews your document.
-                </span>
+            {status === 'pending' && !resubmitted && (
+              <div className="vs-note">
+                <Shield />
+                <span>You&apos;ll get full access the instant an admin approves your document. No need to refresh.</span>
               </div>
             )}
 
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-2 mx-auto text-xs font-semibold transition-colors"
-              style={{ color: 'var(--fg-subtle)' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#C0392B'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; }}
-            >
+            <button onClick={onLogout} className="vs-signout">
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>
           </div>

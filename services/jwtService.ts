@@ -38,7 +38,7 @@ export class JWTService {
         algorithms: ['HS256']
       }) as JWTPayload;
 
-      logger.info('JWT token verified successfully', { 
+      logger.debug('JWT token verified successfully', { 
         userId: decoded.userId, 
         role: decoded.role 
       });
