@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, AlertTriangle, TrendingUp, DollarSign, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings, Power, Download, Upload, Filter, User as UserIcon, Lock, Calendar, CreditCard, Moon, Sun, XCircle, Wallet, FileText, ExternalLink } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { supportService } from '../services/supportService';
+import { supportRealtime } from '../services/supportRealtime';
 import { Ticket, User } from '../types';
 import { useOrganicDialog } from './OrganicDialog';
 
@@ -80,6 +81,13 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   useEffect(() => {
     if (activeTab === 'verification') loadVerifications();
     if (activeTab === 'billing') loadPendingTransactions();
+  }, [activeTab]);
+
+  useEffect(() => {
+    supportRealtime.connect();
+    return supportRealtime.onVerificationUpdated(() => {
+      if (activeTab === 'verification') loadVerifications();
+    });
   }, [activeTab]);
 
   const loadPendingTransactions = async () => {

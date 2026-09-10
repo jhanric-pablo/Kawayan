@@ -638,7 +638,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       {/* Post Modal */}
       {showPostModal && (
         <div className="fixed inset-0 bg-[#273338]/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#FFFFFF] dark:bg-[#273338] rounded-tl-[2.5rem] rounded-br-[2.5rem] rounded-[1.5rem] p-6 w-full max-w-sm shadow-float border border-[#273338]/10 dark:border-[#9CB080]/20">
+          <div className="bg-[#FFFFFF] dark:bg-[#273338] rounded-tl-[2.5rem] rounded-br-[2.5rem] rounded-[1.5rem] p-6 w-full max-w-sm shadow-float border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-display text-xl font-bold text-[#273338] dark:text-white">Post to...</h3>
               <button onClick={() => setShowPostModal(false)} className="rounded-full p-2 hover:bg-slate-900/5 dark:hover:bg-white/5 transition-colors">
@@ -649,7 +649,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             <div className="space-y-3">
               <button 
                 onClick={() => handlePostNow('tiktok')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[#9CB080]/20 hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
               >
                 <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
@@ -662,7 +662,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
               <button 
                 onClick={() => handlePostNow('facebook')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[#9CB080]/20 hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
               >
                 <div className="w-10 h-10 bg-[#1877F2] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
@@ -675,7 +675,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
               <button 
                 onClick={() => handlePostNow('instagram')}
-                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[#9CB080]/20 hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
+                className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] hover:bg-[#273338]/5 dark:hover:bg-white/5 transition-all duration-300 group"
               >
                 <div className="w-10 h-10 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
@@ -694,8 +694,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       <section className="w-full rounded-[2rem] bg-[#FFFFFF]/90 dark:bg-[#273338]/40 p-6 sm:p-8 shadow-soft backdrop-blur-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#2B5748]/15 dark:bg-[#9CB080]/15 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-[#2B5748] dark:text-[#9CB080]" />
+            <div className="w-10 h-10 rounded-full bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] flex items-center justify-center">
+              <Layers className="w-5 h-5 text-[var(--primary)]" />
             </div>
             <div>
               <h2 className="font-display text-lg font-bold text-[#273338] dark:text-white">
@@ -703,17 +703,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
               </h2>
               <p className="text-xs text-[#273338]/70 dark:text-white/60">
                 {subscription === 'PRO' || subscription === 'ENTERPRISE' ? 'Pro' : 'Trial'} plan · batch up to{' '}
-                <span className="font-semibold text-[#2B5748] dark:text-[#9CB080]">{batchPostCount} posts</span>
+                <span className="font-semibold text-[var(--primary)]">{batchPostCount} posts</span>
               </p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#2B5748] dark:text-[#9CB080] bg-[#2B5748]/10 dark:bg-[#9CB080]/10 px-3 py-1.5 rounded-full">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] px-3 py-1.5 rounded-full">
             {monthlyPostCount}/{batchPostCount} posts this month
           </span>
         </div>
 
         {trialLimitReached && (
-          <p className="text-xs text-[#2B5748] dark:text-[#9CB080] bg-[#2B5748]/8 dark:bg-[#9CB080]/10 border border-[#2B5748]/20 dark:border-[#9CB080]/20 rounded-full px-4 py-2 mb-3 transition-all duration-300">
+          <p className="text-xs text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.1)] border border-[var(--border-strong)] dark:border-[rgba(156,176,128,0.22)] rounded-full px-4 py-2 mb-3 transition-all duration-300">
             Trial limit reached for this month. Upgrade to Pro to keep creating.
           </p>
         )}
@@ -726,14 +726,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           onChange={(e) => setBatchStrategy(e.target.value)}
           placeholder='e.g. "Holiday Sale Promotion" or "Local organic bakery items launch"'
           rows={2}
-          className="w-full rounded-[1rem] border border-[#273338]/10 dark:border-[#9CB080]/20 bg-white dark:bg-[#273338] px-4 py-3 text-sm text-[#273338] dark:text-white placeholder:text-[#273338]/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#618764]/40 resize-none font-[Nunito,Quicksand,sans-serif]"
+          className="w-full rounded-[1rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] bg-white dark:bg-[#273338] px-4 py-3 text-sm text-[#273338] dark:text-white placeholder:text-[#273338]/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] resize-none font-[Nunito,Quicksand,sans-serif]"
         />
 
         <div className="flex flex-wrap gap-2 mt-4">
           <button
             onClick={handleGeneratePlan}
             disabled={loadingPlan}
-            className="text-xs flex items-center gap-1.5 bg-white dark:bg-[#273338] border border-[#273338]/10 dark:border-[#9CB080]/20 text-[#273338] dark:text-white font-bold hover:bg-[#9CB080]/10 dark:hover:bg-white/5 px-4 py-2 rounded-full transition-all duration-300 disabled:opacity-60"
+            className="text-xs flex items-center gap-1.5 bg-white dark:bg-[#273338] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-[#273338] dark:text-white font-bold hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.08)] px-4 py-2 rounded-full transition-all duration-300 disabled:opacity-60"
           >
             {loadingPlan ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
             Plan Month
@@ -761,7 +761,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             <button
               type="button"
               onClick={() => setShowBatchIdeas((v) => !v)}
-              className="text-xs flex items-center gap-1.5 text-[#2B5748] dark:text-[#9CB080] font-bold px-4 py-2 rounded-full border border-[#2B5748] dark:border-[#9CB080] hover:bg-[#2B5748]/5 dark:hover:bg-[#9CB080]/10 transition-all"
+              className="text-xs flex items-center gap-1.5 text-[var(--primary)] font-bold px-4 py-2 rounded-full border border-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all"
             >
               {showBatchIdeas ? 'Hide' : 'Review'} {ideas.length} Ideas
             </button>
@@ -774,16 +774,16 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             {ideas.map((idea, index) => (
               <div
                 key={`${idea.day}-${index}`}
-                className="rounded-[1rem] border border-[#273338]/10 dark:border-[#9CB080]/20 bg-[#273338]/[0.03] dark:bg-white/[0.04] p-3 space-y-2"
+                className="rounded-[1rem] border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] bg-[#273338]/[0.03] dark:bg-white/[0.04] p-3 space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#2B5748] dark:text-[#9CB080]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
                     Day {idea.day}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleDayClick(idea.day)}
-                    className="text-[10px] font-semibold text-[#618764] hover:underline"
+                    className="text-[10px] font-semibold text-[var(--fg-muted)] hover:underline"
                   >
                     Open
                   </button>
@@ -791,20 +791,20 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                 <input
                   value={idea.title}
                   onChange={(e) => handleUpdateIdea(index, 'title', e.target.value)}
-                  className="w-full text-xs font-semibold bg-transparent border-b border-dashed border-[#273338]/20 dark:border-[#9CB080]/30 pb-1 text-[#273338] dark:text-white focus:outline-none"
+                  className="w-full text-xs font-semibold bg-transparent border-b border-dashed border-[#273338]/20 dark:border-[rgba(156,176,128,0.25)] pb-1 text-[#273338] dark:text-white focus:outline-none"
                   placeholder="Heading"
                 />
                 <textarea
                   value={idea.topic}
                   onChange={(e) => handleUpdateIdea(index, 'topic', e.target.value)}
                   rows={2}
-                  className="w-full text-xs bg-white/60 dark:bg-[#273338]/80 border border-[#273338]/10 dark:border-[#9CB080]/20 rounded-lg p-2 text-[#273338] dark:text-white resize-none focus:outline-none focus:ring-1 focus:ring-[#618764]/40"
+                  className="w-full text-xs bg-white/60 dark:bg-[#273338]/80 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-lg p-2 text-[#273338] dark:text-white resize-none focus:outline-none focus:ring-1 focus:ring-[rgba(43,87,72,0.18)]"
                   placeholder="Topic / angle"
                 />
                 <select
                   value={idea.format}
                   onChange={(e) => handleUpdateIdea(index, 'format', e.target.value)}
-                  className="w-full text-[10px] font-bold uppercase tracking-wide bg-transparent border border-[#273338]/10 dark:border-[#9CB080]/20 rounded-full px-2 py-1 text-[#273338] dark:text-white"
+                  className="w-full text-[10px] font-bold uppercase tracking-wide bg-transparent border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-full px-2 py-1 text-[#273338] dark:text-white"
                 >
                   <option value="Image">Image</option>
                   <option value="Video">Video</option>
@@ -819,9 +819,12 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
       {/* Full-screen calendar workspace */}
       <section className="w-full flex-1 flex flex-col min-h-[85vh] organic-calendar-canvas rounded-[2rem] overflow-hidden">
-        <div className="flex flex-wrap gap-3 justify-between items-center mb-4 px-2 sm:px-4 pt-2">
-          <div className="flex items-center gap-2">
-            <div className="relative group">
+        <div className="flex flex-wrap gap-4 justify-between items-center mb-5 px-2 sm:px-4 pt-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--fg)] tracking-tight">
+              {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </h2>
+            <div className="relative group hidden sm:block">
               <input
                 type="text"
                 value={dateInputValue}
@@ -829,10 +832,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                 onBlur={handleDateInputBlur}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 placeholder="Jump to date..."
-                className="font-display text-lg text-[#273338] dark:text-white bg-transparent border-b border-dashed border-[#2B5748] dark:border-[#9CB080]/40 p-0 w-44 outline-none placeholder:font-normal placeholder:text-[#273338]/50 dark:placeholder:text-white/40"
-                style={{ boxShadow: 'none' }}
+                className="text-sm text-[var(--fg-muted)] bg-[var(--bg-alt)] dark:bg-[rgba(26,43,38,0.55)] border border-[var(--border-strong)] rounded-lg px-3 py-1.5 w-40 outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] focus:border-[var(--primary)] placeholder:text-[var(--fg-subtle)]"
               />
-              <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#273338] text-white text-[10px] px-2 py-1 rounded-full -bottom-8 left-0 whitespace-nowrap pointer-events-none z-50">
+              <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[var(--kw-forest)] text-white text-[10px] px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
               </div>
             </div>
@@ -840,7 +842,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
               <button
                 type="button"
                 aria-label="Previous month"
-                className="rounded-full p-2 text-[#2B5748] dark:text-[#9CB080] hover:bg-[#2B5748]/10 dark:hover:bg-[#9CB080]/10 transition-all duration-300 hover:scale-110 active:scale-95"
+                className="rounded-full p-2 text-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 hover:scale-110 active:scale-95"
                 onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               >
                 <ChevronLeft className="w-4 h-4"/>
@@ -848,31 +850,31 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
               <button
                 type="button"
                 aria-label="Next month"
-                className="rounded-full p-2 text-[#2B5748] dark:text-[#9CB080] hover:bg-[#2B5748]/10 dark:hover:bg-[#9CB080]/10 transition-all duration-300 hover:scale-110 active:scale-95"
+                className="rounded-full p-2 text-[var(--primary)] hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 hover:scale-110 active:scale-95"
                 onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
               >
                 <ChevronRight className="w-4 h-4"/>
               </button>
             </div>
-            <div className="flex gap-0.5 ml-1 p-1 bg-[#273338]/5 dark:bg-white/5 rounded-full border border-[#273338]/10 dark:border-[#9CB080]/20">
+            <div className="flex gap-0.5 p-1 bg-[var(--bg-alt)] dark:bg-[rgba(26,43,38,0.55)] rounded-xl border border-[var(--border-strong)]">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'grid' ? 'bg-white dark:bg-[#2B5748]/50 shadow-sm text-[#2B5748] dark:text-[#9CB080]' : 'text-[#273338] dark:text-white/70'}`}
+                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'grid' ? 'bg-white dark:bg-[rgba(43,87,72,0.4)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)]'}`}
                 title="Month grid"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'list' ? 'bg-white dark:bg-[#2B5748]/50 shadow-sm text-[#2B5748] dark:text-[#9CB080]' : 'text-[#273338] dark:text-white/70'}`}
+                className={`p-2 rounded-full transition-all duration-300 ${viewMode === 'list' ? 'bg-white dark:bg-[rgba(43,87,72,0.4)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)]'}`}
                 title="Month list"
               >
                 <LayoutList className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-          <p className="text-[11px] font-medium text-[#618764] dark:text-[#9CB080]/80 max-w-sm text-right hidden sm:block">
-            Click any day to preview or generate · tap <span className="font-bold text-[#2B5748] dark:text-[#9CB080]">+</span> on empty cells for ₱{ADDON_POST_PRICE_PHP} add-on
+          <p className="text-sm font-medium text-[var(--fg-muted)] max-w-md text-right hidden md:block leading-relaxed">
+            Click any day to preview or generate · tap <span className="font-bold text-[var(--primary)]">+</span> on empty cells for ₱{ADDON_POST_PRICE_PHP} add-on
           </p>
         </div>
 
@@ -903,7 +905,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
       {/* Sliding right preview panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[450px] bg-[#FFFFFF] dark:bg-[#273338] border-l border-slate-900/10 dark:border-[#9CB080]/20 p-8 shadow-float z-50 transition-transform duration-300 flex flex-col ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-[450px] bg-[#FFFFFF] dark:bg-[#273338] border-l border-[var(--border)] dark:border-[rgba(156,176,128,0.2)] p-8 shadow-float z-50 transition-transform duration-300 flex flex-col ${
           selectedDay !== null ? 'translate-x-0' : 'translate-x-full pointer-events-none'
         }`}
         aria-hidden={selectedDay === null}
@@ -912,7 +914,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           <>
             <div className="flex justify-between items-start mb-6 shrink-0 gap-4">
               <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#2B5748] dark:text-[#9CB080]">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--primary)]">
                   {currentDate.toLocaleString('default', { month: 'long' })} {selectedDay}
                 </span>
                 <h3
@@ -925,10 +927,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
               <button
                 type="button"
                 onClick={handleClosePanel}
-                className="rounded-full p-3 bg-[#2B5748]/8 dark:bg-white/8 hover:bg-[#2B5748]/15 dark:hover:bg-white/12 border border-[#2B5748]/20 dark:border-[#9CB080]/30 transition-all duration-300 hover:scale-105 active:scale-95 shrink-0"
+                className="rounded-full p-3 bg-[var(--kw-green-pale)] dark:bg-white/8 hover:bg-[rgba(43,87,72,0.12)] dark:hover:bg-white/12 border border-[var(--border-strong)] dark:border-[rgba(156,176,128,0.25)] transition-all duration-300 hover:scale-105 active:scale-95 shrink-0"
                 aria-label="Close preview panel"
               >
-                <X className="w-6 h-6 text-[#2B5748] dark:text-[#9CB080]" />
+                <X className="w-6 h-6 text-[var(--primary)]" />
               </button>
             </div>
 
@@ -957,29 +959,29 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                     {ideas.find(i => i.day === selectedDay)
                       ? `Idea: "${ideas.find(i => i.day === selectedDay)?.topic}"`
                       : "Hit 'AI Draft' to generate Taglish content for this day."}
-                    <span className="block mt-2 text-[11px] text-[#618764] dark:text-[#9CB080]/70">
+                    <span className="block mt-2 text-[11px] text-[var(--fg-muted)]">
                       Empty days show a <span className="font-semibold">+</span> control (₱{ADDON_POST_PRICE_PHP} single-post add-on).
                     </span>
                   </p>
                 </div>
               ) : (
                 <div className="w-full max-w-sm mx-auto space-y-6 pb-6">
-                  <div className="bg-white/80 dark:bg-white/5 rounded-[2rem] p-4 shadow-soft border border-[#273338]/10 dark:border-[#9CB080]/20">
+                  <div className="bg-white/80 dark:bg-white/5 rounded-[2rem] p-4 shadow-soft border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-bold text-[#273338]/70 dark:text-white/60 uppercase flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-[#2B5748] dark:text-[#9CB080]"/> Virality Potential
+                        <Flame className="w-3 h-3 text-[var(--primary)]"/> Virality Potential
                       </span>
                       <span className={`text-lg font-black ${
-                        (generatedContent.viralityScore || 0) > 75 ? 'text-[#2B5748] dark:text-[#9CB080]' :
-                        (generatedContent.viralityScore || 0) > 50 ? 'text-[#2B5748]' : 'text-[#273338]/50 dark:text-white/50'
+                        (generatedContent.viralityScore || 0) > 75 ? 'text-[var(--primary)]' :
+                        (generatedContent.viralityScore || 0) > 50 ? 'text-[var(--primary)]' : 'text-[var(--fg-subtle)]'
                       }`}>
                         {generatedContent.viralityScore}/100
                       </span>
                     </div>
-                    <div className="w-full bg-[#9CB080]/30 dark:bg-[#2B5748]/50 rounded-full h-2 mb-3">
+                    <div className="w-full bg-[var(--kw-green-pale)] dark:bg-[rgba(43,87,72,0.4)] rounded-full h-2 mb-3">
                       <div
                         className={`h-2 rounded-full transition-all duration-1000 ${
-                          (generatedContent.viralityScore || 0) > 75 ? 'bg-gradient-to-r from-[#2B5748] to-[#273338]' : 'bg-gradient-to-r from-[#9CB080] to-[#2B5748]'
+                          (generatedContent.viralityScore || 0) > 75 ? 'bg-gradient-to-r from-[var(--kw-green)] to-[var(--kw-forest)]' : 'bg-gradient-to-r from-[var(--secondary)] to-[var(--kw-green)]'
                         }`}
                         style={{ width: `${generatedContent.viralityScore}%` }}
                       />
@@ -994,7 +996,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                       <p className="text-xs font-bold text-[#273338]/70 dark:text-white/60 uppercase mb-2">Previous Versions</p>
                       <div className="space-y-2">
                         {generatedContent.history.map((h, i) => (
-                          <div key={i} className="p-3 bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[#9CB080]/20 rounded-[1rem] relative overflow-hidden group">
+                          <div key={i} className="p-3 bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] rounded-[1rem] relative overflow-hidden group">
                             <div className="blur-[3px] opacity-50 select-none text-xs text-[#273338] dark:text-white/70">
                               {h.caption.substring(0, 50)}...
                             </div>
@@ -1007,13 +1009,13 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                     </div>
                   )}
 
-                  <div className="p-4 rounded-[2rem] bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[#9CB080]/20 text-xs text-[#273338]/70 dark:text-white/60">
+                  <div className="p-4 rounded-[2rem] bg-white/80 dark:bg-white/5 border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-xs text-[#273338]/70 dark:text-white/60">
                     <p className="font-bold mb-2 uppercase text-[10px] flex justify-between items-center">
                       <span>Image Prompt Used:</span>
                       <span className="text-[9px] font-normal opacity-50 italic">Editable</span>
                     </p>
                     <textarea
-                      className="w-full bg-[#9CB080]/20 dark:bg-[#273338] border-none rounded-[1rem] p-3 text-xs italic focus:ring-1 focus:ring-[#2B5748] dark:focus:ring-[#9CB080] transition-all resize-none text-[#273338] dark:text-white"
+                      className="w-full bg-[var(--bg-alt)] dark:bg-[#273338] border-none rounded-[1rem] p-3 text-xs italic focus:ring-1 focus:ring-[var(--primary)] transition-all resize-none text-[var(--fg)]"
                       rows={3}
                       value={generatedContent.imagePrompt}
                       onChange={(e) => setGeneratedContent({...generatedContent, imagePrompt: e.target.value})}
@@ -1026,9 +1028,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                     <button
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
-                      className="w-full py-5 rounded-[1.5rem] border-2 border-dashed border-[#2B5748] dark:border-[#9CB080] bg-white/40 dark:bg-white/5 flex flex-col items-center gap-2 hover:bg-[#2B5748]/5 dark:hover:bg-[#9CB080]/10 transition-all duration-300 group"
+                      className="w-full py-5 rounded-[1.5rem] border-2 border-dashed border-[var(--primary)] bg-white/40 dark:bg-white/5 flex flex-col items-center gap-2 hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all duration-300 group"
                     >
-                      <Upload className="w-5 h-5 text-[#2B5748] dark:text-[#9CB080]" />
+                      <Upload className="w-5 h-5 text-[var(--primary)]" />
                       <span className="text-xs text-[#273338] dark:text-white font-medium">
                         Drop or click to upload your photo
                       </span>
@@ -1043,17 +1045,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                     />
                   </div>
 
-                  <div className="bg-white dark:bg-black rounded-[2rem] border-[6px] border-[#273338] dark:border-[#9CB080]/30 shadow-float overflow-hidden relative mx-auto w-full">
+                  <div className="bg-white dark:bg-black rounded-[2rem] border-[6px] border-[#273338] dark:border-[rgba(156,176,128,0.25)] shadow-float overflow-hidden relative mx-auto w-full">
                     <div className="h-6 bg-[#273338] w-full flex justify-between px-6 items-center">
-                      <div className="w-12 h-3 bg-black dark:bg-[#2B5748]/40 rounded-full" />
+                      <div className="w-12 h-3 bg-black dark:bg-[rgba(43,87,72,0.5)] rounded-full" />
                       <div className="flex gap-1">
                         <div className="w-3 h-3 bg-[#273338] rounded-full" />
                         <div className="w-3 h-3 bg-[#273338] rounded-full" />
                       </div>
                     </div>
 
-                    <div className="p-3 border-b border-[#9CB080]/30 flex items-center gap-3 bg-white dark:bg-black">
-                      <div className="w-8 h-8 rounded-full bg-[#2B5748]/15 flex items-center justify-center text-[#2B5748] dark:text-[#9CB080] font-bold text-xs border border-[#273338]/10 dark:border-[#9CB080]/20">
+                    <div className="p-3 border-b border-[var(--border)] dark:border-[rgba(156,176,128,0.2)] flex items-center gap-3 bg-white dark:bg-black">
+                      <div className="w-8 h-8 rounded-full bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] flex items-center justify-center text-[var(--primary)] font-bold text-xs border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)]">
                         {profile.businessName.substring(0,2).toUpperCase()}
                       </div>
                       <div className="flex-1">
@@ -1063,7 +1065,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                       <MoreHorizontal className="w-4 h-4 text-[#273338] dark:text-white/60" />
                     </div>
 
-                    <div className="aspect-square bg-[#9CB080]/20 dark:bg-[#273338] relative overflow-hidden">
+                    <div className="aspect-square bg-[var(--bg-alt)] dark:bg-[#273338] relative overflow-hidden">
                       {generatedContent.imageUrl ? (
                         <div className="w-full h-full overflow-hidden relative">
                           <img
@@ -1082,7 +1084,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                               type="button"
                               onClick={handleGenerateImage}
                               disabled={loadingImage}
-                              className="rounded-full px-3 py-1.5 text-xs font-bold border border-[#2B5748] dark:border-[#9CB080] text-[#2B5748] dark:text-[#9CB080] bg-white/95 dark:bg-[#273338]/95 backdrop-blur-sm flex items-center gap-1.5 hover:bg-[#2B5748]/5 dark:hover:bg-[#9CB080]/10 transition-all disabled:opacity-60 shadow-soft"
+                              className="rounded-full px-3 py-1.5 text-xs font-bold border border-[var(--primary)] text-[var(--primary)] bg-white/95 dark:bg-[#273338]/95 backdrop-blur-sm flex items-center gap-1.5 hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.1)] transition-all disabled:opacity-60 shadow-soft"
                             >
                               {loadingImage ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -1095,7 +1097,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                         </div>
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                          <ImageIcon className="w-8 h-8 text-[#2B5748] dark:text-[#9CB080] mb-2" />
+                          <ImageIcon className="w-8 h-8 text-[var(--primary)] mb-2" />
                           <p className="text-xs text-[#273338]/60 dark:text-white/50 mb-4 line-clamp-3">{generatedContent.imagePrompt}</p>
                           <button
                             type="button"
@@ -1136,11 +1138,11 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
               )}
             </div>
 
-            <div className="pt-4 mt-4 border-t border-[#273338]/10 dark:border-[#9CB080]/20 flex gap-3 shrink-0">
+            <div className="pt-4 mt-4 border-t border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] flex gap-3 shrink-0">
               <button
                 onClick={() => handleSavePost()}
                 disabled={!generatedContent}
-                className="flex-1 py-3 rounded-full border border-[#273338]/10 dark:border-[#9CB080]/20 text-[#273338] dark:text-white font-semibold hover:bg-[#9CB080]/10 dark:hover:bg-white/5 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-3 rounded-full border border-[#273338]/10 dark:border-[rgba(156,176,128,0.2)] text-[#273338] dark:text-white font-semibold hover:bg-[rgba(43,87,72,0.06)] dark:hover:bg-[rgba(156,176,128,0.08)] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4"/> Save Draft
               </button>
@@ -1148,7 +1150,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                 disabled={!generatedContent || generatedContent.status === 'Scheduled'}
                 className={`flex-1 py-3 rounded-full font-semibold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                   generatedContent?.status === 'Scheduled'
-                    ? 'bg-[#2B5748]/15 text-[#2B5748] dark:text-[#9CB080] cursor-default'
+                    ? 'bg-[var(--kw-green-pale)] dark:bg-[rgba(156,176,128,0.15)] text-[var(--primary)] cursor-default'
                     : 'organic-btn-primary'
                 }`}
                 onClick={async () => {
@@ -1167,7 +1169,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
                   setShowPostModal(true);
                 }}
                 disabled={!generatedContent}
-                className="flex-1 py-3 rounded-full border border-[#2B5748]/40 dark:border-[#9CB080]/40 bg-[#2B5748]/10 dark:bg-[#9CB080]/10 text-[#2B5748] dark:text-[#9CB080] font-semibold hover:bg-[#2B5748]/20 dark:hover:bg-[#9CB080]/20 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-3 rounded-full border border-[var(--border-strong)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] text-[var(--primary)] font-semibold hover:bg-[rgba(43,87,72,0.12)] dark:hover:bg-[rgba(156,176,128,0.18)] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Share2 className="w-4 h-4"/> Post Now
               </button>
