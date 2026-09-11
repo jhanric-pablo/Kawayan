@@ -113,6 +113,11 @@ const Login: React.FC<Props> = ({
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotLink, setForgotLink] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [dbService] = useState(() => new UniversalDatabaseService());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,6 +245,27 @@ const Login: React.FC<Props> = ({
     }
   };
 
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotMsg('');
+    setForgotLink('');
+    setForgotLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      setForgotMsg(data.message || 'If that email exists, a reset link has been sent.');
+      if (data.devResetUrl) setForgotLink(data.devResetUrl);
+    } catch {
+      setForgotMsg('Network error. Please try again.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   // Bumps on every Sign in ⇄ Create switch so the light-sweep animation replays.
   const [flip, setFlip] = useState<{ seq: number; dir: 'fwd' | 'back' }>({ seq: 0, dir: 'fwd' });
 
@@ -356,7 +382,7 @@ const Login: React.FC<Props> = ({
         <div className="af-formwrap">
           <div className="af-formcard">
             {!isAdminLogin ? (
-              <div className="af-tabs" ref={tabsRef}>
+              <div className="af-tabs" ref={tabsRef} hidden={forgotMode}>
                 <button type="button" className={!isSignUp ? 'is-active' : ''} onClick={() => switchMode(false)}>
                   Sign in
                 </button>
@@ -373,7 +399,7 @@ const Login: React.FC<Props> = ({
               <p className="af-formcard__title">Staff sign-in</p>
             )}
 
-            <form onSubmit={handleSubmit} className="af-form">
+            <form onSubmit={handleSubmit} className="af-form" hidden={forgotMode}>
               {isSignUp && !isAdminLogin && (
                 <div className="af-grp af-reveal">
                   <Field
@@ -531,6 +557,16 @@ const Login: React.FC<Props> = ({
                 {!isLoading && <ArrowRight className="w-4 h-4" />}
               </button>
 
+              {!isSignUp && !isAdminLogin && (
+                <button
+                  type="button"
+                  className="af-alt"
+                  onClick={() => { setForgotMode(true); setForgotEmail(email); setError(''); }}
+                >
+                  Forgot password?
+                </button>
+              )}
+
               <p className="af-trust">
                 <ShieldCheck />
                 {isAdminLogin
@@ -540,6 +576,46 @@ const Login: React.FC<Props> = ({
                     : 'Encrypted end-to-end. No credit card needed to start.'}
               </p>
             </form>
+
+            {forgotMode && (
+              <form onSubmit={handleForgot} className="af-form">
+                <p className="af-sub">
+                  Enter your account email and we&apos;ll send a link to reset your password.
+                </p>
+                <Field
+                  id="af-forgot-email"
+                  label="Email address"
+                  type="email"
+                  inputMode="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  icon={<Mail />}
+                />
+
+                {forgotMsg && <div className="af-error">{forgotMsg}</div>}
+                {forgotLink && (
+                  <div className="af-error">
+                    Dev link (no mailer configured):{' '}
+                    <a href={forgotLink}>{forgotLink}</a>
+                  </div>
+                )}
+
+                <button type="submit" className="af-submit" disabled={forgotLoading}>
+                  <span>{forgotLoading ? 'Sending…' : 'Send reset link'}</span>
+                  {!forgotLoading && <ArrowRight className="w-4 h-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  className="af-alt"
+                  onClick={() => { setForgotMode(false); setForgotMsg(''); setForgotLink(''); }}
+                >
+                  ← Back to sign in
+                </button>
+              </form>
+            )}
 
             {isAdminLogin && (
               <button type="button" className="af-alt" onClick={() => onNavigate(ViewState.LOGIN)}>

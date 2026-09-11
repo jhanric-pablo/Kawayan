@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { JWTService } from './jwtService';
 import { logger } from '../utils/logger';
@@ -111,6 +112,16 @@ export class SupabaseService {
     return { user: safeUser, token };
   }
 
+  async getUserById(userId: string): Promise<Pick<User, 'id' | 'email' | 'role' | 'businessName' | 'theme'> | null> {
+    const { data: row, error } = await this.supabase
+      .from('users')
+      .select('id, email, role, business_name, theme')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !row) return null;
+    return { id: row.id, email: row.email, role: row.role, businessName: row.business_name, theme: row.theme };
+  }
+
   async logoutUser(): Promise<void> {
     // No-op for Supabase; session management is handled by JWT and localStorage
   }
@@ -140,6 +151,66 @@ export class SupabaseService {
       logger.error('updateUserPassword error', { error: error.message });
       throw error;
     }
+    return true;
+  }
+
+  // Returns a one-time reset token, or null if no such user (caller must not leak which).
+  async createPasswordReset(email: string): Promise<string | null> {
+    const normalizedEmail = normalizeEmail(email);
+    const { data: row } = await this.supabase
+      .from('users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+    if (!row) return null;
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(token, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    const { error } = await this.supabase.from('password_resets').insert({
+      id: Date.now().toString(),
+      user_id: row.id,
+      token_hash: tokenHash,
+      expires_at: expiresAt.toISOString(),
+    });
+    if (error) {
+      logger.error('createPasswordReset error', { error: error.message });
+      throw error;
+    }
+    return token;
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<boolean> {
+    const validation = JWTService.validatePasswordStrength(newPassword);
+    if (!validation.isValid) {
+      throw new Error(`Password requirements: ${validation.errors.join(', ')}`);
+    }
+
+    // ponytail: scans all unused, unexpired resets and bcrypt-compares each.
+    // Fine at this scale; store a lookup id alongside the hash if resets ever get heavy.
+    const { data: rows } = await this.supabase
+      .from('password_resets')
+      .select('*')
+      .eq('used', false)
+      .gt('expires_at', new Date().toISOString());
+    if (!rows || rows.length === 0) return false;
+
+    let match: any = null;
+    for (const r of rows) {
+      if (await bcrypt.compare(token, r.token_hash)) { match = r; break; }
+    }
+    if (!match) return false;
+
+    const passwordHash = await JWTService.hashPassword(newPassword);
+    const { error: upErr } = await this.supabase
+      .from('users')
+      .update({ password_hash: passwordHash })
+      .eq('id', match.user_id);
+    if (upErr) throw upErr;
+
+    await this.supabase.from('password_resets').update({ used: true }).eq('id', match.id);
+    logger.info('Password reset completed', { userId: match.user_id });
     return true;
   }
 
@@ -517,6 +588,25 @@ export class SupabaseService {
         }
       }
     }
+  }
+
+  async getPendingTransaction(userId: string): Promise<any | null> {
+    const { data, error } = await this.supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'PENDING')
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async failTransaction(transactionId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('transactions')
+      .update({ status: 'FAILED' })
+      .eq('id', transactionId);
+    if (error) throw error;
   }
 
   async cancelTransaction(transactionId: string, userId: string): Promise<void> {
@@ -996,6 +1086,26 @@ export class SupabaseService {
   }
 
   // Verification
+  // Business verification documents live in the private 'verifications' Storage bucket,
+  // keyed by userId so re-submits overwrite the previous file.
+  async uploadVerificationDoc(userId: string, buffer: Buffer, originalName: string, mimetype: string): Promise<string> {
+    const ext = originalName.includes('.') ? originalName.slice(originalName.lastIndexOf('.')) : '';
+    const storagePath = `${userId}/verif_${Date.now()}${ext}`;
+    const { error } = await this.supabase.storage
+      .from('verifications')
+      .upload(storagePath, buffer, { contentType: mimetype, upsert: true });
+    if (error) throw error;
+    return storagePath;
+  }
+
+  async getVerificationDocSignedUrl(storagePath: string): Promise<string> {
+    const { data, error } = await this.supabase.storage
+      .from('verifications')
+      .createSignedUrl(storagePath, 300); // 5 minutes
+    if (error || !data) throw error || new Error('Failed to create signed URL');
+    return data.signedUrl;
+  }
+
   async submitVerification(userId: string, businessAddress: string, businessPhone: string, documentName: string, documentPath: string): Promise<void> {
     const id = `verif_${userId}_${Date.now()}`;
     const { error } = await this.supabase

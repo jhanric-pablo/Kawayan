@@ -497,7 +497,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         await dialog.alert('Failed to generate image. Please try again.');
         return;
       }
-      const imageUrl = `${base}${base.includes('?') ? '&' : '?'}seed=${Date.now()}`;
+      // Cache-busting query param only makes sense for real URLs (Pollinations fallback);
+      // a data: URL is already unique per generation and a query string corrupts it.
+      const imageUrl = base.startsWith('data:') ? base : `${base}${base.includes('?') ? '&' : '?'}seed=${Date.now()}`;
       const updated: GeneratedPost = { ...generatedContent, imageUrl };
       setGeneratedContent(updated);
       if (updated.id) {

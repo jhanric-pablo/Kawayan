@@ -2,14 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
+import { GoogleGenAI } from '@google/genai';
 import { SupabaseService } from './services/supabaseService.ts';
 import { JWTService } from './services/jwtService.ts';
 import { logger } from './utils/logger.ts';
+import { sendEmail } from './utils/mailer.ts';
 
 // ESM fix for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -110,7 +111,9 @@ app.set('trust proxy', true);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Default 100kb is too small for posts carrying a Cloudflare-generated image
+// (returned as a base64 data URL, ~700KB-1MB, stored directly on the post).
+app.use(express.json({ limit: '10mb' }));
 
 // CSP Middleware to allow Social Plugins
 app.use((req, res, next) => {
@@ -170,19 +173,10 @@ const requireAdmin = (req, res, next) => {
 };
 
 // --- Multer File Upload (Business Verification Documents) ---
-const uploadDir = path.join(__dirname, 'uploads', 'verifications');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const verificationStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `verif_${Date.now()}${ext}`);
-  }
-});
-
+// Buffered in memory, then handed to SupabaseService to upload into the
+// private 'verifications' Storage bucket — no local disk involved.
 const uploadVerifDoc = multer({
-  storage: verificationStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
@@ -261,17 +255,9 @@ app.post('/api/auth/logout', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   const user = req.user;
   try {
-    const db = dbService['dbConfig'].getDatabase();
-    const row = db.prepare('SELECT id, email, role, business_name, theme FROM users WHERE id = ?').get(user.userId);
+    const row = await dbService.getUserById(user.userId);
     if (!row) return res.status(404).json({ error: 'User not found' });
-    
-    res.json({
-      id: row.id,
-      email: row.email,
-      role: row.role,
-      businessName: row.business_name,
-      theme: row.theme
-    });
+    res.json(row);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch user data' });
   }
@@ -318,6 +304,55 @@ app.put('/api/auth/password', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('Update password error', { error: error.message });
     res.status(500).json({ error: error.message || 'Failed to update password' });
+  }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  try {
+    const token = await dbService.createPasswordReset(normalizedEmail);
+    if (token) {
+      const base = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      const resetUrl = `${base}/?reset=${token}`;
+      logger.info('Password reset requested', { email: normalizedEmail, resetUrl });
+
+      const sent = await sendEmail(
+        normalizedEmail,
+        'Reset your Kawayan password',
+        `<p>Someone asked to reset the password for this Kawayan account.</p>
+         <p><a href="${resetUrl}">Reset your password</a> — this link expires in 1 hour.</p>
+         <p>If you didn't ask for this, you can ignore this email.</p>`
+      );
+
+      // Echo the link only when no mail was sent AND we're not in production
+      // (so a dev without RESEND_API_KEY can still click through).
+      const devResetUrl = !sent && process.env.NODE_ENV !== 'production' ? resetUrl : undefined;
+      return res.json({ message: 'If that email exists, a reset link has been sent.', devResetUrl });
+    }
+    // Same response whether or not the account exists (no enumeration).
+    return res.json({ message: 'If that email exists, a reset link has been sent.' });
+  } catch (error) {
+    logger.error('Forgot password error', { error: error.message });
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: 'Token and new password are required' });
+  }
+  try {
+    const ok = await dbService.resetPasswordWithToken(token, newPassword);
+    if (!ok) return res.status(400).json({ error: 'This reset link is invalid or has expired.' });
+    logger.logUserAction('reset_password', 'via-token');
+    res.json({ message: 'Password updated. You can now sign in.' });
+  } catch (error) {
+    logger.error('Reset password error', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to reset password' });
   }
 });
 
@@ -474,8 +509,7 @@ app.post('/api/wallet/cancel-transaction', authenticateToken, async (req, res) =
 app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
   const user = req.user;
   try {
-    const db = dbService['dbConfig'].getDatabase();
-    const pendingTxn = db.prepare("SELECT * FROM transactions WHERE user_id = ? AND status = 'PENDING'").get(user.userId);
+    const pendingTxn = await dbService.getPendingTransaction(user.userId);
 
     if (!pendingTxn) {
       return res.json({ status: 'NO_PENDING', message: "No pending transaction found." });
@@ -506,7 +540,7 @@ app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
             await dbService.approveTransaction(pendingTxn.id);
             return res.json({ status: 'COMPLETED', message: 'Payment verified and balance updated.' });
         } else if (invoice.status === 'EXPIRED') {
-             db.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = ?").run(pendingTxn.id);
+             await dbService.failTransaction(pendingTxn.id);
              return res.json({ status: 'FAILED', message: 'Payment expired.' });
         }
     }
@@ -933,9 +967,6 @@ app.post('/api/admin/subscription', authenticateToken, requireAdmin, async (req,
 // Business Verification Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Serve uploaded verification documents (admin only)
-app.use('/uploads/verifications', authenticateToken, requireAdmin, express.static(uploadDir));
-
 // Submit verification document (user, called right after registration)
 app.post('/api/verification/submit', authenticateToken, uploadVerifDoc.single('document'), async (req, res) => {
   try {
@@ -955,7 +986,8 @@ app.post('/api/verification/submit', authenticateToken, uploadVerifDoc.single('d
       return res.status(400).json({ error: 'Business address and phone are required' });
     }
 
-    await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, req.file.filename);
+    const storagePath = await dbService.uploadVerificationDoc(userId, req.file.buffer, req.file.originalname, req.file.mimetype);
+    await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, storagePath);
     broadcastVerificationChanged(userId);
     res.status(201).json({ message: 'Verification submitted', status: 'pending' });
   } catch (error) {
@@ -991,6 +1023,7 @@ app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single(
     }
     if (!req.file) return res.status(400).json({ error: 'No document uploaded' });
 
+    const storagePath = await dbService.uploadVerificationDoc(userId, req.file.buffer, req.file.originalname, req.file.mimetype);
     const existing = await dbService.getVerification(userId);
     if (!existing) {
       if (!businessAddress || !businessPhone) {
@@ -998,9 +1031,9 @@ app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single(
           error: 'No verification on file. Provide business address and phone for first-time submission.',
         });
       }
-      await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, req.file.filename);
+      await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, storagePath);
     } else {
-      await dbService.resubmitVerification(userId, req.file.originalname, req.file.filename);
+      await dbService.resubmitVerification(userId, req.file.originalname, storagePath);
     }
     broadcastVerificationChanged(userId);
     res.json({ message: 'Submitted for review', status: 'pending' });
@@ -1050,14 +1083,13 @@ app.post('/api/admin/verifications/:id/reject', authenticateToken, requireAdmin,
   }
 });
 
-// Admin — view document file (stream the file)
+// Admin — view document file (redirect to a short-lived signed Storage URL)
 app.get('/api/admin/verifications/:id/document', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const verif = await dbService.getVerificationById(req.params.id);
     if (!verif) return res.status(404).json({ error: 'Not found' });
-    const filePath = path.join(uploadDir, verif.document_path);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
-    res.sendFile(filePath);
+    const signedUrl = await dbService.getVerificationDocSignedUrl(verif.document_path);
+    res.redirect(signedUrl);
   } catch (error) {
     logger.error('View document error', { error: error.message });
     res.status(500).json({ error: error.message });
@@ -1450,39 +1482,104 @@ app.post('/api/ai/local', async (req, res) => {
   }
 });
 
-// --- Unsloth AI Proxy ---
-app.post('/api/ai/unsloth', async (req, res) => {
-  const url = process.env.UNSLOTH_API_URL || 'https://sharp-spies-doubt.loca.lt/v1/chat/completions';
-  const token = process.env.UNSLOTH_API_KEY || 'sk-unsloth-2ac78b9fd6f6d5f70b0b3f752a73ba60';
+// --- Gemini AI Proxy (text generation: content plans, captions, support bot) ---
+// Free-tier Flash model — API key stays server-side, never sent to the browser.
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
-  // Fail fast: a dead tunnel used to hang the request (and the caller's UI).
+app.post('/api/ai/gemini', async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+  if (!genAI) return res.status(503).json({ error: 'AI service not configured', degraded: true });
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.UNSLOTH_TIMEOUT_MS) || 20000);
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS) || 20000);
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Bypass-Tunnel-Reminder': 'true'
-      },
-      body: JSON.stringify(req.body),
-      signal: controller.signal,
+    const response = await genAI.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: prompt,
+      config: { abortSignal: controller.signal },
     });
+    res.json({ text: response.text || '' });
+  } catch (error) {
+    const aborted = error?.name === 'AbortError';
+    logger.warn('Gemini AI proxy error', { aborted, message: error?.message });
+    res.status(503).json({ error: aborted ? 'AI request timed out' : 'AI service unavailable', degraded: true });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
+// --- Gemini Image Proxy (post images) ---
+// NOTE: every Gemini image model (flash-image, flash-lite-image, pro-image) currently
+// returns free-tier quota limit: 0 for this project — image generation needs billing
+// enabled on the Google Cloud project tied to this API key. Route is wired and correct,
+// just unreachable on the free tier; the frontend calls Pollinations.ai directly instead.
+// Flip services/geminiService.ts's generateImageFromPrompt back to hit this route first
+// once billing is on.
+app.post('/api/ai/gemini-image', async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+  if (!genAI) return res.status(503).json({ error: 'AI service not configured', degraded: true });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS) || 30000);
+
+  try {
+    const response = await genAI.models.generateContent({
+      model: 'gemini-3.1-flash-image',
+      contents: prompt,
+      config: { responseModalities: ['IMAGE'], abortSignal: controller.signal },
+    });
+    const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (!part?.inlineData?.data) throw new Error('No image returned');
+    const dataUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+    res.json({ imageUrl: dataUrl });
+  } catch (error) {
+    const aborted = error?.name === 'AbortError';
+    logger.warn('Gemini image proxy error', { aborted, message: error?.message });
+    res.status(503).json({ error: aborted ? 'Image request timed out' : 'Image service unavailable', degraded: true });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
+// --- Cloudflare Workers AI Image Proxy (post images, free tier) ---
+app.post('/api/ai/cloudflare-image', async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !token) return res.status(503).json({ error: 'Image service not configured', degraded: true });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.CLOUDFLARE_TIMEOUT_MS) || 30000);
+
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+        signal: controller.signal,
+      }
+    );
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      throw new Error(`Unsloth API Error: ${response.status} - ${errText}`);
+      throw new Error(`Cloudflare Workers AI error: ${response.status} - ${errText}`);
     }
 
-    const data = await response.json();
-    res.json(data);
+    // Success returns the raw image bytes (image/png), not JSON.
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+    res.json({ imageUrl: dataUrl });
   } catch (error) {
     const aborted = error?.name === 'AbortError';
-    logger.warn('Unsloth AI proxy unavailable', { aborted, message: error?.message });
-    // 503 is correct here; the client already has offline fallbacks.
-    res.status(503).json({ error: aborted ? 'AI request timed out' : 'AI service unavailable', degraded: true });
+    logger.warn('Cloudflare image proxy error', { aborted, message: error?.message });
+    res.status(503).json({ error: aborted ? 'Image request timed out' : 'Image service unavailable', degraded: true });
   } finally {
     clearTimeout(timeout);
   }

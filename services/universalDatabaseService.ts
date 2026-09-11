@@ -1,45 +1,23 @@
-// Universal database service that works in both browser and Node.js environments
+// Wraps the browser-side (localStorage) database service behind a stable async
+// interface. The real backend is server.js -> SupabaseService over the API;
+// this class is only ever used from frontend components (App.tsx, Login.tsx, etc).
 import { User, BrandProfile, GeneratedPost } from '../types';
 import { logger } from '../utils/logger';
-
-// Dynamic import for better-sqlite3 (only works in Node.js)
-const isNodeEnvironment = typeof window === 'undefined';
-
-class DatabaseServiceFactory {
-  static async createService() {
-    if (isNodeEnvironment) {
-      // Node.js environment - use SQLite
-      const { DatabaseService } = await import('./databaseService');
-      return new DatabaseService();
-    } else {
-      // Browser environment - use localStorage
-      const { ClientDatabaseService } = await import('./clientDatabaseService');
-      return new ClientDatabaseService();
-    }
-  }
-}
 
 export class UniversalDatabaseService {
   private service: any;
 
   constructor() {
-    // Store promise that resolves to the appropriate service
     this.initializeService();
   }
 
   private async initializeService() {
     try {
-      this.service = await DatabaseServiceFactory.createService();
-      logger.info(`Database service initialized`, { 
-        environment: isNodeEnvironment ? 'Node.js/SQLite' : 'Browser/LocalStorage' 
-      });
+      const { ClientDatabaseService } = await import('./clientDatabaseService');
+      this.service = new ClientDatabaseService();
+      logger.info('Database service initialized', { environment: 'Browser/LocalStorage' });
     } catch (error) {
-      logger.error('Failed to initialize database service', { error, environment: isNodeEnvironment ? 'Node.js' : 'Browser' });
-      // Fallback to localStorage if SQLite fails
-      if (isNodeEnvironment) {
-        const { ClientDatabaseService } = await import('./clientDatabaseService');
-        this.service = new ClientDatabaseService();
-      }
+      logger.error('Failed to initialize database service', { error });
     }
   }
 
@@ -94,15 +72,8 @@ export class UniversalDatabaseService {
   }
 
   getCurrentUser(): User | null {
-    if (isNodeEnvironment) {
-      // Node.js - need to handle async
-      logger.warn('getCurrentUser called in Node.js environment - should be async');
-      return null;
-    } else {
-      // Browser - can use localStorage directly
-      const session = localStorage.getItem('kawayan_session');
-      return session ? JSON.parse(session) : null;
-    }
+    const session = localStorage.getItem('kawayan_session');
+    return session ? JSON.parse(session) : null;
   }
 
   async getCurrentUserAsync(): Promise<User | null> {
@@ -238,7 +209,7 @@ export class UniversalDatabaseService {
   }
 
   static isClientEnvironment(): boolean {
-    return !isNodeEnvironment;
+    return true;
   }
 }
 

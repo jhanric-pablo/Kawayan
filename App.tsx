@@ -5,6 +5,7 @@ import BrandSurvey from './components/BrandSurvey';
 import ContentCalendar from './components/ContentCalendar';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './components/Login';
+import ResetPassword from './components/auth/ResetPassword';
 import LandingPage from './components/LandingPage';
 import LandingNav from './components/landing/LandingNav';
 import Settings from './components/Settings';
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [darkMode, setDarkMode] = useState(() => readThemeFromSession());
   const [dbService] = useState(() => new UniversalDatabaseService());
+  const [resetToken, setResetToken] = useState<string | null>(null);
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
@@ -155,6 +157,16 @@ const App: React.FC = () => {
 
       try {
         const urlParams = new URLSearchParams(window.location.search);
+
+        // Password reset link: skip session restore, go straight to the form.
+        const resetTok = urlParams.get('reset');
+        if (resetTok) {
+          setResetToken(resetTok);
+          navigateView(ViewState.RESET_PASSWORD);
+          setIsHydrating(false);
+          return;
+        }
+
         const isPaymentSuccess = urlParams.get('success') === 'true';
 
         let currentUser = await dbService.getCurrentUserAsync();
@@ -400,7 +412,7 @@ const App: React.FC = () => {
   // Safe navigation guard for logged in users
   const isLoggedIn = user !== null;
 
-  const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN];
+  const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN, ViewState.RESET_PASSWORD];
   const isAuthView = authViews.includes(view);
   const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
 
@@ -558,6 +570,8 @@ const App: React.FC = () => {
                     return <Login onLogin={handleLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
                   case ViewState.ADMIN_LOGIN:
                     return <Login onLogin={handleLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+                  case ViewState.RESET_PASSWORD:
+                    return <ResetPassword token={resetToken} onNavigate={navigateView} />;
                   case ViewState.VERIFICATION:
                     return (
                       <VerificationStatusScreen

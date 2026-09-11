@@ -3,28 +3,23 @@ import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
 import { normalizeIdeasToBatchCount } from "../utils/tierLimits";
 
-// --- UNSLOTH LLM API (BACKEND PROXIED) ---
-const callUnslothLLM = async (prompt: string): Promise<string> => {
-  const response = await fetch('/api/ai/unsloth', {
+// --- GEMINI LLM API (BACKEND PROXIED — key never reaches the browser) ---
+const callGeminiLLM = async (prompt: string): Promise<string> => {
+  const response = await fetch('/api/ai/gemini', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      messages: [
-        { role: 'user', content: prompt }
-      ],
-      stream: false
-    })
+    body: JSON.stringify({ prompt })
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Unsloth Proxy Error: ${response.status} - ${errText}`);
+    throw new Error(`Gemini Proxy Error: ${response.status} - ${errText}`);
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  return data.text || "";
 };
 
 const stripThinking = (text: string) => {
@@ -48,8 +43,7 @@ const extractJson = (text: string) => {
 };
 
 const generateWithFallback = async (prompt: string) => {
-  console.log("Attempting Unsloth LLM API...");
-  return await callUnslothLLM(prompt);
+  return await callGeminiLLM(prompt);
 };
 
 export const generateContentPlan = async (
@@ -127,8 +121,25 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
   }
 };
 
+// Cloudflare Workers AI (free tier, Stable Diffusion XL) is the primary image source.
+// Falls back to Pollinations.ai (free, no key) if Cloudflare isn't configured or errors.
+// (Gemini's image models all return free-tier quota limit: 0 on this project — see
+// server.js's /api/ai/gemini-image, wired and ready if billing is ever enabled there.)
 export const generateImageFromPrompt = async (prompt: string): Promise<string | null> => {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1080&height=1080&nologo=true`;
+  try {
+    const response = await fetch('/api/ai/cloudflare-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!response.ok) throw new Error(`Cloudflare image proxy error: ${response.status}`);
+    const data = await response.json();
+    if (data.imageUrl) return data.imageUrl;
+    throw new Error('No image returned');
+  } catch (e: any) {
+    logger.error("Cloudflare image generation failed, falling back to Pollinations:", e.message);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1080&height=1080&nologo=true`;
+  }
 };
 
 export const getTrendingTopicsPH = async (industry?: string): Promise<string[]> => {

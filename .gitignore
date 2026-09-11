@@ -44,3 +44,6 @@ coverage
 *.sw?
 # Temporary recovery folder
 recover/
+
+# User-uploaded verification documents (PII)
+uploads/
