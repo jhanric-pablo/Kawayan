@@ -1245,17 +1245,22 @@ export class SupabaseService {
     // Nothing to close for Supabase
   }
 
-  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+  async healthCheck(): Promise<{ status: string; timestamp: string; detail?: string }> {
     try {
       const { data, error } = await this.supabase.from('users').select('id').limit(1);
       return {
         status: error ? 'unhealthy' : 'healthy',
         timestamp: new Date().toISOString(),
+        // TEMP diagnostic (2026-09-12): surfacing the real Supabase error to
+        // debug a live deploy issue. Revert once resolved — do not leave a
+        // public endpoint leaking backend error detail long-term.
+        ...(error ? { detail: `${error.message} (code: ${error.code})` } : {}),
       };
-    } catch {
+    } catch (e: any) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
+        detail: e?.message || String(e),
       };
     }
   }
