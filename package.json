@@ -8,6 +8,7 @@
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "server": "npx tsx watch server.js",
     "build": "vite build",
+    "start": "npx tsx server.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "guide:system-pdf": "node scripts/generate-system-guide-pdf.mjs"

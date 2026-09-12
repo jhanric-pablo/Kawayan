@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: kawayan-ai
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npx tsx server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render sets PORT itself; server.js already reads process.env.PORT.
+
+      # Supabase — Project Settings -> API in your Supabase dashboard.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+
+      # Auth
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_TIMEOUT
+        value: 24h
+
+      # Email (password reset links)
+      - key: APP_URL
+        sync: false # your Render URL, e.g. https://kawayan-ai.onrender.com
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
+      # Google Gemini AI (text generation)
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Cloudflare Workers AI (image generation)
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+
+      # Payments (Xendit)
+      - key: XENDIT_SECRET_KEY
+        sync: false
+      - key: XENDIT_WEBHOOK_VERIFICATION_TOKEN
+        sync: false
+
+      # Social (TikTok)
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: VITE_TIKTOK_CLIENT_KEY
+        sync: false
+
+      - key: LOG_LEVEL
+        value: info
