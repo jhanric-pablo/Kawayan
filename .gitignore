@@ -47,3 +47,6 @@ recover/
 
 # User-uploaded verification documents (PII)
 uploads/
+
+# Local Impeccable design-tool cache/config
+.impeccable/

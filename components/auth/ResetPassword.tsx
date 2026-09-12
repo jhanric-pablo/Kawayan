@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ViewState } from '../../types';
 import { ValidationService } from '../../services/validationService';
-import { ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
-import './authScreen.css';
+import { ArrowRight, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import AuthShell from './AuthShell';
+import AuthField from './AuthField';
+import PasswordMeter from './PasswordMeter';
 
 interface Props {
   token: string | null;
@@ -47,86 +49,84 @@ const ResetPassword: React.FC<Props> = ({ token, onNavigate }) => {
   };
 
   return (
-    <div className="af-screen">
-      <div className="af-grid">
-        <button type="button" className="af-back" onClick={() => onNavigate(ViewState.LANDING)}>
-          ← Kawayan
-        </button>
-
-        <div className="af-formwrap" style={{ gridColumn: '1 / -1' }}>
-          <div className="af-formcard">
-            <p className="af-formcard__title">Set a new password</p>
-
-            {done ? (
-              <>
-                <p className="af-sub">Your password has been updated.</p>
-                <button type="button" className="af-submit" onClick={() => onNavigate(ViewState.LOGIN)}>
-                  <span>Go to sign in</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </>
-            ) : (
-              <form onSubmit={submit} className="af-form">
-                <div className="af-field af-field--icon">
-                  <span className="af-field__icon" aria-hidden="true"><Lock /></span>
-                  <input
-                    id="rp-pw"
-                    className="af-input"
-                    type={show ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder=" "
-                    required
-                    autoComplete="new-password"
-                  />
-                  <label htmlFor="rp-pw" className="af-label">New password</label>
-                  <div className="af-trailing">
-                    <button type="button" className="af-show" tabIndex={-1} onClick={() => setShow((s) => !s)}
-                      aria-label={show ? 'Hide password' : 'Show password'}>
-                      {show ? <EyeOff /> : <Eye />}
-                    </button>
-                  </div>
-                  <span className="af-underline" aria-hidden="true" />
-                </div>
-
-                <div className="af-field af-field--icon">
-                  <span className="af-field__icon" aria-hidden="true"><Lock /></span>
-                  <input
-                    id="rp-confirm"
-                    className="af-input"
-                    type={show ? 'text' : 'password'}
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    placeholder=" "
-                    required
-                    autoComplete="new-password"
-                  />
-                  <label htmlFor="rp-confirm" className="af-label">Confirm password</label>
-                  <span className="af-underline" aria-hidden="true" />
-                </div>
-
-                {errors.length > 0 && (
-                  <div className="af-error">
-                    <strong>Password needs</strong>
-                    <ul>{errors.map((er, i) => <li key={i}>{er}</li>)}</ul>
-                  </div>
-                )}
-                {error && <div className="af-error">{error}</div>}
-
-                <button type="submit" className="af-submit" disabled={loading}>
-                  <span>{loading ? 'Just a sec…' : 'Update password'}</span>
-                  {!loading && <ArrowRight className="w-4 h-4" />}
-                </button>
-
-                <button type="button" className="af-alt" onClick={() => onNavigate(ViewState.LOGIN)}>
-                  ← Back to sign in
-                </button>
-              </form>
-            )}
-          </div>
+    <AuthShell
+      onBack={() => onNavigate(ViewState.LANDING)}
+      eyebrow="Account recovery"
+      title={done ? <>You’re all <em>set.</em></> : <>Set a new <em>password.</em></>}
+      subtitle={done
+        ? 'Your password has been updated — sign in to pick up where you left off.'
+        : 'Choose something strong you haven’t used elsewhere.'}
+      footer={
+        <div className="ax__foot">
+          <span className="ax__foot-item"><ShieldCheck /> This link expires in 1 hour</span>
         </div>
-      </div>
-    </div>
+      }
+    >
+      {done ? (
+        <div className="ax-form">
+          <button type="button" className="ax-btn ax-btn--primary" onClick={() => onNavigate(ViewState.LOGIN)}>
+            <span>Go to sign in</span>
+            <ArrowRight />
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="ax-form">
+          <AuthField
+            id="rp-pw"
+            label="New password"
+            type={show ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus
+            autoComplete="new-password"
+            icon={<Lock />}
+            trailing={
+              <button
+                type="button"
+                className="ax-eye"
+                tabIndex={-1}
+                onClick={() => setShow((s) => !s)}
+                aria-label={show ? 'Hide password' : 'Show password'}
+              >
+                {show ? <EyeOff /> : <Eye />}
+              </button>
+            }
+          />
+          <PasswordMeter password={password} />
+
+          <AuthField
+            id="rp-confirm"
+            label="Confirm password"
+            type={show ? 'text' : 'password'}
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            autoComplete="new-password"
+            icon={<Lock />}
+          />
+
+          {errors.length > 0 && (
+            <div className="ax-error">
+              <strong>Password needs</strong>
+              <ul>{errors.map((er, i) => <li key={i}>{er}</li>)}</ul>
+            </div>
+          )}
+          {error && <div className="ax-error">{error}</div>}
+
+          <div className="ax-actions">
+            <button type="submit" className="ax-btn ax-btn--primary" disabled={loading}>
+              <span>{loading ? 'Just a sec…' : 'Update password'}</span>
+              {!loading && <ArrowRight />}
+            </button>
+          </div>
+
+          <button type="button" className="ax-link" onClick={() => onNavigate(ViewState.LOGIN)}>
+            ← Back to sign in
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 };
 

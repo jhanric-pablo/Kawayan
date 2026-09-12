@@ -179,6 +179,9 @@ const uploadVerifDoc = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (_req, file, cb) => {
+    // Multer/busboy decodes multipart filenames as latin1; re-decode as utf8 so
+    // non-ASCII names (accents, macOS's narrow no-break space in "7.50.03 AM") render correctly.
+    file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
     if (allowed.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPG, PNG, or PDF files are accepted'));
@@ -1503,8 +1506,10 @@ app.post('/api/ai/gemini', async (req, res) => {
     res.json({ text: response.text || '' });
   } catch (error) {
     const aborted = error?.name === 'AbortError';
-    logger.warn('Gemini AI proxy error', { aborted, message: error?.message });
-    res.status(503).json({ error: aborted ? 'AI request timed out' : 'AI service unavailable', degraded: true });
+    const isQuota = /RESOURCE_EXHAUSTED|429/.test(error?.message || '');
+    logger.warn('Gemini AI proxy error', { aborted, isQuota, message: error?.message });
+    const message = aborted ? 'AI request timed out' : isQuota ? 'Gemini API quota exceeded' : 'AI service unavailable';
+    res.status(isQuota ? 429 : 503).json({ error: message, degraded: true });
   } finally {
     clearTimeout(timeout);
   }

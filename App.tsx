@@ -412,6 +412,18 @@ const App: React.FC = () => {
   // Safe navigation guard for logged in users
   const isLoggedIn = user !== null;
 
+  // A 'user' account that isn't verified yet must stay on the verification
+  // screen — used by every user-clickable nav trigger (pills, brand mark).
+  // Internal auth/logout/session-transition code calls navigateView directly,
+  // since at those call sites `user`/`verifStatus` are stale closures mid-transition.
+  const goTo = (next: ViewState) => {
+    if (isLoggedIn && user?.role === 'user' && verifStatus !== 'verified' && next !== ViewState.VERIFICATION) {
+      navigateView(ViewState.VERIFICATION);
+      return;
+    }
+    navigateView(next);
+  };
+
   const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN, ViewState.RESET_PASSWORD];
   const isAuthView = authViews.includes(view);
   const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
@@ -434,7 +446,7 @@ const App: React.FC = () => {
             {/* Brand */}
             <div
               className="flex items-center gap-2.5 cursor-pointer select-none"
-              onClick={() => navigateView(isLoggedIn && user ? getHomeViewForRole(user.role) : ViewState.LANDING)}
+              onClick={() => goTo(isLoggedIn && user ? getHomeViewForRole(user.role) : ViewState.LANDING)}
             >
               <img src="/logo.png" alt="Kawayan" className="w-8 h-8 rounded-xl object-contain" />
               <span className="font-display text-xl font-bold" style={{ color: 'var(--fg)' }}>
@@ -461,8 +473,9 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Role-based nav pills */}
-                  {user?.role !== 'admin' && (
+                  {/* Role-based nav pills — hidden entirely (not just blocked)
+                      for a 'user' account that isn't verified yet. */}
+                  {user?.role !== 'admin' && !(user?.role === 'user' && verifStatus !== 'verified') && (
                     <div className="flex items-center p-1 rounded-xl gap-0.5 border"
                       style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
                       {[
@@ -473,7 +486,7 @@ const App: React.FC = () => {
                       ].filter(item => item.roles.includes(user?.role || '')).map((item) => (
                         <button
                           key={item.id}
-                          onClick={() => navigateView(item.id)}
+                          onClick={() => goTo(item.id)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             view === item.id ? 'nav-item-active' : 'hover:text-[var(--fg)]'
                           }`}

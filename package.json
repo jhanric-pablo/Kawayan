@@ -49,6 +49,7 @@
     "@types/nodemailer": "^8.0.1",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.2.1",
+    "playwright": "^1.63.0",
     "ts-essentials": "^9.4.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",

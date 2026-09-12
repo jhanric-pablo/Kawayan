@@ -3,6 +3,7 @@ import { ViewState } from '../types';
 import {
   ArrowRight, Sparkles, Calendar, Zap, CheckCircle2,
   Wand2, Share2, Store, Heart, MessageCircle, Send, Bookmark, Loader2,
+  ShieldCheck, Lock, UserCheck,
 } from 'lucide-react';
 import HeroBackground from './landing/HeroBackground';
 import WhyKawayan from './landing/WhyKawayan';
@@ -38,6 +39,13 @@ const FAQS = [
   { q: 'Is the AI actually good at Taglish?', a: 'It is tuned for Filipino business culture — hugot, diskarte, and everyday Taglish — not a literal English-to-Tagalog translation.' },
   { q: 'Can I edit what the AI writes?', a: 'Always. Every caption, hashtag, and image prompt is fully editable, and you can upload your own photo to replace the AI visual.' },
   { q: 'What happens when I run out of posts?', a: 'Add single posts anytime for ₱150 each, or upgrade to Pro (₱499/mo) for 16 posts, analytics, and priority generation.' },
+];
+
+const TRUST_ITEMS = [
+  { Icon: Lock, label: 'Encrypted end-to-end' },
+  { Icon: UserCheck, label: 'Manual business verification' },
+  { Icon: ShieldCheck, label: 'PH-based, Taglish support' },
+  { Icon: CheckCircle2, label: 'No credit card required' },
 ];
 
 const PLANS = [
@@ -453,6 +461,9 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
     mouseRef.current = { x: (e.clientX - cx) / cx, y: (e.clientY - cy) / cy };
   };
 
+  // FAQ answers expand/collapse independently (not an exclusive accordion).
+  const [openFaqs, setOpenFaqs] = useState<Set<string>>(new Set());
+
   // Click the product console → dim + blur the rest of the page and lift/zoom it.
   // Click again, click the backdrop, or press Escape to exit.
   const [consoleFocus, setConsoleFocus] = useState(false);
@@ -516,7 +527,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           </div>
 
           <div ref={indicatorRef} className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-white/40 animate-bounce transition-opacity duration-500">
-            <span className="text-[9px] font-bold uppercase tracking-[0.25em]">Scroll to explore</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em]">Scroll to explore</span>
             <div className="w-px h-8" style={{ background: 'linear-gradient(to bottom, #9CB080, transparent)' }} />
           </div>
 
@@ -532,7 +543,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                 style={{ filter: 'drop-shadow(0 4px 30px rgba(0,0,0,0.85))' }}
               >
                 Social Media <br />
-                <span style={{ WebkitTextFillColor: 'transparent', background: 'linear-gradient(115deg, #E4EFD9, #9CB080 55%, #6FAE8C)', WebkitBackgroundClip: 'text', backgroundClip: 'text' }}>
+                <span style={{ color: '#9CB080' }}>
                   On Autopilot.
                 </span>
               </h1>
@@ -648,6 +659,9 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           ))}
         </div>
       </div>
+
+      {/* ══ Why Kawayan — the meaning behind the name (moved up: brand trust before the funnel) ══ */}
+      <WhyKawayan />
 
       {/* ══ How it works ══ */}
       <section id="how" className="relative z-10 bg-slate-50 dark:bg-slate-900 py-28 sm:py-32 overflow-hidden">
@@ -777,9 +791,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* ══ Why Kawayan — the meaning behind the name ══ */}
-      <WhyKawayan />
-
       {/* ══ Pricing ══ */}
       <section id="pricing" className="relative z-10 bg-white dark:bg-slate-900 py-28 sm:py-32 border-t border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="lp-blob lp-blob--sage w-[440px] h-[440px] -left-32 bottom-10" data-parallax="0.09" />
@@ -840,6 +851,20 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </section>
 
+      {/* ══ Trust strip ══ */}
+      <section className="relative z-10 bg-white dark:bg-slate-900 py-12 border-t border-slate-200 dark:border-slate-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="lp-trust reveal">
+            {TRUST_ITEMS.map(({ Icon, label }) => (
+              <div className="lp-trust__item" key={label}>
+                <Icon className="lp-trust__icon" aria-hidden="true" />
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ══ FAQ ══ */}
       <section className="relative z-10 bg-slate-50 dark:bg-slate-900 py-28 sm:py-32">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -850,12 +875,29 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             </h2>
           </div>
           <div className="lp-faq reveal">
-            {FAQS.map((f) => (
-              <details key={f.q} className="lp-faq__item">
-                <summary className="lp-faq__q">{f.q}</summary>
-                <p className="lp-faq__a">{f.a}</p>
-              </details>
-            ))}
+            {FAQS.map((f) => {
+              const isOpen = openFaqs.has(f.q);
+              return (
+                <div key={f.q} className={`lp-faq__item${isOpen ? ' is-open' : ''}`}>
+                  <button
+                    type="button"
+                    className="lp-faq__q"
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-a-${f.q}`}
+                    onClick={() => setOpenFaqs((prev) => {
+                      const next = new Set(prev);
+                      next.has(f.q) ? next.delete(f.q) : next.add(f.q);
+                      return next;
+                    })}
+                  >
+                    {f.q}
+                  </button>
+                  <div className="lp-faq__a-wrap" id={`faq-a-${f.q}`}>
+                    <p className="lp-faq__a">{f.a}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

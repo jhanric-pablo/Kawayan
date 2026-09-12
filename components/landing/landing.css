@@ -68,7 +68,7 @@
   border-radius: 12px;
   border: 1.5px solid currentColor;
   opacity: 0.22;
-  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
 }
 .lnav__brand:hover .lnav__logo-ring { transform: rotate(90deg) scale(1.1); opacity: 0.55; }
 .lnav__word {
@@ -527,7 +527,7 @@
   display: flex; align-items: center;
   padding: 0 4px;
   color: #fff;
-  animation: lp-chip-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation: lp-chip-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 @keyframes lp-chip-in { from { opacity: 0; transform: translateY(5px) scale(0.7); } to { opacity: 1; transform: none; } }
 .lp-cal__chip--idea { background: #C2772E; }
@@ -626,7 +626,7 @@
   font-size: 8.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
   transform: rotate(-7deg) scale(1.7);
   opacity: 0;
-  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
 }
 .lp-pv__stamp[data-shown='true'] { transform: rotate(-7deg) scale(1); opacity: 1; }
 
@@ -683,7 +683,7 @@
 }
 .lp-console__badge[data-on='true'] { opacity: 1; }
 .lp-console__badge svg { color: #2B5748; }
-.lp-console__badge[data-on='true'] svg { animation: lp-badge-tick 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.lp-console__badge[data-on='true'] svg { animation: lp-badge-tick 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes lp-badge-tick { 0% { transform: scale(0.3); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
 .lp-console__badge--tl { top: -16px; left: -10px; }
 .lp-console__badge--br { bottom: 22px; right: -10px; animation-delay: -3s; }
@@ -804,6 +804,26 @@
 .lp-quote__name { font-size: 0.82rem; font-weight: 700; color: var(--fg); }
 .lp-quote__role { font-size: 0.74rem; color: var(--fg-subtle); }
 
+/* ═══ Trust strip ═══════════════════════════════════════════════ */
+.lp-trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1.75rem 2.75rem;
+}
+.lp-trust__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.lp-trust__icon { width: 17px; height: 17px; color: #2B5748; flex-shrink: 0; }
+.dark .lp-trust__icon { color: #9CB080; }
+
 /* ═══ FAQ ══════════════════════════════════════════════════════ */
 .lp-faq { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
 .lp-faq__item {
@@ -813,9 +833,12 @@
   overflow: hidden;
   transition: border-color 0.2s ease;
 }
-.lp-faq__item[open] { border-color: var(--border-strong); }
+.lp-faq__item.is-open { border-color: var(--border-strong); }
 .lp-faq__q {
-  list-style: none;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
   cursor: pointer;
   padding: 16px 18px;
   font-family: var(--font-display);
@@ -828,22 +851,36 @@
   justify-content: space-between;
   gap: 12px;
 }
-.lp-faq__q::-webkit-details-marker { display: none; }
 .lp-faq__q::after {
   content: "+";
   font-family: var(--font-ui);
   font-size: 1.3rem;
   font-weight: 400;
   color: var(--fg-muted);
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
-.lp-faq__item[open] .lp-faq__q::after { transform: rotate(45deg); }
+.lp-faq__item.is-open .lp-faq__q::after { transform: rotate(45deg); }
+/* Grid-rows trick animates height without measuring it in JS: 0fr -> 1fr. */
+.lp-faq__a-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-faq__item.is-open .lp-faq__a-wrap { grid-template-rows: 1fr; }
+.lp-faq__a-wrap > .lp-faq__a { overflow: hidden; }
 .lp-faq__a {
   padding: 0 18px 16px;
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--fg-muted);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.lp-faq__item.is-open .lp-faq__a { opacity: 1; transition-delay: 0.08s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-faq__a-wrap, .lp-faq__a, .lp-faq__q::after { transition-duration: 0.01ms; }
 }
 
 /* ═══ Animated gradient border (featured pricing) ══════════════ */
@@ -942,8 +979,8 @@
   opacity: 0;
   transform: translateX(-0.45em) rotate(-14deg);
   transition:
-    opacity 0.7s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.7s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity 0.7s 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal.is-in .lp-why__word-accent { opacity: 1; transform: none; }
 .lp-why__underline {
@@ -962,7 +999,7 @@
 .lp-why .lp-eyebrow--on-dark {
   opacity: 0;
   transform: translateY(9px) scale(0.94);
-  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .lp-why .reveal.is-in .lp-eyebrow--on-dark { opacity: 1; transform: none; }
 
@@ -1068,15 +1105,8 @@
   color: #0E241C;
   background: linear-gradient(140deg, #C2D6B6, #9CB080);
   box-shadow: 0 12px 30px -8px rgba(156, 176, 128, 0.55);
-  transform-origin: 72% 82%;
-  animation: lp-wave-hand 3.6s ease-in-out infinite;
 }
-@keyframes lp-wave-hand {
-  0%, 58%, 100% { transform: rotate(0deg); }
-  66% { transform: rotate(16deg); }
-  76% { transform: rotate(-9deg); }
-  86% { transform: rotate(11deg); }
-}
+.lp-why-card__glyph-svg { width: 34px; height: 34px; overflow: visible; }
 .lp-ripple {
   position: absolute;
   width: 54px; height: 54px;
@@ -1091,32 +1121,93 @@
   100% { transform: scale(3.2); opacity: 0; }
 }
 
-/* — kawayan: growing bamboo — */
-.lp-bamboo { width: 90px; height: 118px; overflow: visible; transform-origin: 50% 100%; }
-/* once grown, sway gently like bamboo in the wind */
-.lp-why-card.is-in .lp-bamboo { animation: lp-bamboo-sway 5.5s 1.8s ease-in-out infinite; }
-@keyframes lp-bamboo-sway {
-  0%, 100% { transform: rotate(-1.7deg); }
-  50% { transform: rotate(1.7deg); }
+/* — kaway: detailed waving hand — wrist swings, each digit trails a beat
+   behind for a real gesture, motion-trail arcs flick in at the peak. */
+.lp-hand__trail { opacity: 0; }
+.lp-why-card.is-in .lp-hand__trail { animation: lp-hand-trail 3.6s ease-in-out infinite; }
+@keyframes lp-hand-trail {
+  0%, 55%, 100% { opacity: 0; }
+  68% { opacity: 1; }
+  80% { opacity: 0; }
 }
-.lp-bamboo__stalk {
+.lp-hand__group { transform-origin: 50% 88%; }
+.lp-why-card.is-in .lp-hand__group { animation: lp-wave-hand 3.6s ease-in-out infinite; }
+@keyframes lp-wave-hand {
+  0%, 58%, 100% { transform: rotate(0deg); }
+  66% { transform: rotate(18deg); }
+  76% { transform: rotate(-10deg); }
+  86% { transform: rotate(13deg); }
+}
+.lp-hand__digit { transform-box: fill-box; }
+.lp-hand__digit--1, .lp-hand__digit--2, .lp-hand__digit--3, .lp-hand__digit--4 { transform-origin: 50% 100%; }
+.lp-hand__digit--thumb { transform-origin: 85% 85%; }
+.lp-why-card.is-in .lp-hand__digit--1 { animation: lp-finger-fan 3.6s ease-in-out infinite; animation-delay: 0.02s; }
+.lp-why-card.is-in .lp-hand__digit--2 { animation: lp-finger-fan 3.6s ease-in-out infinite; animation-delay: 0.05s; }
+.lp-why-card.is-in .lp-hand__digit--3 { animation: lp-finger-fan 3.6s ease-in-out infinite; animation-delay: 0.08s; }
+.lp-why-card.is-in .lp-hand__digit--4 { animation: lp-finger-fan 3.6s ease-in-out infinite; animation-delay: 0.11s; }
+.lp-why-card.is-in .lp-hand__digit--thumb { animation: lp-thumb-fan 3.6s ease-in-out infinite; }
+@keyframes lp-finger-fan {
+  0%, 58%, 100% { transform: rotate(0deg); }
+  70% { transform: rotate(9deg); }
+  82% { transform: rotate(-5deg); }
+}
+@keyframes lp-thumb-fan {
+  0%, 58%, 100% { transform: rotate(0deg); }
+  70% { transform: rotate(-7deg); }
+  82% { transform: rotate(4deg); }
+}
+
+/* — kawayan: 3-stalk bamboo cluster — grows joint by joint, then each
+   stalk and leafset settles into its own independent gentle sway. */
+.lp-bamboo2 { width: 100px; height: 118px; overflow: visible; }
+.lp-bamboo2__seg {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  transform: scaleY(0.04);
-  transition: transform 1.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scaleY(0.05);
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.lp-bamboo__node { opacity: 0.55; }
-.lp-bamboo__leaf {
+.lp-bamboo2__stalk--c .lp-bamboo2__seg--1 { transition-delay: 0.1s; }
+.lp-bamboo2__stalk--c .lp-bamboo2__seg--2 { transition-delay: 0.35s; }
+.lp-bamboo2__stalk--c .lp-bamboo2__seg--3 { transition-delay: 0.6s; }
+.lp-bamboo2__stalk--c .lp-bamboo2__seg--4 { transition-delay: 0.85s; }
+.lp-bamboo2__stalk--l .lp-bamboo2__seg--1 { transition-delay: 0.25s; }
+.lp-bamboo2__stalk--l .lp-bamboo2__seg--2 { transition-delay: 0.5s; }
+.lp-bamboo2__stalk--r .lp-bamboo2__seg--1 { transition-delay: 0.4s; }
+.lp-bamboo2__stalk--r .lp-bamboo2__seg--2 { transition-delay: 0.65s; }
+.lp-why-card.is-in .lp-bamboo2__seg { transform: scaleY(1); }
+
+.lp-bamboo2__node { opacity: 0; transition: opacity 0.4s ease 1.1s; }
+.lp-why-card.is-in .lp-bamboo2__node { opacity: 0.6; }
+
+.lp-bamboo2__leafset {
   transform-box: fill-box;
   opacity: 0;
-  transform: scale(0.12);
-  transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.15);
+  transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.lp-bamboo__leaf--l { transform-origin: 100% 100%; transition-delay: 0.95s; }
-.lp-bamboo__leaf--c { transform-origin: 50% 100%; transition-delay: 1.15s; }
-.lp-bamboo__leaf--r { transform-origin: 0% 100%; transition-delay: 1.35s; }
-.lp-why-card.is-in .lp-bamboo__stalk { transform: scaleY(1); }
-.lp-why-card.is-in .lp-bamboo__leaf { opacity: 1; transform: scale(1); }
+.lp-bamboo2__leafset--crown { transform-origin: 50% 100%; transition-delay: 1.05s; }
+.lp-bamboo2__leafset--mid { transform-origin: 100% 100%; transition-delay: 0.85s; }
+.lp-bamboo2__leafset--l1 { transform-origin: 100% 100%; transition-delay: 0.55s; }
+.lp-bamboo2__leafset--r1 { transform-origin: 0% 100%; transition-delay: 0.7s; }
+.lp-why-card.is-in .lp-bamboo2__leafset { opacity: 1; transform: scale(1); }
+
+.lp-bamboo2__stalk { transform-box: fill-box; transform-origin: 50% 100%; }
+.lp-why-card.is-in .lp-bamboo2__stalk--c { animation: lp-sway-c 5.2s 1.9s ease-in-out infinite; }
+.lp-why-card.is-in .lp-bamboo2__stalk--l { animation: lp-sway-l 4.6s 1.7s ease-in-out infinite; }
+.lp-why-card.is-in .lp-bamboo2__stalk--r { animation: lp-sway-r 5.8s 2.1s ease-in-out infinite; }
+@keyframes lp-sway-c { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+@keyframes lp-sway-l { 0%, 100% { transform: rotate(-2.2deg); } 50% { transform: rotate(1.4deg); } }
+@keyframes lp-sway-r { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(2.2deg); } }
+
+.lp-bamboo2__leaf { transform-box: fill-box; }
+.lp-bamboo2__leaf--l { transform-origin: 100% 100%; }
+.lp-bamboo2__leaf--c { transform-origin: 50% 100%; }
+.lp-bamboo2__leaf--r { transform-origin: 0% 100%; }
+.lp-why-card.is-in .lp-bamboo2__leaf--l { animation: lp-leaf-sway 3.4s 2.3s ease-in-out infinite; }
+.lp-why-card.is-in .lp-bamboo2__leaf--c { animation: lp-leaf-sway 3.8s 2.5s ease-in-out infinite; }
+.lp-why-card.is-in .lp-bamboo2__leaf--r { animation: lp-leaf-sway-rev 3.6s 2.4s ease-in-out infinite; }
+@keyframes lp-leaf-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes lp-leaf-sway-rev { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(-3deg); } }
 
 .lp-why-card__title {
   font-family: var(--font-display);
@@ -1155,24 +1246,20 @@
   font-weight: 700;
   font-size: clamp(1.05rem, 0.9rem + 0.7vw, 1.4rem);
   letter-spacing: -0.01em;
-  background: linear-gradient(100deg, #C2D6B6 0%, #ffffff 25%, #9CB080 50%, #ffffff 75%, #C2D6B6 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: lp-why-shimmer 4.5s linear infinite;
+  color: #9CB080;
 }
-@keyframes lp-why-shimmer { to { background-position: 200% center; } }
 
 @media (prefers-reduced-motion: reduce) {
   .lp-why__leaf,
-  .lp-why-card__glyph,
   .lp-why-card__ring,
-  .lp-bamboo,
-  .lp-why-card.is-in .lp-bamboo,
+  .lp-hand__group,
+  .lp-hand__digit--1, .lp-hand__digit--2, .lp-hand__digit--3, .lp-hand__digit--4, .lp-hand__digit--thumb,
+  .lp-hand__trail,
+  .lp-bamboo2__stalk--c, .lp-bamboo2__stalk--l, .lp-bamboo2__stalk--r,
+  .lp-bamboo2__leaf--l, .lp-bamboo2__leaf--c, .lp-bamboo2__leaf--r,
   .lp-why__tag-text,
   .reveal.is-in .lp-anitext__w.is-b { animation: none !important; }
-  .lp-ripple { display: none; }
+  .lp-ripple, .lp-hand__trail { display: none; }
   .lp-why-card__ring { opacity: 0.4 !important; }
   .lp-why__word-accent,
   .lp-why__underline,
@@ -1185,6 +1272,11 @@
   }
   .lp-why__underline { transform: scaleX(1) !important; }
   .lp-why-card::before { transform: scaleY(1); transition: none; }
-  .lp-bamboo__stalk { transform: none; transition: none; }
-  .lp-bamboo__leaf { opacity: 1; transform: none; transition: none; }
+  .lp-hand__group, .lp-hand__digit { transform: none !important; }
+  .lp-bamboo2__seg, .lp-bamboo2__leafset {
+    transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+  .lp-bamboo2__node { opacity: 0.6 !important; transition: none; }
 }

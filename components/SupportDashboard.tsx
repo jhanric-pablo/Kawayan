@@ -430,7 +430,7 @@ const SupportDashboard: React.FC = () => {
                           <p className="text-xs font-bold text-slate-800 dark:text-white truncate">#{t.ticketNum} — {t.subject}</p>
                           <p className="text-[10px] text-slate-400 truncate">{t.userEmail} · {t.category}</p>
                         </div>
-                        <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${t.status === 'Open' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
+                        <span className={`shrink-0 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${t.status === 'Open' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
                       </button>
                     </li>
                   ))}
@@ -560,13 +560,13 @@ const SupportDashboard: React.FC = () => {
                            </div>
                            <h4 className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{ticket.subject}</h4>
                            <div className="mt-2 flex items-center gap-2 flex-wrap">
-                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
                                 ticket.category === 'Billing' ? 'bg-emerald-100 text-emerald-700' :
                                 ticket.category === 'Technical' ? 'bg-amber-100 text-amber-700' :
                                 'bg-slate-100 text-slate-600'
                               }`}>{ticket.category || 'General'}</span>
-                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-700' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{ticket.priority}</span>
-                              <span className={`text-[9px] font-black uppercase tracking-wider ${ticket.status === 'Open' ? 'text-emerald-600' : ticket.status === 'Resolved' ? 'text-slate-400' : 'text-blue-500'}`}>{ticket.status}</span>
+                              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-700' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{ticket.priority}</span>
+                              <span className={`text-[10px] font-black uppercase tracking-wider ${ticket.status === 'Open' ? 'text-emerald-600' : ticket.status === 'Resolved' ? 'text-slate-400' : 'text-blue-500'}`}>{ticket.status}</span>
                            </div>
                         </div>
                      ))
@@ -584,7 +584,7 @@ const SupportDashboard: React.FC = () => {
                   {activeCalls.length === 0 ? <p className="text-[10px] text-slate-400 italic">No active requests.</p> : activeCalls.map(call => (
                     <div key={call.user_id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
                        <span className="text-[10px] font-bold truncate max-w-[120px]">{call.user_email}</span>
-                       <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="px-3 py-1 rounded-full text-[9px] font-black uppercase text-white hover:scale-105 transition-all bg-[#2B5748]">Connect</button>
+                       <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="px-3 py-1 rounded-full text-[10px] font-black uppercase text-white hover:scale-105 transition-all bg-[#2B5748]">Connect</button>
                     </div>
                   ))}
                </div>

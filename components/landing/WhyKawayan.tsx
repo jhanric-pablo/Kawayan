@@ -1,5 +1,7 @@
 import React from 'react';
-import { Hand, Sprout, Radio } from 'lucide-react';
+import { Sprout, Radio } from 'lucide-react';
+import WaveHandIcon from './WaveHandIcon';
+import BambooGrowIcon from './BambooGrowIcon';
 
 /**
  * Splits a string into per-word spans that fade + rise in sequence once an
@@ -78,7 +80,7 @@ const WhyKawayan: React.FC = () => (
             <span className="lp-ripple" />
             <span className="lp-ripple" />
             <span className="lp-ripple" />
-            <span className="lp-why-card__glyph"><Hand className="w-6 h-6" /></span>
+            <span className="lp-why-card__glyph"><WaveHandIcon className="lp-why-card__glyph-svg" /></span>
           </div>
           <h3 className="lp-why-card__title">
             <AnimatedText text="Kaway — a wave hello" step={0.05} bold={[0]} />
@@ -95,23 +97,7 @@ const WhyKawayan: React.FC = () => (
 
         <article className="lp-why-card reveal reveal-d2">
           <div className="lp-why-card__viz lp-why-card__viz--bamboo">
-            <svg className="lp-bamboo" viewBox="0 0 60 122" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-              <defs>
-                <linearGradient id="lpBamboo" x1="0" y1="1" x2="0" y2="0">
-                  <stop offset="0" stopColor="#5E7F63" />
-                  <stop offset="1" stopColor="#9CB080" />
-                </linearGradient>
-              </defs>
-              <g className="lp-bamboo__stalk">
-                <rect x="24" y="76" width="12" height="42" rx="5" fill="url(#lpBamboo)" />
-                <rect x="24" y="46" width="12" height="26" rx="5" fill="url(#lpBamboo)" />
-                <rect x="24" y="20" width="12" height="22" rx="5" fill="url(#lpBamboo)" />
-                <path className="lp-bamboo__node" d="M21 74h18M21 44h18" stroke="#3F5A46" strokeWidth="2.5" strokeLinecap="round" />
-              </g>
-              <path className="lp-bamboo__leaf lp-bamboo__leaf--l" d="M29 30C17 28 7 22 2 12C13 10 26 17 31 27Z" fill="#8AA773" />
-              <path className="lp-bamboo__leaf lp-bamboo__leaf--c" d="M30 26C29 13 32 5 37 1C42 8 40 19 34 26Z" fill="#C2D6B6" />
-              <path className="lp-bamboo__leaf lp-bamboo__leaf--r" d="M31 30C43 28 53 22 58 12C47 10 34 17 29 27Z" fill="#9CB080" />
-            </svg>
+            <BambooGrowIcon />
           </div>
           <h3 className="lp-why-card__title">
             <AnimatedText text="Kawayan — bamboo strong" step={0.05} bold={[0]} />

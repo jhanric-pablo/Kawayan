@@ -87,7 +87,7 @@ const AccessibilityWidget: React.FC = () => {
   const fontLevel = settings.fontLevel;
 
   return (
-    <div className="a11y-widget-root fixed bottom-6 left-6 z-[60] flex flex-col items-start gap-3">
+    <div className="a11y-widget-root fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[60] flex flex-col items-start gap-3">
       {isOpen && (
         <div
           ref={panelRef}
@@ -211,7 +211,7 @@ const AccessibilityWidget: React.FC = () => {
         ref={toggleRef}
         type="button"
         onClick={() => setIsOpen((o) => !o)}
-        className="a11y-widget-toggle w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        className="a11y-widget-toggle w-11 h-11 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
         style={{
           background: 'var(--kw-green, #2B5748)',
           color: '#fff',

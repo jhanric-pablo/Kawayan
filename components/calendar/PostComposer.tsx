@@ -229,11 +229,20 @@ const PostComposer: React.FC<Props> = ({
   // Stable fake engagement number (was recomputed on every keystroke before).
   const fakeLikes = useMemo(() => Math.floor(Math.random() * 500) + 10, [generatedContent?.id]);
 
+  // `onClose` is a fresh function reference on every keystroke in this panel
+  // (its parent re-renders on every setGeneratedContent), so it can't sit in
+  // this effect's deps — that used to re-run the effect (and its
+  // dialogRef.current?.focus()) on every character, yanking focus off the
+  // caption/visual textareas after each keystroke. A ref keeps Escape
+  // wired to the latest onClose without making the effect depend on it.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   // Esc to close + lock background scroll while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -243,7 +252,7 @@ const PostComposer: React.FC<Props> = ({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) setShowHistory(false);

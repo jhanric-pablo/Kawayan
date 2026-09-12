@@ -1,14 +1,18 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User, ViewState } from '../types';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
 import { TOS_VERSION } from '../constants/termsOfService';
 import TermsOfServiceModal from './TermsOfServiceModal';
+import AuthShell from './auth/AuthShell';
+import AuthField from './auth/AuthField';
+import AuthTabs from './auth/AuthTabs';
+import StepProgress from './auth/StepProgress';
+import PasswordMeter from './auth/PasswordMeter';
 import {
   ArrowRight, X, Mail, Lock, Building2, MapPin, Phone, Eye, EyeOff,
-  ShieldCheck, Wand2, Share2, CalendarCheck, UploadCloud, Check,
+  ShieldCheck, UploadCloud, Check, Sparkles, Wallet,
 } from 'lucide-react';
-import './auth/authScreen.css';
 
 interface Props {
   onLogin: (user: User) => void | Promise<void>;
@@ -19,34 +23,12 @@ interface Props {
   toggleTheme?: () => void;
 }
 
-const AUTH_FEATURES = [
-  { Icon: Wand2, title: 'Taglish captions in one click', desc: 'AI that writes like a Filipino shop owner — hugot, diskarte and all.' },
-  { Icon: Share2, title: 'Preview for FB, IG & TikTok', desc: 'See every post exactly as it lands on each platform before you publish.' },
-  { Icon: CalendarCheck, title: 'A month of posts, auto-planned', desc: 'Turn one strategy line into a full calendar of dated, scheduled content.' },
-];
-
-function passwordStrength(pw: string): { score: number; label: string } {
-  if (!pw) return { score: 0, label: '' };
-  let s = 0;
-  if (pw.length >= 8) s += 1;
-  if (pw.length >= 12) s += 1;
-  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s += 1;
-  if (/\d/.test(pw)) s += 1;
-  if (/[^A-Za-z0-9]/.test(pw)) s += 1;
-  const score = Math.max(1, Math.min(4, s));
-  return { score, label: ['', 'Weak', 'Fair', 'Good', 'Strong'][score] };
-}
+const SIGNUP_STEPS = ['Your account', 'Your business', 'Verification'];
 
 /* Honest, on-brand cycling line — the kinds of shops Kawayan is built for. */
 const BUILT_FOR = [
-  'sari-sari stores',
-  'panaderias',
-  'milk tea kiosks',
-  'carinderias',
-  'barbershops',
-  'ukay boutiques',
-  'hardware stores',
-  'plant shops',
+  'sari-sari stores', 'panaderias', 'milk tea kiosks', 'carinderias',
+  'barbershops', 'ukay boutiques', 'hardware stores', 'plant shops',
 ];
 
 const BuiltForTicker: React.FC = () => {
@@ -55,42 +37,13 @@ const BuiltForTicker: React.FC = () => {
     const t = setInterval(() => setI((n) => (n + 1) % BUILT_FOR.length), 2600);
     return () => clearInterval(t);
   }, []);
-  return <span key={i} className="af-today__line">{BUILT_FOR[i]}</span>;
+  return (
+    <span className="ax__built">
+      <b>Built for</b>
+      <span key={i} className="ax__built-line">{BUILT_FOR[i]}</span>
+    </span>
+  );
 };
-
-/* Module-level so the input never remounts (keeps focus while typing). */
-interface FieldProps {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  type?: string;
-  required?: boolean;
-  autoComplete?: string;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
-  trailing?: React.ReactNode;
-  icon?: React.ReactNode;
-}
-
-const Field: React.FC<FieldProps> = ({ id, label, value, onChange, type = 'text', required, autoComplete, inputMode, trailing, icon }) => (
-  <div className={`af-field${icon ? ' af-field--icon' : ''}`}>
-    {icon && <span className="af-field__icon" aria-hidden="true">{icon}</span>}
-    <input
-      id={id}
-      className="af-input"
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder=" "
-      required={required}
-      autoComplete={autoComplete}
-      inputMode={inputMode}
-    />
-    <label htmlFor={id} className="af-label">{label}</label>
-    {trailing && <div className="af-trailing">{trailing}</div>}
-    <span className="af-underline" aria-hidden="true" />
-  </div>
-);
 
 const Login: React.FC<Props> = ({
   onLogin,
@@ -101,6 +54,7 @@ const Login: React.FC<Props> = ({
   toggleTheme,
 }) => {
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
+  const [step, setStep] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -121,6 +75,15 @@ const Login: React.FC<Props> = ({
   const [dbService] = useState(() => new UniversalDatabaseService());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const clearMessages = () => { setError(''); setValidationErrors([]); };
+
+  const switchMode = (next: boolean) => {
+    setIsSignUp(next);
+    setStep(0);
+    setAcceptedTerms(false);
+    clearMessages();
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -137,10 +100,36 @@ const Login: React.FC<Props> = ({
     setDocument(file);
   };
 
+  /** Gate each wizard step so problems surface where they're fixable. */
+  const validateStep = (s: number): boolean => {
+    clearMessages();
+    if (s === 0) {
+      if (!email.trim() || !password) { setError('Email and password are required'); return false; }
+      const v = ValidationService.validatePassword(password);
+      if (!v.isValid) { setValidationErrors(v.errors); return false; }
+      return true;
+    }
+    if (s === 1) {
+      if (businessName.trim().length < 2) { setError('Business name must be at least 2 characters long'); return false; }
+      if (!businessAddress.trim()) { setError('Business address is required'); return false; }
+      if (!businessPhone.trim()) { setError('Business phone / contact number is required'); return false; }
+      return true;
+    }
+    if (!document) { setError("Please upload a business registration document (Mayor's Permit, DTI, or SEC Registration)."); return false; }
+    if (!acceptedTerms) { setError('You must read and accept the Terms of Service before creating an account.'); return false; }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setValidationErrors([]);
+
+    // Sign-up: advance through the wizard until the last step.
+    if (isSignUp && !isAdminLogin && step < SIGNUP_STEPS.length - 1) {
+      if (validateStep(step)) setStep((s) => s + 1);
+      return;
+    }
+
+    clearMessages();
     setIsLoading(true);
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -148,7 +137,7 @@ const Login: React.FC<Props> = ({
 
     try {
       if (!trimmedEmail || !password) {
-        setError("Email and password are required");
+        setError('Email and password are required');
         setIsLoading(false);
         return;
       }
@@ -160,31 +149,26 @@ const Login: React.FC<Props> = ({
           setIsLoading(false);
           return;
         }
-
         if (!trimmedBusinessName || trimmedBusinessName.length < 2) {
-          setError("Business name must be at least 2 characters long");
+          setError('Business name must be at least 2 characters long');
           setIsLoading(false);
           return;
         }
-
         if (!businessAddress.trim()) {
-          setError("Business address is required");
+          setError('Business address is required');
           setIsLoading(false);
           return;
         }
-
         if (!businessPhone.trim()) {
-          setError("Business phone / contact number is required");
+          setError('Business phone / contact number is required');
           setIsLoading(false);
           return;
         }
-
         if (!document) {
           setError("Please upload a business registration document (Mayor's Permit, DTI, or SEC Registration).");
           setIsLoading(false);
           return;
         }
-
         if (!acceptedTerms) {
           setError('You must read and accept the Terms of Service before creating an account.');
           setIsLoading(false);
@@ -200,7 +184,7 @@ const Login: React.FC<Props> = ({
         );
 
         if (!newUser) {
-          setError("Registration failed. Please try again.");
+          setError('Registration failed. Please try again.');
           setIsLoading(false);
           return;
         }
@@ -228,18 +212,18 @@ const Login: React.FC<Props> = ({
 
         if (result && result.user) {
           if (isAdminLogin && result.user.role !== 'admin' && result.user.role !== 'support') {
-            setError("Access denied. Use the main Login page for SME accounts.");
+            setError('Access denied. Use the main Login page for SME accounts.');
             await dbService.logoutUser();
           } else {
             await onLogin(result.user);
           }
         } else {
-          setError("Invalid email or password.");
+          setError('Invalid email or password.');
         }
       }
     } catch (err: any) {
       console.error('Login/Signup error:', err);
-      setError(err.message || "An error occurred. Please try again.");
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -266,228 +250,182 @@ const Login: React.FC<Props> = ({
     }
   };
 
-  // Bumps on every Sign in ⇄ Create switch so the light-sweep animation replays.
-  const [flip, setFlip] = useState<{ seq: number; dir: 'fwd' | 'back' }>({ seq: 0, dir: 'fwd' });
+  const eyeToggle = (
+    <button
+      type="button"
+      className="ax-eye"
+      tabIndex={-1}
+      onClick={() => setShowPassword((s) => !s)}
+      aria-label={showPassword ? 'Hide password' : 'Show password'}
+    >
+      {showPassword ? <EyeOff /> : <Eye />}
+    </button>
+  );
 
-  const switchMode = (next: boolean) => {
-    if (next !== isSignUp) setFlip((f) => ({ seq: f.seq + 1, dir: next ? 'fwd' : 'back' }));
-    setIsSignUp(next);
-    setError('');
-    setValidationErrors([]);
-    setAcceptedTerms(false);
-  };
+  const messages = (
+    <>
+      {validationErrors.length > 0 && (
+        <div className="ax-error">
+          <strong>Password needs</strong>
+          <ul>{validationErrors.map((err, i) => <li key={i}>{err}</li>)}</ul>
+        </div>
+      )}
+      {error && <div className="ax-error">{error}</div>}
+    </>
+  );
 
-  // Sliding underline indicator for the Sign in / Create account tabs
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const [ink, setInk] = useState({ left: 0, width: 0 });
+  /* ── Heading copy per mode ── */
+  const heading = forgotMode
+    ? { eyebrow: 'Account recovery', title: <>Reset your <em>password.</em></>, sub: 'We’ll email you a secure link to set a new one.' }
+    : isAdminLogin
+      ? { eyebrow: 'Staff access', title: <>Staff <em>console.</em></>, sub: 'Admin and support accounts only. Access is logged and monitored.' }
+      : isSignUp
+        ? { eyebrow: 'Free to start', title: <>Set up shop <em>in minutes.</em></>, sub: 'Three quick steps — account, business details, then verification.' }
+        : { eyebrow: 'Welcome back', title: <>Back to <em>business.</em></>, sub: 'Your calendar, drafts and analytics are right where you left them.' };
 
-  useLayoutEffect(() => {
-    if (isAdminLogin) return;
-    const measure = () => {
-      const active = tabsRef.current?.querySelector<HTMLElement>('button.is-active');
-      if (active) setInk({ left: active.offsetLeft, width: active.offsetWidth });
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    // `document` is shadowed by local state in this component — reach the real one via window
-    const fonts = (window.document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
-    fonts?.ready?.then(measure).catch(() => undefined);
-    return () => window.removeEventListener('resize', measure);
-  }, [isSignUp, isAdminLogin]);
-
-  const editorialKey = isAdminLogin ? 'admin' : isSignUp ? 'signup' : 'signin';
-
-  const headline = isAdminLogin
-    ? ['Staff', 'console.']
-    : isSignUp
-      ? ['Set up shop', 'in minutes.']
-      : ['Back to', 'business.'];
-
-  const sub = isAdminLogin
-    ? 'Admin and support access only.'
-    : isSignUp
-      ? 'Create your account, attach your business permit for verification, and start planning content today.'
-      : 'Sign in to your Kawayan workspace — your calendar, drafts and analytics are right where you left them.';
-
-  const submitDisabled = isLoading || (isSignUp && !isAdminLogin && !acceptedTerms);
-  const strength = passwordStrength(password);
+  // Staff sign-in gets none of the customer-facing conversion signals.
+  const footer = isAdminLogin ? (
+    <div className="ax__foot">
+      <span className="ax__foot-item"><ShieldCheck /> Access is logged and monitored</span>
+    </div>
+  ) : (
+    <>
+      <div className="ax__foot">
+        <span className="ax__foot-item"><ShieldCheck /> Encrypted end-to-end</span>
+        <span className="ax__foot-item"><Check /> Manual business verification</span>
+        <span className="ax__foot-item"><Wallet /> No credit card to start</span>
+      </div>
+      <BuiltForTicker />
+    </>
+  );
 
   return (
-    <div className={`af-screen${isSignUp && !isAdminLogin ? ' is-signup' : ''}`}>
-      <div className="af-spine" aria-hidden="true" />
+    <AuthShell
+      onBack={() => onNavigate(ViewState.LANDING)}
+      eyebrow={heading.eyebrow}
+      title={heading.title}
+      subtitle={heading.sub}
+      darkMode={darkMode}
+      toggleTheme={toggleTheme}
+      footer={footer}
+    >
+      {/* ── Forgot password ── */}
+      {forgotMode ? (
+        <form onSubmit={handleForgot} className="ax-form">
+          <AuthField
+            id="af-forgot-email"
+            label="Email address"
+            type="email"
+            inputMode="email"
+            value={forgotEmail}
+            onChange={(e) => setForgotEmail(e.target.value)}
+            required
+            autoFocus
+            autoComplete="email"
+            icon={<Mail />}
+          />
 
-      <div className="af-grid">
-        {flip.seq > 0 && !isAdminLogin && (
-          <span key={flip.seq} className={`af-sweep af-sweep--${flip.dir}`} aria-hidden="true" />
-        )}
+          {forgotMsg && <div className="ax-error">{forgotMsg}</div>}
+          {forgotLink && (
+            <div className="ax-error">
+              Dev link (no mailer configured): <a href={forgotLink}>{forgotLink}</a>
+            </div>
+          )}
 
-        <button type="button" className="af-back" onClick={() => onNavigate(ViewState.LANDING)}>
-          ← Kawayan
-        </button>
-        {toggleTheme && (
-          <button type="button" className="af-theme" onClick={toggleTheme}>
-            {darkMode ? 'Light' : 'Dark'}
-          </button>
-        )}
-
-        {/* ── Brand panel ── */}
-        <div className="af-editorial">
-          <span className="af-panel-grid" aria-hidden="true" />
-          <span className="af-editorial__wash" aria-hidden="true" />
-          <span className="af-orb af-orb--1" aria-hidden="true" />
-          <span className="af-orb af-orb--2" aria-hidden="true" />
-
-          <button type="button" className="af-brand" onClick={() => onNavigate(ViewState.LANDING)} title="Back to home">
-            <img src="/logo.png" alt="" />
-            <span>Kawayan AI</span>
-          </button>
-
-          <div className="af-lede" key={editorialKey}>
-            <h1 className="af-headline">
-              {headline.map((line) => <span key={line}>{line}</span>)}
-            </h1>
-            <hr className="af-rule" />
-            <p className="af-sub">{sub}</p>
+          <div className="ax-actions">
+            <button type="submit" className="ax-btn ax-btn--primary" disabled={forgotLoading}>
+              <span>{forgotLoading ? 'Sending…' : 'Send reset link'}</span>
+              {!forgotLoading && <ArrowRight />}
+            </button>
           </div>
 
-          {!isAdminLogin && (
-            <div className="af-feats">
-              {AUTH_FEATURES.map((f) => (
-                <div className="af-feat" key={f.title}>
-                  <span className="af-feat__ico"><f.Icon /></span>
-                  <div>
-                    <h4>{f.title}</h4>
-                    <p>{f.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <button
+            type="button"
+            className="ax-link"
+            onClick={() => { setForgotMode(false); setForgotMsg(''); setForgotLink(''); }}
+          >
+            ← Back to sign in
+          </button>
+        </form>
+      ) : (
+        <>
+          {!isAdminLogin && <AuthTabs isSignUp={isSignUp} onChange={switchMode} />}
+          {isSignUp && !isAdminLogin && <StepProgress steps={SIGNUP_STEPS} current={step} />}
 
-          {!isAdminLogin && (
-            <div className="af-proof">
-              <span className="af-proof__avs" aria-hidden="true"><i /><i /><i /><i /></span>
-              <span className="af-proof__txt"><b>1,000+ Filipino shops</b> already plan with Kawayan.</span>
-            </div>
-          )}
-          {!isAdminLogin && (
-            <p className="af-today">
-              <span className="af-today__k">Built for</span>
-              <BuiltForTicker />
-            </p>
-          )}
-        </div>
-
-        {/* ── Form ── */}
-        <div className="af-formwrap">
-          <div className="af-formcard">
-            {!isAdminLogin ? (
-              <div className="af-tabs" ref={tabsRef} hidden={forgotMode}>
-                <button type="button" className={!isSignUp ? 'is-active' : ''} onClick={() => switchMode(false)}>
-                  Sign in
-                </button>
-                <button type="button" className={isSignUp ? 'is-active' : ''} onClick={() => switchMode(true)}>
-                  Create account
-                </button>
-                <span
-                  className="af-tabs__ink"
-                  aria-hidden="true"
-                  style={{ transform: `translateX(${ink.left}px)`, width: ink.width || undefined }}
+          <form onSubmit={handleSubmit} className="ax-form">
+            {/* Step 1 — account (also the whole form for sign-in / admin) */}
+            {(!isSignUp || isAdminLogin || step === 0) && (
+              <>
+                <AuthField
+                  id="af-email"
+                  label="Email address"
+                  type="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  icon={<Mail />}
                 />
-              </div>
-            ) : (
-              <p className="af-formcard__title">Staff sign-in</p>
+                <AuthField
+                  id="af-pw"
+                  label="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  icon={<Lock />}
+                  trailing={eyeToggle}
+                />
+                {isSignUp && !isAdminLogin && <PasswordMeter password={password} />}
+              </>
             )}
 
-            <form onSubmit={handleSubmit} className="af-form" hidden={forgotMode}>
-              {isSignUp && !isAdminLogin && (
-                <div className="af-grp af-reveal">
-                  <Field
-                    id="af-biz"
-                    label="Business name"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    required
-                    autoComplete="organization"
-                    icon={<Building2 />}
-                  />
-                  <div className="af-two">
-                    <Field
-                      id="af-addr"
-                      label="Business address"
-                      value={businessAddress}
-                      onChange={(e) => setBusinessAddress(e.target.value)}
-                      required
-                      autoComplete="street-address"
-                      icon={<MapPin />}
-                    />
-                    <Field
-                      id="af-phone"
-                      label="Contact number"
-                      type="tel"
-                      inputMode="tel"
-                      value={businessPhone}
-                      onChange={(e) => setBusinessPhone(e.target.value)}
-                      required
-                      autoComplete="tel"
-                      icon={<Phone />}
-                    />
-                  </div>
-                </div>
-              )}
+            {/* Step 2 — business details */}
+            {isSignUp && !isAdminLogin && step === 1 && (
+              <>
+                <AuthField
+                  id="af-biz"
+                  label="Business name"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="organization"
+                  icon={<Building2 />}
+                />
+                <AuthField
+                  id="af-addr"
+                  label="Business address"
+                  value={businessAddress}
+                  onChange={(e) => setBusinessAddress(e.target.value)}
+                  required
+                  autoComplete="street-address"
+                  icon={<MapPin />}
+                />
+                <AuthField
+                  id="af-phone"
+                  label="Contact number"
+                  type="tel"
+                  inputMode="tel"
+                  value={businessPhone}
+                  onChange={(e) => setBusinessPhone(e.target.value)}
+                  required
+                  autoComplete="tel"
+                  icon={<Phone />}
+                />
+              </>
+            )}
 
-              <Field
-                id="af-email"
-                label="Email address"
-                type="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                icon={<Mail />}
-              />
-
-              <Field
-                id="af-pw"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                icon={<Lock />}
-                trailing={
-                  <button
-                    type="button"
-                    className="af-show"
-                    tabIndex={-1}
-                    onClick={() => setShowPassword((s) => !s)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff /> : <Eye />}
-                  </button>
-                }
-              />
-
-              {isSignUp && !isAdminLogin && password && (
-                <div className="af-strength" data-score={strength.score}>
-                  <div className="af-strength__bars">
-                    {[0, 1, 2, 3].map((i) => (
-                      <span key={i} className={i < strength.score ? 'is-on' : ''} />
-                    ))}
-                  </div>
-                  <span className="af-strength__label">{strength.label}</span>
-                </div>
-              )}
-
-              {isSignUp && !isAdminLogin && (
-                <div className="af-reveal" style={{ animationDelay: '60ms' }}>
-                <div className="af-doc">
-                  <span className="af-doc__label"><ShieldCheck className="w-3 h-3" /> Business permit</span>
+            {/* Step 3 — permit + terms */}
+            {isSignUp && !isAdminLogin && step === 2 && (
+              <>
+                <div className="ax-doc">
+                  <span className="ax-doc__label"><ShieldCheck /> Business permit</span>
                   {document ? (
-                    <div className="af-doc__chip">
-                      <Check className="af-doc__ok" />
+                    <div className="ax-doc__chip">
+                      <Check className="ax-doc__ok" />
                       <span>{document.name}</span>
                       <button
                         type="button"
@@ -498,11 +436,11 @@ const Login: React.FC<Props> = ({
                       </button>
                     </div>
                   ) : (
-                    <button type="button" className="af-doc__add" onClick={() => fileInputRef.current?.click()}>
+                    <button type="button" className="ax-doc__add" onClick={() => fileInputRef.current?.click()}>
                       <UploadCloud /> Attach Mayor&apos;s Permit / DTI / SEC
                     </button>
                   )}
-                  <p className="af-doc__hint">JPG, PNG or PDF · max 5&nbsp;MB</p>
+                  <p className="ax-doc__hint">JPG, PNG or PDF · max 5&nbsp;MB</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -511,11 +449,8 @@ const Login: React.FC<Props> = ({
                     onChange={handleFileChange}
                   />
                 </div>
-                </div>
-              )}
 
-              {isSignUp && !isAdminLogin && (
-                <label className="af-tos af-reveal" style={{ animationDelay: '120ms' }}>
+                <label className="ax-tos">
                   <input
                     type="checkbox"
                     checked={acceptedTerms}
@@ -533,98 +468,60 @@ const Login: React.FC<Props> = ({
                     . Verification is required before full platform access.
                   </span>
                 </label>
+              </>
+            )}
+
+            {messages}
+
+            <div className="ax-actions">
+              {isSignUp && !isAdminLogin && step > 0 && (
+                <button
+                  type="button"
+                  className="ax-btn ax-btn--ghost"
+                  onClick={() => { clearMessages(); setStep((s) => s - 1); }}
+                >
+                  Back
+                </button>
               )}
-
-              {validationErrors.length > 0 && (
-                <div className="af-error">
-                  <strong>Password needs</strong>
-                  <ul>
-                    {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {error && <div className="af-error">{error}</div>}
-
-              <button type="submit" className="af-submit" disabled={submitDisabled}>
+              <button type="submit" className="ax-btn ax-btn--primary" disabled={isLoading}>
                 <span>
                   {isLoading
                     ? 'Just a sec…'
                     : isSignUp && !isAdminLogin
-                      ? 'Create account'
+                      ? (step < SIGNUP_STEPS.length - 1 ? 'Continue' : 'Create account')
                       : 'Sign in'}
                 </span>
-                {!isLoading && <ArrowRight className="w-4 h-4" />}
+                {!isLoading && <ArrowRight />}
               </button>
+            </div>
 
-              {!isSignUp && !isAdminLogin && (
-                <button
-                  type="button"
-                  className="af-alt"
-                  onClick={() => { setForgotMode(true); setForgotEmail(email); setError(''); }}
-                >
-                  Forgot password?
-                </button>
-              )}
-
-              <p className="af-trust">
-                <ShieldCheck />
-                {isAdminLogin
-                  ? 'Staff access is logged and monitored.'
-                  : isSignUp
-                    ? 'Encrypted end-to-end. Manual verification keeps Kawayan spam-free.'
-                    : 'Encrypted end-to-end. No credit card needed to start.'}
-              </p>
-            </form>
-
-            {forgotMode && (
-              <form onSubmit={handleForgot} className="af-form">
-                <p className="af-sub">
-                  Enter your account email and we&apos;ll send a link to reset your password.
-                </p>
-                <Field
-                  id="af-forgot-email"
-                  label="Email address"
-                  type="email"
-                  inputMode="email"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  icon={<Mail />}
-                />
-
-                {forgotMsg && <div className="af-error">{forgotMsg}</div>}
-                {forgotLink && (
-                  <div className="af-error">
-                    Dev link (no mailer configured):{' '}
-                    <a href={forgotLink}>{forgotLink}</a>
-                  </div>
-                )}
-
-                <button type="submit" className="af-submit" disabled={forgotLoading}>
-                  <span>{forgotLoading ? 'Sending…' : 'Send reset link'}</span>
-                  {!forgotLoading && <ArrowRight className="w-4 h-4" />}
-                </button>
-
-                <button
-                  type="button"
-                  className="af-alt"
-                  onClick={() => { setForgotMode(false); setForgotMsg(''); setForgotLink(''); }}
-                >
-                  ← Back to sign in
-                </button>
-              </form>
+            {!isSignUp && !isAdminLogin && (
+              <button
+                type="button"
+                className="ax-link"
+                onClick={() => { setForgotMode(true); setForgotEmail(email); clearMessages(); }}
+              >
+                Forgot password?
+              </button>
             )}
 
             {isAdminLogin && (
-              <button type="button" className="af-alt" onClick={() => onNavigate(ViewState.LOGIN)}>
+              <button type="button" className="ax-link" onClick={() => onNavigate(ViewState.LOGIN)}>
                 ← Back to user login
               </button>
             )}
-          </div>
-        </div>
-      </div>
+
+            <p className="ax-note">
+              <Sparkles />
+              {isAdminLogin
+                ? 'Staff access is logged and monitored.'
+                : isSignUp
+                  ? 'Manual verification keeps Kawayan spam-free.'
+                  : 'Encrypted end-to-end. No credit card needed to start.'}
+            </p>
+          </form>
+        </>
+      )}
 
       <TermsOfServiceModal
         open={legalDoc !== null}
@@ -634,7 +531,7 @@ const Login: React.FC<Props> = ({
         requireScrollToAccept={legalDoc === 'terms' && !acceptedTerms}
         onAccept={legalDoc === 'terms' && !acceptedTerms ? () => setAcceptedTerms(true) : undefined}
       />
-    </div>
+    </AuthShell>
   );
 };
 

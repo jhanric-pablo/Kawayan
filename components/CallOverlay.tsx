@@ -300,7 +300,7 @@ const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reas
               {/* Remote Camera - Centered if no screen, else floating small */}
               <div className={`${remoteCamActive ? 'flex' : 'hidden'} ${remoteScreenActive ? 'absolute bottom-8 right-8 w-64 h-48 border-2 border-slate-700 shadow-2xl rounded-3xl overflow-hidden z-40' : 'flex-1'} transition-all duration-500 bg-black items-center justify-center`}>
                  <video ref={remoteCamVideoRef} autoPlay playsInline className={`w-full h-full ${remoteScreenActive ? 'object-cover' : 'object-contain'}`} />
-                 <div className="absolute top-3 left-3 bg-black/60 px-2 py-0.5 rounded text-[8px] text-white font-black uppercase tracking-tighter border border-white/10 z-50">{isAgent ? 'User' : 'Agent'}</div>
+                 <div className="absolute top-3 left-3 bg-black/60 px-2 py-0.5 rounded text-[10px] text-white font-black uppercase tracking-tighter border border-white/10 z-50">{isAgent ? 'User' : 'Agent'}</div>
               </div>
 
               {/* Status Message (Waiting) */}
@@ -315,13 +315,13 @@ const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reas
               {/* Local Mini-Preview (Camera) */}
               <div className={`absolute bottom-8 left-8 transition-all duration-500 ${isVideoOff ? 'w-0 h-0 opacity-0' : 'w-48 h-32 border-2 border-emerald-500 shadow-2xl z-50'} bg-black rounded-3xl overflow-hidden`}>
                  <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                 <div className="absolute bottom-2 left-2 bg-emerald-600 px-2 py-0.5 rounded text-[8px] text-white font-black uppercase tracking-tighter border border-white/10">Your Camera</div>
+                 <div className="absolute bottom-2 left-2 bg-emerald-600 px-2 py-0.5 rounded text-[10px] text-white font-black uppercase tracking-tighter border border-white/10">Your Camera</div>
               </div>
 
               {/* NEW: Local Screen Share Preview */}
               <div className={`absolute top-8 left-8 transition-all duration-500 ${!isScreenSharing ? 'w-0 h-0 opacity-0' : 'w-64 h-40 border-2 border-blue-500 shadow-2xl z-50'} bg-black rounded-3xl overflow-hidden`}>
                  <video ref={localScreenVideoRef} autoPlay muted playsInline className="w-full h-full object-contain" />
-                 <div className="absolute bottom-2 left-2 bg-blue-600 px-2 py-0.5 rounded text-[8px] text-white font-black uppercase tracking-tighter border border-white/10">Your Screen</div>
+                 <div className="absolute bottom-2 left-2 bg-blue-600 px-2 py-0.5 rounded text-[10px] text-white font-black uppercase tracking-tighter border border-white/10">Your Screen</div>
               </div>
            </div>
 
@@ -358,7 +358,7 @@ const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reas
                       }`}>
                          {msg.text}
                       </div>
-                      <span className="text-[8px] font-black text-slate-600 uppercase mt-2 tracking-widest">{msg.sender} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase mt-2 tracking-widest">{msg.sender} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                    </div>
                  ))}
                  {messages.length === 0 && (

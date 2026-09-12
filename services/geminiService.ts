@@ -82,10 +82,10 @@ export const generateContentPlan = async (
     return normalizeIdeasToBatchCount(validated, itemCount);
   } catch (e: any) {
     logger.error("Error generating content plan:", e.message);
-    return normalizeIdeasToBatchCount(
-      ValidationService.createFallbackContentIdeas(month, itemCount),
-      itemCount
-    );
+    // Let the caller decide how to handle this (e.g. show a quota-exceeded
+    // message) rather than silently returning generic fallback ideas that
+    // look identical to a successful AI generation.
+    throw e;
   }
 };
 
@@ -117,7 +117,10 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
     return ValidationService.validatePostResponse(data);
   } catch (e: any) {
     logger.error("Error generating post caption and image prompt:", e.message);
-    return ValidationService.createFallbackPostResponse(topic);
+    // Let the caller decide how to handle this (e.g. show a quota-exceeded
+    // message, or stop a batch run) rather than silently returning a generic
+    // fallback caption that looks identical to a successful AI generation.
+    throw e;
   }
 };
 
