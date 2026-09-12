@@ -4,7 +4,10 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install && npm run build
+    # --include=dev: vite, tsx, and typescript all live in devDependencies,
+    # but NODE_ENV=production below makes plain `npm install` skip them —
+    # and tsx is also what the start command needs at runtime.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npx tsx server.js
     healthCheckPath: /api/health
     envVars:
