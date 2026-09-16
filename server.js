@@ -222,6 +222,7 @@ app.post('/api/auth/register', async (req, res) => {
     
     // Auto login
     const result = await dbService.loginUser(normalizedEmail, password);
+    await dbService.logAudit(user.id, 'register', `${user.businessName || user.email} <${user.email}> (id:${user.id})`);
     res.status(201).json(result);
   } catch (error) {
     logger.error('Registration error', { error: error.message });
@@ -243,6 +244,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!result) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    await dbService.logAudit(result.user.id, 'login', `${result.user.businessName || result.user.email} <${result.user.email}> (id:${result.user.id})`);
     res.json(result);
   } catch (error) {
     logger.error('Login error', { error: error.message });
@@ -934,7 +936,14 @@ app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res
 app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
+    // Fetch identities before deleting — audit_logs.user_id cascades on delete,
+    // so the log is attributed to the admin, not the (about to be gone) account.
+    const [deletedInfo, adminInfo] = await Promise.all([
+      dbService.describeUser(id),
+      dbService.describeUser(req.user.userId),
+    ]);
     await dbService.deleteUser(id);
+    await dbService.logAudit(req.user.userId, 'delete_user', `admin: ${adminInfo} deleted account: ${deletedInfo}`);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     logger.error('Admin delete user error', { error: error.message });
@@ -991,6 +1000,8 @@ app.post('/api/verification/submit', authenticateToken, uploadVerifDoc.single('d
 
     const storagePath = await dbService.uploadVerificationDoc(userId, req.file.buffer, req.file.originalname, req.file.mimetype);
     await dbService.submitVerification(userId, businessAddress, businessPhone, req.file.originalname, storagePath);
+    const submitterInfo = await dbService.describeUser(userId);
+    await dbService.logAudit(userId, 'submit_verification', `${submitterInfo} — doc:${req.file.originalname}`);
     broadcastVerificationChanged(userId);
     res.status(201).json({ message: 'Verification submitted', status: 'pending' });
   } catch (error) {
@@ -1038,6 +1049,8 @@ app.post('/api/verification/resubmit', authenticateToken, uploadVerifDoc.single(
     } else {
       await dbService.resubmitVerification(userId, req.file.originalname, storagePath);
     }
+    const resubmitterInfo = await dbService.describeUser(userId);
+    await dbService.logAudit(userId, 'resubmit_verification', `${resubmitterInfo} — doc:${req.file.originalname}`);
     broadcastVerificationChanged(userId);
     res.json({ message: 'Submitted for review', status: 'pending' });
   } catch (error) {
@@ -1063,7 +1076,23 @@ app.post('/api/admin/verifications/:id/approve', authenticateToken, requireAdmin
   try {
     const verif = await dbService.getVerificationById(id);
     await dbService.approveVerification(id, req.user.userId);
+    const [adminInfo, clientInfo, clientUser] = await Promise.all([
+      dbService.describeUser(req.user.userId),
+      verif?.userId ? dbService.describeUser(verif.userId) : Promise.resolve('unknown'),
+      verif?.userId ? dbService.getUserById(verif.userId) : Promise.resolve(null),
+    ]);
+    await dbService.logAudit(req.user.userId, 'approve_verification', `admin: ${adminInfo} approved client: ${clientInfo}`);
     broadcastVerificationChanged(verif?.userId);
+    if (clientUser?.email) {
+      await sendEmail(
+        clientUser.email,
+        'Your business has been verified — Kawayan',
+        `<p>Hi ${clientUser.businessName || 'there'},</p>
+         <p>Good news — your submitted business document has been reviewed and <strong>verified</strong>. Your Kawayan account now has full access.</p>
+         <p><a href="https://kawayan-ai.onrender.com/">Login now here</a> to get started.</p>
+         <p>Thanks for choosing Kawayan.</p>`
+      );
+    }
     res.json({ message: 'Verification approved' });
   } catch (error) {
     logger.error('Approve verification error', { error: error.message });
@@ -1078,6 +1107,15 @@ app.post('/api/admin/verifications/:id/reject', authenticateToken, requireAdmin,
   try {
     const verif = await dbService.getVerificationById(id);
     await dbService.rejectVerification(id, req.user.userId, reason || '');
+    const [rejectorInfo, rejectedClientInfo] = await Promise.all([
+      dbService.describeUser(req.user.userId),
+      verif?.userId ? dbService.describeUser(verif.userId) : Promise.resolve('unknown'),
+    ]);
+    await dbService.logAudit(
+      req.user.userId,
+      'reject_verification',
+      `admin: ${rejectorInfo} rejected client: ${rejectedClientInfo}${reason ? ` — reason: ${reason}` : ''}`
+    );
     broadcastVerificationChanged(verif?.userId);
     res.json({ message: 'Verification rejected' });
   } catch (error) {

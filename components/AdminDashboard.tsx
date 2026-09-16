@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Users, TrendingUp, DollarSign, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings, Power, Download, Filter, Lock, Calendar, CreditCard, Moon, Sun, XCircle, Wallet, FileText, ExternalLink, ChevronRight, RefreshCw } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings, Power, Download, Filter, Lock, Calendar, CreditCard, Moon, Sun, XCircle, Wallet, FileText, ChevronRight, ChevronDown, RefreshCw, UserPlus, LogIn, Upload } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { supportService } from '../services/supportService';
 import { supportRealtime } from '../services/supportRealtime';
 import { Ticket, User } from '../types';
 import { useOrganicDialog } from './OrganicDialog';
+import { useToast } from './ui/Toast';
 import './admin/adminConsole.css';
 
 interface Props {
@@ -81,6 +82,54 @@ const VStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
+/* ── Audit timeline: per-action icon, color and label ────────────── */
+const ACTION_META: Record<string, { label: string; icon: React.ElementType; bg: string; fg: string; dot: string }> = {
+  register: { label: 'Account registered', icon: UserPlus, bg: 'bg-blue-500/10', fg: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' },
+  login: { label: 'Signed in', icon: LogIn, bg: 'bg-[var(--bg-alt)]', fg: 'text-[var(--fg-muted)]', dot: 'bg-[var(--fg-subtle)]' },
+  submit_verification: { label: 'Document submitted', icon: Upload, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
+  resubmit_verification: { label: 'Document resubmitted', icon: Upload, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
+  approve_verification: { label: 'Verification approved', icon: CheckCircle, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  reject_verification: { label: 'Verification rejected', icon: XCircle, bg: 'bg-red-500/10', fg: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
+  delete_user: { label: 'Account deleted', icon: Trash2, bg: 'bg-rose-600/10', fg: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-600' },
+};
+const DEFAULT_ACTION_META = { label: 'System event', icon: Activity, bg: 'bg-[var(--bg-alt)]', fg: 'text-[var(--fg-muted)]', dot: 'bg-[var(--fg-subtle)]' };
+
+const LOG_FILTERS: Array<{ key: string; label: string; actions?: string[] }> = [
+  { key: 'all', label: 'All actions' },
+  { key: 'accounts', label: 'Accounts — register & login', actions: ['register', 'login'] },
+  { key: 'submitted', label: 'Documents submitted', actions: ['submit_verification', 'resubmit_verification'] },
+  { key: 'approved', label: 'Verifications approved', actions: ['approve_verification'] },
+  { key: 'rejected', label: 'Verifications rejected', actions: ['reject_verification'] },
+  { key: 'deleted', label: 'Accounts deleted', actions: ['delete_user'] },
+];
+
+// Supabase returns timestamptz values with no UTC marker (e.g. "2026-09-16T16:40:30.69"),
+// so `new Date(...)` misreads them as local time instead of UTC. Force UTC before parsing;
+// `toLocaleString`/`toLocaleDateString` then render in the viewer's own local time automatically.
+const parseUtc = (iso: string): Date => new Date(/[Zz]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
+
+const timeAgo = (iso: string): string => {
+  const s = Math.floor((Date.now() - parseUtc(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return parseUtc(iso).toLocaleDateString();
+};
+
+const dayLabel = (iso: string): string => {
+  const d = parseUtc(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+};
+
 const chartTip = {
   borderRadius: 10,
   border: '1px solid var(--border-strong)',
@@ -92,6 +141,7 @@ const chartTip = {
 
 const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   const dialog = useOrganicDialog();
+  const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'billing' | 'helpdesk' | 'logs' | 'settings'>('overview');
   
@@ -128,6 +178,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
+  const [logFilter, setLogFilter] = useState('all');
+  const [logFilterOpen, setLogFilterOpen] = useState(false);
+  const logFilterRef = useRef<HTMLDivElement>(null);
+  const [logSearch, setLogSearch] = useState('');
+  const [logSortDir, setLogSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Modal State
   const [manageAction, setManageAction] = useState<'balance' | 'subscription'>('balance');
@@ -139,6 +194,12 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   const [verifLoading, setVerifLoading] = useState(false);
   const [rejectModal, setRejectModal] = useState<{ id: string; businessName: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [verifStatusFilter, setVerifStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [selectedVerifId, setSelectedVerifId] = useState<string | null>(null);
+  const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null);
+  const [docPreviewLoading, setDocPreviewLoading] = useState(false);
+  const [docPreviewError, setDocPreviewError] = useState<string | null>(null);
+  const [docPreviewRetryTick, setDocPreviewRetryTick] = useState(0);
 
   // Settings State
   const [systemSettings, setSystemSettings] = useState({
@@ -160,6 +221,21 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     if (activeTab === 'verification') loadVerifications();
     if (activeTab === 'billing') loadPendingTransactions();
   }, [activeTab]);
+
+  // Audit logs auto-refresh — no manual refresh button, just poll quietly.
+  useEffect(() => {
+    const interval = setInterval(loadAuditLogs, 8000);
+    return () => clearInterval(interval);
+  }, [dbService]);
+
+  useEffect(() => {
+    if (!logFilterOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (logFilterRef.current && !logFilterRef.current.contains(e.target as Node)) setLogFilterOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [logFilterOpen]);
 
   useEffect(() => {
     supportRealtime.connect();
@@ -212,11 +288,21 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     }
   };
 
+  const loadAuditLogs = async () => {
+    try {
+      const logs = await dbService.getAuditLogs(100);
+      setAuditLogs(logs);
+    } catch (e) {
+      console.error('Error loading audit logs:', e);
+    }
+  };
+
   const loadVerifications = async () => {
     setVerifLoading(true);
     try {
       const list = await dbService.getAllVerifications();
       setVerifications(list);
+      setSelectedVerifId((current) => current ?? (list[0]?.id ?? null));
     } catch (e) {
       console.error('Error loading verifications:', e);
     } finally {
@@ -224,12 +310,53 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     }
   };
 
-  const handleApprove = async (id: string) => {
-    const confirmed = await dialog.confirm('Approve this business verification?');
+  // Load the selected submission's document as an in-app preview instead of a new tab.
+  useEffect(() => {
+    if (!selectedVerifId) { setDocPreviewUrl(null); return; }
+    let cancelled = false;
+    setDocPreviewLoading(true);
+    setDocPreviewError(null);
+    (async () => {
+      try {
+        const token = localStorage.getItem('kawayan_jwt');
+        const res = await fetch(`/api/admin/verifications/${selectedVerifId}/document`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) throw new Error('load failed');
+        const blob = await res.blob();
+        if (cancelled) return;
+        setDocPreviewUrl(URL.createObjectURL(blob));
+      } catch {
+        if (!cancelled) setDocPreviewError('Could not load this document.');
+      } finally {
+        if (!cancelled) setDocPreviewLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedVerifId, docPreviewRetryTick]);
+
+  // Release the previous blob URL whenever it's replaced or the tab unmounts.
+  useEffect(() => {
+    return () => { if (docPreviewUrl) URL.revokeObjectURL(docPreviewUrl); };
+  }, [docPreviewUrl]);
+
+  // After a decision, jump straight to the next pending item so the queue can be cleared without re-scanning the list.
+  const refreshVerificationsAndAdvance = async () => {
+    const list = await dbService.getAllVerifications();
+    setVerifications(list);
+    const nextPending = list.find((v: any) => v.status === 'pending');
+    setSelectedVerifId(nextPending ? nextPending.id : (list[0]?.id ?? null));
+  };
+
+  const handleApprove = async (id: string, businessName?: string) => {
+    const confirmed = await dialog.confirm({
+      title: 'Approve verification',
+      message: `Approve ${businessName ? `"${businessName}"` : 'this business'}? They will immediately gain full account access.`,
+      confirmLabel: 'Approve',
+    });
     if (!confirmed) return;
     try {
       await dbService.approveVerification(id);
-      loadVerifications();
+      toast.success(`${businessName ? `"${businessName}"` : 'Business'} approved`);
+      await refreshVerificationsAndAdvance();
     } catch (e) {
       await dialog.alert('Failed to approve. Please try again.');
     }
@@ -240,13 +367,40 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     if (!rejectReason.trim()) { await dialog.alert('Please provide a rejection reason.'); return; }
     try {
       await dbService.rejectVerification(rejectModal.id, rejectReason.trim());
+      toast.info(`"${rejectModal.businessName}" rejected`);
       setRejectModal(null);
       setRejectReason('');
-      loadVerifications();
+      await refreshVerificationsAndAdvance();
     } catch (e) {
       await dialog.alert('Failed to reject. Please try again.');
     }
   };
+
+  // Verification queue keyboard nav: ↑/↓ to move selection, A/R to approve/reject the pending item in view.
+  useEffect(() => {
+    if (activeTab !== 'verification' || rejectModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const list = verifStatusFilter === 'all' ? verifications : verifications.filter((v) => v.status === verifStatusFilter);
+      if (list.length === 0) return;
+      const idx = list.findIndex((v) => v.id === selectedVerifId);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedVerifId(list[Math.min(idx + 1, list.length - 1)]?.id ?? list[0].id);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedVerifId(list[Math.max(idx - 1, 0)]?.id ?? list[0].id);
+      } else if ((e.key === 'a' || e.key === 'A') && idx >= 0 && list[idx].status === 'pending') {
+        handleApprove(list[idx].id, list[idx].businessName);
+      } else if ((e.key === 'r' || e.key === 'R') && idx >= 0 && list[idx].status === 'pending') {
+        setRejectModal({ id: list[idx].id, businessName: list[idx].businessName });
+        setRejectReason('');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTab, verifications, verifStatusFilter, selectedVerifId, rejectModal]);
 
   // --- Sorting & Filtering ---
   const handleSort = (key: string) => {
@@ -283,6 +437,29 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
+  };
+
+  const getFilteredLogs = () => {
+    const q = logSearch.trim().toLowerCase();
+    const group = LOG_FILTERS.find(f => f.key === logFilter);
+    return auditLogs
+      .filter((log) => !group?.actions || group.actions.includes(log.action))
+      .filter((log) => !q || `${log.action} ${log.user_id} ${log.details || ''}`.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const diff = parseUtc(a.timestamp).getTime() - parseUtc(b.timestamp).getTime();
+        return logSortDir === 'asc' ? diff : -diff;
+      });
+  };
+
+  const getGroupedLogs = () => {
+    const groups: Array<{ day: string; entries: any[] }> = [];
+    for (const log of getFilteredLogs()) {
+      const label = dayLabel(log.timestamp);
+      const last = groups[groups.length - 1];
+      if (last && last.day === label) last.entries.push(log);
+      else groups.push({ day: label, entries: [log] });
+    }
+    return groups;
   };
 
   // --- Export Data ---
@@ -452,7 +629,6 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
               </button>
             )}
             {activeTab === 'verification' && refreshBtn(loadVerifications)}
-            {activeTab === 'logs' && refreshBtn(loadData)}
           </div>
         </header>
 
@@ -513,18 +689,22 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                   </button>
                 </header>
                 <div className="divide-y divide-[var(--border)]">
-                  {auditLogs.slice(0, 6).map((log, idx) => (
-                    <div key={idx} className="flex items-center gap-3 px-5 py-3">
-                      <div className="w-8 h-8 rounded-lg bg-[var(--bg-alt)] grid place-items-center shrink-0">
-                        <Activity className="w-3.5 h-3.5 text-[var(--fg-muted)]" />
+                  {auditLogs.slice(0, 6).map((log) => {
+                    const meta = ACTION_META[log.action] || DEFAULT_ACTION_META;
+                    const Icon = meta.icon;
+                    return (
+                      <div key={log.id} className="flex items-center gap-3 px-5 py-3">
+                        <div className={cx('w-8 h-8 rounded-lg grid place-items-center shrink-0', meta.bg)}>
+                          <Icon className={cx('w-3.5 h-3.5', meta.fg)} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-[var(--fg)] truncate">{meta.label}</p>
+                          <p className="text-xs text-[var(--fg-subtle)] truncate adm-table__mono">{log.user_id}</p>
+                        </div>
+                        <span className="text-xs text-[var(--fg-subtle)] whitespace-nowrap">{timeAgo(log.timestamp)}</span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[var(--fg)] truncate">{String(log.action).replace(/_/g, ' ')}</p>
-                        <p className="text-xs text-[var(--fg-subtle)] truncate adm-table__mono">{log.user_id}</p>
-                      </div>
-                      <span className="text-xs text-[var(--fg-subtle)] whitespace-nowrap">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {auditLogs.length === 0 && <div className="adm-empty">No activity recorded yet.</div>}
                 </div>
               </div>
@@ -604,7 +784,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                       </td>
                       <td className="adm-table__money">₱{(user.balance || 0).toLocaleString()}</td>
                       <td className="text-xs text-[var(--fg-subtle)] whitespace-nowrap">
-                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
+                        {user.createdAt ? parseUtc(user.createdAt).toLocaleDateString() : '—'}
                       </td>
                       <td>
                         <div className="flex items-center justify-end gap-1">
@@ -639,83 +819,132 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
           </Panel>
         )}
 
-        {/* ─────────────  VERIFICATION  ───────────── */}
-        {activeTab === 'verification' && (
-          <Panel flush>
-            <div className="px-4 py-3 flex gap-2 border-b border-[var(--border)] bg-[var(--bg-alt)] flex-wrap">
-              {(['pending', 'verified', 'rejected'] as const).map((s) => (
-                <span key={s} className={cx('badge', s === 'pending' ? 'badge-amber' : s === 'verified' ? 'badge-green' : 'badge-red')}>
-                  {s}: {verifications.filter((v) => v.status === s).length}
-                </span>
-              ))}
-            </div>
-            {verifLoading ? (
-              <div className="adm-spinner" />
-            ) : verifications.length === 0 ? (
-              <div className="adm-empty">No verification submissions yet.</div>
-            ) : (
-              <div className="adm-table-wrap">
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      <th>Business</th><th>Contact</th><th>Document</th><th>Status</th><th>Submitted</th><th className="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {verifications.map((v) => (
-                      <tr key={v.id}>
-                        <td>
-                          <p className="adm-table__primary">{v.businessName}</p>
-                          <p className="text-xs text-[var(--fg-subtle)] mt-0.5">{v.email}</p>
-                          {v.businessAddress && <p className="text-xs text-[var(--fg-subtle)] mt-0.5 truncate max-w-[180px]">{v.businessAddress}</p>}
-                        </td>
-                        <td className="text-xs text-[var(--fg-muted)]">{v.businessPhone || '—'}</td>
-                        <td>
-                          <button
-                            onClick={async () => {
-                              const token = localStorage.getItem('kawayan_jwt');
-                              try {
-                                const res = await fetch(`/api/admin/verifications/${v.id}/document`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                                if (!res.ok) { await dialog.alert('Could not load document.'); return; }
-                                const blob = await res.blob();
-                                const url = URL.createObjectURL(blob);
-                                window.open(url, '_blank');
-                              } catch { await dialog.alert('Failed to open document.'); }
-                            }}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--primary)] hover:underline"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            {v.documentName || 'View file'}
-                            <ExternalLink className="w-3 h-3 opacity-60" />
-                          </button>
-                        </td>
-                        <td>
-                          <VStatusBadge status={v.status} />
-                          {v.status === 'rejected' && v.rejectionReason && (
-                            <p className="text-[10px] text-[var(--danger)] mt-1 max-w-[150px] truncate" title={v.rejectionReason}>{v.rejectionReason}</p>
-                          )}
-                        </td>
-                        <td className="text-xs text-[var(--fg-subtle)] whitespace-nowrap">{v.createdAt ? new Date(v.createdAt).toLocaleDateString() : '—'}</td>
-                        <td>
-                          {v.status === 'pending' ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => handleApprove(v.id)} className="btn btn-primary btn-sm"><CheckCircle className="w-3.5 h-3.5" /> Approve</button>
-                              <button onClick={() => { setRejectModal({ id: v.id, businessName: v.businessName }); setRejectReason(''); }} className="btn btn-danger btn-sm"><XCircle className="w-3.5 h-3.5" /> Reject</button>
-                            </div>
-                          ) : (
-                            <span className="block text-right text-xs text-[var(--fg-subtle)] italic">
-                              Reviewed {v.reviewedAt ? new Date(v.reviewedAt).toLocaleDateString() : ''}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* ─────────────  VERIFICATION — review queue  ───────────── */}
+        {activeTab === 'verification' && (() => {
+          const filteredVerifs = verifStatusFilter === 'all' ? verifications : verifications.filter((v) => v.status === verifStatusFilter);
+          const selectedVerif = verifications.find((v) => v.id === selectedVerifId) || null;
+          const isPdf = /\.pdf$/i.test(selectedVerif?.documentName || '');
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 items-start">
+              {/* Queue list */}
+              <div className="adm-panel overflow-hidden">
+                <div className="p-3 border-b border-[var(--border)] flex items-center gap-1.5 flex-wrap">
+                  {(['all', 'pending', 'verified', 'rejected'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setVerifStatusFilter(s)}
+                      className={cx(
+                        'px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border transition-colors',
+                        verifStatusFilter === s
+                          ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                          : 'border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)]'
+                      )}
+                    >
+                      {s === 'all' ? `All · ${verifications.length}` : `${s} · ${verifications.filter((v) => v.status === s).length}`}
+                    </button>
+                  ))}
+                </div>
+                <p className="px-3 py-1.5 text-[10px] text-[var(--fg-subtle)] border-b border-[var(--border)]">
+                  <kbd className="adm-table__mono">↑↓</kbd> move · <kbd className="adm-table__mono">A</kbd> approve · <kbd className="adm-table__mono">R</kbd> reject
+                </p>
+                <div className="max-h-[600px] overflow-y-auto divide-y divide-[var(--border)]">
+                  {verifLoading ? (
+                    <div className="adm-spinner m-6" />
+                  ) : filteredVerifs.length === 0 ? (
+                    <div className="adm-empty">No submissions.</div>
+                  ) : filteredVerifs.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVerifId(v.id)}
+                      className={cx('w-full text-left pl-16 pr-4 py-3 lg:px-4 transition-colors', selectedVerifId === v.id ? 'bg-[var(--bg-alt)]' : 'hover:bg-[var(--bg-alt)]')}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[var(--fg)] truncate">{v.businessName || 'Unnamed business'}</p>
+                        <VStatusBadge status={v.status} />
+                      </div>
+                      <p className="text-xs text-[var(--fg-subtle)] truncate mt-0.5">{v.email}</p>
+                      <p className="text-[11px] text-[var(--fg-subtle)] mt-1">{v.createdAt ? parseUtc(v.createdAt).toLocaleDateString() : '—'}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-          </Panel>
-        )}
+
+              {/* Detail + inline document preview */}
+              <div className="adm-panel p-5 min-h-[520px]">
+                {!selectedVerif ? (
+                  <div className="adm-empty h-full flex items-center justify-center min-h-[460px]">Select a submission to review.</div>
+                ) : (
+                  <>
+                    <header className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-[var(--border)]">
+                      <div className="min-w-0">
+                        <h3 className="font-display text-lg font-bold text-[var(--fg)] truncate">{selectedVerif.businessName || 'Unnamed business'}</h3>
+                        <p className="text-sm text-[var(--fg-muted)] truncate">{selectedVerif.email}</p>
+                      </div>
+                      <VStatusBadge status={selectedVerif.status} />
+                    </header>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-5">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Phone</p>
+                        <p className="text-[var(--fg)]">{selectedVerif.businessPhone || '—'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Address</p>
+                        <p className="text-[var(--fg)] truncate">{selectedVerif.businessAddress || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Submitted</p>
+                        <p className="text-[var(--fg)]">{selectedVerif.createdAt ? parseUtc(selectedVerif.createdAt).toLocaleDateString() : '—'}</p>
+                      </div>
+                    </div>
+
+                    {selectedVerif.status === 'rejected' && selectedVerif.rejectionReason && (
+                      <div className="mb-5 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-3.5 py-2.5 text-xs text-[var(--danger)]">
+                        <strong>Rejection reason:</strong> {selectedVerif.rejectionReason}
+                      </div>
+                    )}
+                    {selectedVerif.status !== 'pending' && selectedVerif.reviewedAt && (
+                      <p className="text-xs text-[var(--fg-subtle)] italic mb-5">Reviewed {parseUtc(selectedVerif.reviewedAt).toLocaleString()}</p>
+                    )}
+
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" /> Submitted document
+                      </p>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--fg-subtle)]">{isPdf ? 'PDF' : 'Image'}</span>
+                    </div>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-alt)] overflow-hidden flex items-center justify-center" style={{ minHeight: 380 }}>
+                      {docPreviewLoading ? (
+                        <div className="adm-spinner" />
+                      ) : docPreviewError ? (
+                        <div className="text-center p-6">
+                          <p className="text-xs text-[var(--fg-subtle)] mb-3">{docPreviewError}</p>
+                          <button type="button" onClick={() => setDocPreviewRetryTick((n) => n + 1)} className="btn btn-outline btn-sm">
+                            <RefreshCw className="w-3.5 h-3.5" /> Retry
+                          </button>
+                        </div>
+                      ) : docPreviewUrl && isPdf ? (
+                        <iframe src={docPreviewUrl} className="w-full" style={{ height: 480, border: 0 }} title="Submitted document" />
+                      ) : docPreviewUrl ? (
+                        <img src={docPreviewUrl} alt="Submitted document" className="max-w-full max-h-[480px] object-contain" />
+                      ) : null}
+                    </div>
+                    <p className="text-[11px] text-[var(--fg-subtle)] mt-1.5 mb-5 truncate" title={selectedVerif.documentName}>{selectedVerif.documentName || ' '}</p>
+
+                    {selectedVerif.status === 'pending' && (
+                      <div className="flex items-center gap-5">
+                        <button onClick={() => handleApprove(selectedVerif.id, selectedVerif.businessName)} className="btn btn-primary"><CheckCircle className="w-4 h-4" /> Approve</button>
+                        <button onClick={() => { setRejectModal({ id: selectedVerif.id, businessName: selectedVerif.businessName }); setRejectReason(''); }} className="btn btn-danger"><XCircle className="w-4 h-4" /> Reject</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ─────────────  BILLING  ───────────── */}
         {activeTab === 'billing' && (
@@ -739,7 +968,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                         </td>
                         <td className="text-[var(--fg-muted)]">{txn.description}</td>
                         <td className="adm-table__money">₱{Number(txn.amount).toLocaleString()}</td>
-                        <td className="text-xs text-[var(--fg-subtle)]">{new Date(txn.date).toLocaleString()}</td>
+                        <td className="text-xs text-[var(--fg-subtle)]">{parseUtc(txn.date).toLocaleString()}</td>
                         <td><span className="badge badge-amber">{txn.status}</span></td>
                         <td className="text-right">
                           <button onClick={() => handleApproveTransaction(txn.id)} className="btn btn-primary btn-sm">Verify payment</button>
@@ -801,29 +1030,103 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
           </Panel>
         )}
 
-        {/* ─────────────  AUDIT LOGS  ───────────── */}
+        {/* ─────────────  AUDIT LOGS — activity timeline  ───────────── */}
         {activeTab === 'logs' && (
-          <Panel flush>
-            <div className="adm-table-wrap">
-              <table className="adm-table">
-                <thead>
-                  <tr><th>Timestamp</th><th>User ID</th><th>Action</th><th>Details</th></tr>
-                </thead>
-                <tbody>
-                  {auditLogs.length === 0 ? (
-                    <tr><td colSpan={4}><div className="adm-empty">No logs recorded.</div></td></tr>
-                  ) : auditLogs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td className="text-xs text-[var(--fg-muted)] whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                      <td className="adm-table__mono">{log.user_id}</td>
-                      <td><span className="badge badge-sage">{String(log.action).replace(/_/g, ' ')}</span></td>
-                      <td className="text-xs text-[var(--fg-muted)] max-w-xs truncate">{log.details || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="adm-panel p-3.5" style={{ overflow: 'visible' }}>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-subtle)]" />
+                  <input
+                    type="text"
+                    placeholder="Search account, email, action…"
+                    value={logSearch}
+                    onChange={(e) => setLogSearch(e.target.value)}
+                    className="input !pl-8 !py-1.5 !text-xs"
+                  />
+                </div>
+                <div className="relative" ref={logFilterRef}>
+                  <button
+                    type="button"
+                    onClick={() => setLogFilterOpen((o) => !o)}
+                    className="input !py-1.5 !text-xs !w-auto !pl-8 pr-7 relative flex items-center whitespace-nowrap cursor-pointer"
+                  >
+                    <Filter className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-subtle)]" />
+                    {LOG_FILTERS.find((f) => f.key === logFilter)?.label}
+                    <ChevronDown className={cx('w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-subtle)] transition-transform', logFilterOpen && 'rotate-180')} />
+                  </button>
+                  {logFilterOpen && (
+                    <div className="absolute z-20 top-full mt-1.5 left-0 min-w-[230px] rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg py-1.5">
+                      {LOG_FILTERS.map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => { setLogFilter(f.key); setLogFilterOpen(false); }}
+                          className={cx(
+                            'w-full text-left px-3.5 py-2 text-xs font-medium transition-colors',
+                            logFilter === f.key
+                              ? 'bg-[var(--primary)] text-white'
+                              : 'text-[var(--fg-muted)] hover:bg-[var(--bg-alt)] hover:text-[var(--fg)]'
+                          )}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLogSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                  className="btn btn-glass btn-sm ml-auto"
+                >
+                  <Filter className="w-3.5 h-3.5" /> {logSortDir === 'desc' ? 'Newest' : 'Oldest'} first
+                </button>
+              </div>
             </div>
-          </Panel>
+
+            {/* Timeline */}
+            <div className="adm-panel p-5">
+              {getGroupedLogs().length === 0 ? (
+                <div className="adm-empty">No logs match.</div>
+              ) : (
+                getGroupedLogs().map(({ day, entries }) => (
+                  <div key={day} className="mb-7 last:mb-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--fg-subtle)] mb-3.5">{day}</p>
+                    <div className="space-y-5 border-l-2 border-[var(--border)] pl-5 ml-1.5">
+                      {entries.map((log) => {
+                        const meta = ACTION_META[log.action] || DEFAULT_ACTION_META;
+                        const Icon = meta.icon;
+                        return (
+                          <div key={log.id} className="relative">
+                            <span className={cx('absolute -left-[26px] top-1 w-2.5 h-2.5 rounded-full ring-4 ring-[var(--card)]', meta.dot)} />
+                            <div className="flex items-start gap-3">
+                              <div className={cx('w-8 h-8 rounded-lg grid place-items-center shrink-0', meta.bg)}>
+                                <Icon className={cx('w-4 h-4', meta.fg)} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-semibold text-[var(--fg)]">{meta.label}</p>
+                                  <span className="text-xs text-[var(--fg-subtle)] whitespace-nowrap" title={parseUtc(log.timestamp).toLocaleString()}>
+                                    {timeAgo(log.timestamp)}
+                                  </span>
+                                </div>
+                                {log.details && (
+                                  <p className="text-xs text-[var(--fg-muted)] mt-1 break-words leading-relaxed">{log.details}</p>
+                                )}
+                                <p className="adm-table__mono text-[10px] mt-1.5">account id: {log.user_id}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         )}
 
         {/* ─────────────  SETTINGS  ───────────── */}

@@ -49,7 +49,7 @@ export class SupabaseService {
 
     const passwordHash = await JWTService.hashPassword(password);
     const newUser: User = {
-      id: Date.now().toString(),
+      id: `KWYN-${Date.now()}`,
       email: normalizedEmail,
       passwordHash,
       role,
@@ -1230,6 +1230,27 @@ export class SupabaseService {
     if (error) throw error;
   }
 
+  // "name <email> (id:...)" string for audit-log details, reusing getUserById.
+  async describeUser(userId: string): Promise<string> {
+    const user = await this.getUserById(userId);
+    if (!user) return `id:${userId}`;
+    return `${user.businessName || user.email} <${user.email}> (id:${user.id})`;
+  }
+
+  async logAudit(userId: string, action: string, details?: string): Promise<void> {
+    const { error } = await this.supabase.from('audit_logs').insert({
+      id: Date.now().toString(),
+      user_id: userId,
+      action,
+      details: details ?? null,
+    });
+    if (error) {
+      logger.error('Audit log insert failed', { error: error.message, action });
+    } else {
+      logger.info(`AUDIT: ${action}`, { userId, details });
+    }
+  }
+
   async getAuditLogs(limit: number = 100): Promise<any[]> {
     const { data, error } = await this.supabase
       .from('audit_logs')
@@ -1280,7 +1301,7 @@ export class SupabaseService {
       .maybeSingle();
     if (!existing) {
       const passwordHash = await JWTService.hashPassword('Admin123!');
-      const id = Date.now().toString();
+      const id = `KWYN-${Date.now()}`;
       const { error } = await this.supabase
         .from('users')
         .insert({
