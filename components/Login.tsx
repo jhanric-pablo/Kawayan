@@ -234,18 +234,22 @@ const Login: React.FC<Props> = ({
     setForgotMsg('');
     setForgotLink('');
     setForgotLoading(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+        signal: controller.signal,
       });
       const data = await res.json();
       setForgotMsg(data.message || 'If that email exists, a reset link has been sent.');
       if (data.devResetUrl) setForgotLink(data.devResetUrl);
-    } catch {
-      setForgotMsg('Network error. Please try again.');
+    } catch (err: any) {
+      setForgotMsg(err?.name === 'AbortError' ? 'Request timed out. Please try again.' : 'Network error. Please try again.');
     } finally {
+      clearTimeout(timeout);
       setForgotLoading(false);
     }
   };

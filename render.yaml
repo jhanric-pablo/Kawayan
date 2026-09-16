@@ -29,12 +29,13 @@ services:
       - key: SESSION_TIMEOUT
         value: 24h
 
-      # Email (password reset links)
+      # Email (password reset links, verification-approved notice) — sent via
+      # Resend's HTTPS API, not SMTP, since Render's free plan blocks outbound
+      # SMTP ports. Get a key at resend.com; no domain verification needed if
+      # MAIL_FROM stays on their shared onboarding@resend.dev sender.
       - key: APP_URL
         sync: false # your Render URL, e.g. https://kawayan-ai.onrender.com
-      - key: GMAIL_USER
-        sync: false
-      - key: GMAIL_APP_PASSWORD
+      - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM
         sync: false

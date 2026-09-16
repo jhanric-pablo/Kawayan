@@ -1,39 +1,35 @@
-import nodemailer from 'nodemailer';
 import { logger } from './logger';
 
-// Sends through Gmail SMTP. Needs a Google account with 2-Step Verification
-// enabled and an App Password (myaccount.google.com -> Security -> App passwords).
-// Returns false (and logs) when GMAIL_USER / GMAIL_APP_PASSWORD are unset, so a
-// dev without creds still works off the reset link the caller logs / echoes.
-let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
-
-function getTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) return null;
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
-    });
-  }
-  return transporter;
-}
-
+// Sends through Resend's HTTPS API (resend.com), not SMTP — outbound SMTP
+// (ports 25/465/587) is blocked on Render's free plan and similar hosts,
+// which silently hangs a raw SMTP connection instead of failing fast.
+// Returns false (and logs) when RESEND_API_KEY is unset, so a dev without
+// creds still works off the reset link the caller logs / echoes.
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  const tx = getTransporter();
-  if (!tx) {
-    logger.warn('sendEmail skipped: GMAIL_USER / GMAIL_APP_PASSWORD not set', { to, subject });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    logger.warn('sendEmail skipped: RESEND_API_KEY not set', { to, subject });
     return false;
   }
 
   try {
-    await tx.sendMail({
-      from: process.env.MAIL_FROM || `Kawayan <${process.env.GMAIL_USER}>`,
-      to,
-      subject,
-      html,
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM || 'Kawayan <onboarding@resend.dev>',
+        to,
+        subject,
+        html,
+      }),
     });
+    if (!res.ok) {
+      logger.error('sendEmail error', { to, status: res.status, body: await res.text() });
+      return false;
+    }
     return true;
   } catch (error: any) {
     logger.error('sendEmail error', { to, error: error.message });
