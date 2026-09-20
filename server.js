@@ -1086,11 +1086,11 @@ app.post('/api/admin/verifications/:id/approve', authenticateToken, requireAdmin
     if (clientUser?.email) {
       await sendEmail(
         clientUser.email,
-        'Your business has been verified — Kawayan',
+        'Your Kawayan business verification is approved',
         `<p>Hi ${clientUser.businessName || 'there'},</p>
-         <p>Good news — your submitted business document has been reviewed and <strong>verified</strong>. Your Kawayan account now has full access.</p>
-         <p><a href="https://kawayan-ai.onrender.com/">Login now here</a> to get started.</p>
-         <p>Thanks for choosing Kawayan.</p>`
+         <p>Your business verification for this Kawayan account has been approved.</p>
+         <p><a href="https://kawayan-ai.onrender.com/">Sign in to your account</a></p>
+         <p>Thanks for using Kawayan.</p>`
       );
     }
     res.json({ message: 'Verification approved' });

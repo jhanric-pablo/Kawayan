@@ -1,5 +1,19 @@
 import { logger } from './logger';
 
+// Sending HTML with no plain-text alternative is a spam signal — derive one
+// from our (always simple: <p>/<a>/<strong>) templates rather than asking
+// every caller to write both.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<a\s+[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, '$2 ($1)')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n\s*/g, '\n\n')
+    .trim();
+}
+
 // Sends through Resend's HTTPS API (resend.com), not SMTP — outbound SMTP
 // (ports 25/465/587) is blocked on Render's free plan and similar hosts,
 // which silently hangs a raw SMTP connection instead of failing fast.
@@ -24,6 +38,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
         to,
         subject,
         html,
+        text: htmlToText(html),
       }),
     });
     if (!res.ok) {
