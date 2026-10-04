@@ -29,7 +29,7 @@ Last updated: June 2025
 | User can access **Growth Insights Dashboard** | **Done** | `InsightsDashboard.tsx`, nav label **Growth Insights** |
 | Dashboard shows **engagement metrics** | **Done** | Followers, views, interactions, likes per platform (`socialService` + extension sync) |
 | Dashboard translates metrics into **visual charts** | **Enhanced** | Bar chart — engagement by channel (`recharts`) |
-| Dashboard demonstrates **digital ROI** | **Enhanced** | ROI card: estimated reach value vs wallet spend |
+| Dashboard demonstrates **digital ROI** | **Removed** | ROI card withdrawn (Sept 2026 review); Insights now shows engagement metrics and the per-channel chart only |
 | User can access **analytics from the platform** | **Done** | Browser extension sync (Facebook, Instagram, TikTok) |
 
 ---
@@ -60,7 +60,7 @@ Last updated: June 2025
 
 - **Trial** maps to subscription tier `FREE` in code; UI may label it “Free Trial”.
 - **Add-on posts** use `addon-{timestamp}` IDs to bypass the monthly tier cap after wallet payment.
-- **ROI** uses an estimated ₱0.05 per reach unit (views + interactions + likes + followers); adjust in `InsightsDashboard.tsx` if business rules change.
+- **ROI** was previously estimated at ₱0.05 per reach unit; the card was removed from `InsightsDashboard.tsx` in the Sept 2026 review and the formula no longer ships.
 - **Retention** is approximated from distinct monthly posters vs cumulative user base (no `deleted_at` cohort churn yet).
 
 ## Related docs

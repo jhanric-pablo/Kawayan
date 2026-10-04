@@ -394,7 +394,7 @@ const SupportWidget: React.FC = () => {
 
           </div>
         )}
-        <button onClick={() => setIsOpen(!isOpen)} className="group relative flex items-center justify-center w-14 h-14 bg-[#2B5748] dark:bg-[#2B5748] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
+        <button data-tour="support-bubble" onClick={() => setIsOpen(!isOpen)} className="group relative flex items-center justify-center w-14 h-14 bg-[#2B5748] dark:bg-[#2B5748] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
           {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         </button>
       </div>

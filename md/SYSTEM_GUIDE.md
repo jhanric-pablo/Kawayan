@@ -109,7 +109,7 @@ Billing uses a **prepaid wallet** funded through **Xendit**. Pro users get 16 po
 | Tier Limits | FREE=8, PRO=16 posts per calendar month |
 | Add-on Posts | ₱150 paid supplemental post (`addon-` ID bypasses cap) |
 | Xendit Billing | Wallet top-up, Pro subscription, transaction history |
-| Growth Insights | Engagement metrics, charts, digital ROI estimate |
+| Growth Insights | Engagement metrics and per-channel charts |
 | Browser Extension | Sync FB/IG/TikTok stats; assist posting |
 | Business Verification | Document upload; admin approve/reject |
 | Help Desk | Technical/Billing tickets, AI chat, WebRTC calls |
@@ -183,7 +183,7 @@ This section maps **typical Capstone thesis chapters** to what Kawayan implement
 | Automate scheduling | `content_plans` + calendar day assignment | Reduces manual calendar work |
 | Implement tiered SaaS model | 8/16 post limits + Pro plan | Sustainable freemium business model |
 | Integrate local payments | Xendit wallet | PH-standard e-wallet checkout |
-| Measure digital ROI | Growth Insights ROI card | Connects spend to engagement outcomes |
+| Measure engagement | Growth Insights per-channel chart | Connects posting activity to reach outcomes |
 | Ensure trustworthy onboarding | Business verification | Reduces fraud; aligns with MSME registration |
 | Provide user support | Help desk + ticket categories | Operational requirement for real deployment |
 
@@ -226,7 +226,7 @@ Documented in **Section 16**. Includes `systemTest.ts`, `dbTest.ts`, manual UAT 
 | User growth | Admin → User Growth chart |
 | Retention | Admin → 30-day retention % + bar chart |
 | Engagement | Growth Insights per platform |
-| Digital ROI | Insights ROI card (reach value vs wallet spend) |
+| Reach | Insights per-channel engagement chart |
 | Content output | Posts created count (admin stats) |
 | Support load | Open tickets, call history |
 
@@ -522,10 +522,10 @@ flowchart TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Purpose** | Engagement analytics and ROI |
+| **Purpose** | Engagement analytics |
 | **Files** | `InsightsDashboard.tsx`, `socialService.ts`, `extension/*` |
 | **Inputs** | Extension sync messages, platform usernames |
-| **Outputs** | Metric cards, bar chart, ROI percentage |
+| **Outputs** | Metric cards, bar chart |
 | **Tables** | `social_connections` |
 | **APIs** | `/api/social/connections`, `/api/social/stats/:platform/:username` |
 | **Permissions** | Authenticated user |
@@ -1057,25 +1057,17 @@ AI may return 5–7 ideas; `normalizeIdeasToBatchCount` pads or trims to exactly
 nextNum = max(1001, MAX(ticket_num) + 1)
 ```
 
-### 14.4 Digital ROI (Insights)
-
-```
-totalReach = sum(views + interactions + likes + followers) across platforms
-estimatedValue = totalReach × ₱0.05
-ROI% = ((estimatedValue - walletSpend) / walletSpend) × 100
-```
-
-### 14.5 Retention Rate (Admin)
+### 14.4 Retention Rate (Admin)
 
 ```
 retention = (users with posts in last 30 days) / (users joined 30+ days ago) × 100
 ```
 
-### 14.6 Pending Transaction Expiry
+### 14.5 Pending Transaction Expiry
 
 Pending transactions older than **12 hours** auto-marked `FAILED` on wallet load.
 
-### 14.7 Regeneration Limit
+### 14.6 Regeneration Limit
 
 Each post allows max **2** caption/image regenerations (`regenCount` in UI; previous versions stored in `history` JSON).
 

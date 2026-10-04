@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrandProfile, User } from '../types';
-import { Save, User as UserIcon, MessageCircle, Target, Briefcase, Moon, Sun, Monitor, ArrowLeft, Lock, CreditCard, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Save, User as UserIcon, MessageCircle, Target, Briefcase, Moon, Sun, Monitor, ArrowLeft, Lock, CreditCard, AlertTriangle, CheckCircle, PlayCircle } from 'lucide-react';
+import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import { paymentService, Wallet } from '../services/paymentService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
@@ -13,14 +14,18 @@ interface Props {
   onUserUpdate: (u: User) => void;
   darkMode: boolean;
   toggleDarkMode: () => void;
+  /** Re-runs the onboarding walkthrough. Absent for non-'user' roles. */
+  onReplayTour?: () => void;
   onClose?: () => void;
 }
 
-const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdate, darkMode, toggleDarkMode, onClose }) => {
+const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdate, darkMode, toggleDarkMode, onReplayTour, onClose }) => {
   const dialog = useOrganicDialog();
   const [formData, setFormData] = useState<BrandProfile>({
     userId: user?.id || '',
-    businessName: profile?.businessName || '',
+    // Always the verified name on the user record; saving re-syncs the brand
+    // profile copy rather than preserving a divergent one.
+    businessName: user?.businessName || profile?.businessName || '',
     industry: profile?.industry || '',
     targetAudience: profile?.targetAudience || '',
     brandVoice: profile?.brandVoice || '',
@@ -50,12 +55,15 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
     if (profile) {
       setFormData({
         ...profile,
+        // The verified user record wins over the brand-profile copy, so a
+        // profile that drifted in the past is corrected on the next save.
+        businessName: user?.businessName || profile.businessName,
         brandColors: profile.brandColors && profile.brandColors.length > 0 
           ? profile.brandColors 
           : ['#10b981', '#3b82f6', '#f59e0b']
       });
     }
-  }, [profile]);
+  }, [profile, user?.businessName]);
 
   useEffect(() => {
     if (activeTab === 'billing') {
@@ -243,6 +251,22 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
                    <Moon className="w-3.5 h-3.5"/> Dark
                  </button>
               </div>
+
+              {onReplayTour && (
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                   <div className="min-w-0">
+                      <p className="text-xs font-bold" style={{ color: 'var(--fg)' }}>Product walkthrough</p>
+                      <p className="text-[11px] leading-snug" style={{ color: 'var(--fg-muted)' }}>A quick tour of the calendar, insights and billing.</p>
+                   </div>
+                   <button
+                     type="button"
+                     onClick={onReplayTour}
+                     className="btn btn-outline btn-sm shrink-0"
+                   >
+                     <PlayCircle className="w-3.5 h-3.5"/> Replay
+                   </button>
+                </div>
+              )}
            </div>
         </div>
 
@@ -263,24 +287,39 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdat
 
                 <div className="space-y-4">
                    <div>
-                      <label className={fieldLabel} style={labelStyle}>Business name</label>
+                      <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><Lock className="w-3.5 h-3.5"/> Business name</label>
                       <input
                         type="text"
                         value={formData.businessName}
-                        onChange={(e) => handleChange('businessName', e.target.value)}
+                        readOnly
+                        disabled
                         className="input"
+                        style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                        aria-describedby="settings-bizname-hint"
                       />
+                      <p id="settings-bizname-hint" className="text-xs mt-1.5" style={{ color: 'var(--fg-subtle)' }}>
+                        This is your verified business name from your registration document. Contact support to change it.
+                      </p>
                    </div>
 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                         <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><Briefcase className="w-3.5 h-3.5"/> Industry</label>
-                         <input
-                           type="text"
+                         <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle} htmlFor="settings-industry"><Briefcase className="w-3.5 h-3.5"/> Industry</label>
+                         <select
+                           id="settings-industry"
                            value={formData.industry}
                            onChange={(e) => handleChange('industry', e.target.value)}
                            className="input"
-                         />
+                         >
+                           <option value="" disabled>Select an industry…</option>
+                           {/* Keep a pre-dropdown free-text value selectable so saving never silently rewrites it. */}
+                           {isLegacyIndustry(formData.industry) && (
+                             <option value={formData.industry}>{formData.industry}</option>
+                           )}
+                           {INDUSTRY_OPTIONS.map((opt) => (
+                             <option key={opt} value={opt}>{opt}</option>
+                           ))}
+                         </select>
                       </div>
                       <div>
                          <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><Target className="w-3.5 h-3.5"/> Target audience</label>

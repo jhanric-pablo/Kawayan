@@ -146,6 +146,13 @@ export class ValidationService {
   }
   
   // Validate brand profile
+  //
+  // NOTE: currently unused — nothing in the app calls this, and the same is
+  // true of BrandProfileSchema in types.ts. Real enforcement lives in the
+  // forms: business name is read-only (it mirrors the verified users record)
+  // and industry is a <select> over constants/industries.ts, so the two fields
+  // cannot be swapped. If this ever goes live, industry must be checked
+  // against INDUSTRY_OPTIONS rather than sharing business name's length rule.
   static validateBrandProfile(profile: any): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
     

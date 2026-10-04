@@ -3,11 +3,10 @@ import {
   Users, RefreshCcw, ExternalLink, Heart, 
   Image as ImageIcon, UserPlus, Zap, BarChart3,
   Facebook, Instagram, MessageCircle, X, Eye, 
-  UserMinus, MousePointer2, TrendingUp, DollarSign
+  UserMinus, MousePointer2, TrendingUp
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { socialService, SocialPlatformData } from '../services/socialService';
-import { paymentService } from '../services/paymentService';
 import { useOrganicDialog } from './OrganicDialog';
 
 const InsightsDashboard: React.FC = () => {
@@ -17,7 +16,6 @@ const InsightsDashboard: React.FC = () => {
   const [targetPlatform, setTargetPlatform] = useState<'facebook' | 'instagram' | 'tiktok' | null>(null);
   const [modalUsername, setModalUsername] = useState('');
   const [platformData, setPlatformData] = useState<SocialPlatformData[]>([]);
-  const [walletSpend, setWalletSpend] = useState(0);
 
   const chartColors = ['#2B5748', '#4F9878', '#9CB080', '#1877F2', '#dc2743'];
 
@@ -36,19 +34,6 @@ const InsightsDashboard: React.FC = () => {
       };
     });
   }, [platformData]);
-
-  const totalReach = useMemo(
-    () => engagementChartData.reduce((sum, row) => sum + row.reach, 0),
-    [engagementChartData]
-  );
-
-  const estimatedDigitalValue = totalReach * 0.05;
-  const digitalRoiPercent =
-    walletSpend > 0
-      ? Math.round(((estimatedDigitalValue - walletSpend) / walletSpend) * 100)
-      : totalReach > 0
-        ? 100
-        : 0;
 
   useEffect(() => {
     loadData();
@@ -79,16 +64,6 @@ const InsightsDashboard: React.FC = () => {
       }
     }
     setPlatformData(data);
-
-    try {
-      const wallet = await paymentService.getWalletData();
-      const spend = wallet.transactions
-        .filter((t) => t.type === 'DEBIT' && t.status === 'COMPLETED')
-        .reduce((sum, t) => sum + t.amount, 0);
-      setWalletSpend(spend);
-    } catch {
-      setWalletSpend(0);
-    }
   };
 
   const openSyncModal = (platform: 'facebook' | 'instagram' | 'tiktok') => {
@@ -143,7 +118,7 @@ const InsightsDashboard: React.FC = () => {
           </div>
           <h1 className="page-head__title">Growth Insights</h1>
           <p className="page-head__sub">
-            Engagement metrics, charts and digital ROI synced via the Kawayan extension.
+            Engagement metrics and charts synced via the Kawayan extension.
           </p>
         </div>
 
@@ -169,39 +144,23 @@ const InsightsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ROI + Chart */}
+      {/* Engagement chart */}
       {platformData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="surface p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center" style={{ background: 'var(--kw-green-pale)' }}>
-                <DollarSign className="w-4 h-4" style={{ color: 'var(--primary)' }} />
-              </div>
-              <h2 className="font-display text-base font-semibold" style={{ color: 'var(--fg)' }}>Digital ROI</h2>
-            </div>
-            <p className="font-display text-4xl font-semibold" style={{ color: digitalRoiPercent >= 0 ? 'var(--primary)' : 'var(--danger)' }}>
-              {digitalRoiPercent >= 0 ? '+' : ''}{digitalRoiPercent}%
-            </p>
-            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
-              Estimated value ₱{estimatedDigitalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} from {totalReach.toLocaleString()} reach units vs ₱{walletSpend.toLocaleString()} spend.
-            </p>
-          </div>
-          <div className="surface lg:col-span-2 p-6" style={{ height: '280px' }}>
-            <h2 className="font-display text-base font-semibold mb-4" style={{ color: 'var(--fg)' }}>Engagement by channel</h2>
-            <ResponsiveContainer width="100%" height="82%">
-              <BarChart data={engagementChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" tick={{ fill: 'var(--fg-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--fg-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 'var(--r)', border: '1px solid var(--border-strong)', background: 'var(--card)', boxShadow: 'var(--shadow-md)' }} />
-                <Bar dataKey="reach" radius={[8, 8, 0, 0]}>
-                  {engagementChartData.map((_, i) => (
-                    <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="surface p-6" style={{ height: '280px' }}>
+          <h2 className="font-display text-base font-semibold mb-4" style={{ color: 'var(--fg)' }}>Engagement by channel</h2>
+          <ResponsiveContainer width="100%" height="82%">
+            <BarChart data={engagementChartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+              <XAxis dataKey="name" tick={{ fill: 'var(--fg-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--fg-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 'var(--r)', border: '1px solid var(--border-strong)', background: 'var(--card)', boxShadow: 'var(--shadow-md)' }} />
+              <Bar dataKey="reach" radius={[8, 8, 0, 0]}>
+                {engagementChartData.map((_, i) => (
+                  <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 

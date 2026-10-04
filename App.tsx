@@ -16,6 +16,7 @@ import SupportDashboard from './components/SupportDashboard';
 import VerificationStatusScreen from './components/VerificationStatus';
 import TermsOfServiceModal from './components/TermsOfServiceModal';
 import AppHydrationLoader from './components/AppHydrationLoader';
+import SpotlightTour from './components/tour/SpotlightTour';
 import { useOrganicDialog } from './components/OrganicDialog';
 import UniversalDatabaseService from './services/universalDatabaseService';
 import { supportRealtime } from './services/supportRealtime';
@@ -29,7 +30,8 @@ import {
   getHomeViewForRole,
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
-import { LayoutDashboard, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
+import { isTourDone, markTourDone } from './utils/tourState';
+import { CalendarDays, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -52,6 +54,7 @@ const App: React.FC = () => {
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const loginInProgressRef = useRef(false);
   const sessionRestoredRef = useRef(false);
   const handleLoginRef = useRef<(user: User, initialView?: ViewState) => Promise<void>>(async () => {});
@@ -369,6 +372,10 @@ const App: React.FC = () => {
       await dbService.saveProfile(newProfile);
       setBrandProfile(newProfile);
       navigateView(ViewState.CALENDAR);
+      // First time through onboarding: walk them around the calendar they just
+      // landed on. Existing accounts are never ambushed — only this path and
+      // the explicit replay in Settings open the tour.
+      if (!isTourDone(user.id)) setTourOpen(true);
     } catch (error) {
       console.error('Error saving profile:', error);
       await dialog.alert('Failed to save profile. Please try again.');
@@ -424,6 +431,19 @@ const App: React.FC = () => {
     navigateView(next);
   };
 
+  // Replay from Settings: the tour's anchors live on the calendar, so go there
+  // first. The view switch is synchronous, so the elements exist by the time
+  // SpotlightTour measures them.
+  const handleReplayTour = () => {
+    goTo(ViewState.CALENDAR);
+    setTourOpen(true);
+  };
+
+  const closeTour = () => {
+    setTourOpen(false);
+    if (user) markTourDone(user.id);
+  };
+
   const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN, ViewState.RESET_PASSWORD];
   const isAuthView = authViews.includes(view);
   const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
@@ -464,15 +484,6 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2">
               {isLoggedIn ? (
                 <>
-                  {/* Business name chip (calendar view) */}
-                  {view === ViewState.CALENDAR && user?.businessName && (
-                    <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold mr-1 border"
-                      style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)', color: 'var(--fg-muted)' }}>
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                      {user.businessName}
-                    </div>
-                  )}
-
                   {/* Role-based nav pills — hidden entirely (not just blocked)
                       for a 'user' account that isn't verified yet. */}
                   {user?.role !== 'admin' && !(user?.role === 'user' && verifStatus !== 'verified') && (
@@ -480,12 +491,14 @@ const App: React.FC = () => {
                       style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
                       {[
                         { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
+                        { id: ViewState.CALENDAR, label: 'Calendar', icon: CalendarDays, roles: ['user'] },
                         { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
                         { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
                         { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
                       ].filter(item => item.roles.includes(user?.role || '')).map((item) => (
                         <button
                           key={item.id}
+                          data-tour={`nav-${item.label.toLowerCase()}`}
                           onClick={() => goTo(item.id)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             view === item.id ? 'nav-item-active' : 'hover:text-[var(--fg)]'
@@ -493,7 +506,9 @@ const App: React.FC = () => {
                           style={view !== item.id ? { color: 'var(--fg-muted)' } : {}}
                         >
                           <item.icon className="w-3.5 h-3.5" />
-                          <span className={`${view === item.id ? 'inline' : 'hidden'} lg:inline`}>{item.label}</span>
+                          {/* Active pill shows its label from sm up; below that every
+                              pill is icon-only, or the row overflows on a phone. */}
+                          <span className={`${view === item.id ? 'hidden sm:inline' : 'hidden'} lg:inline`}>{item.label}</span>
                         </button>
                       ))}
                     </div>
@@ -599,7 +614,7 @@ const App: React.FC = () => {
                       />
                     );
                   case ViewState.SURVEY:
-                    return <BrandSurvey onComplete={handleSurveyComplete} />;
+                    return <BrandSurvey onComplete={handleSurveyComplete} businessName={user?.businessName} />;
                   case ViewState.CALENDAR:
                     if (user?.role === 'support') {
                       return (
@@ -629,7 +644,7 @@ const App: React.FC = () => {
                       <AppHydrationLoader />
                     );
                   case ViewState.SETTINGS:
-                    return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
+                    return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
                   case ViewState.INSIGHTS:
                     return <InsightsDashboard />;
                   case ViewState.BILLING:
@@ -655,6 +670,11 @@ const App: React.FC = () => {
       </main>
 
       {isLoggedIn && user?.role === 'user' && <SupportWidget />}
+
+      {/* Onboarding walkthrough — only on the calendar, where its anchors are. */}
+      {isLoggedIn && user?.role === 'user' && verifStatus === 'verified' && view === ViewState.CALENDAR && (
+        <SpotlightTour open={tourOpen} onClose={closeTour} />
+      )}
 
       {/* Footer */}
       {view === ViewState.LANDING && (

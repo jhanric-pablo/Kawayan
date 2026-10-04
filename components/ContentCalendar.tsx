@@ -782,14 +782,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
             </div>
             <button
               type="button"
+              data-tour="plan-month"
               onClick={() => setPlanningOpen(true)}
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary btn-lg"
               title="AI content planning"
             >
-              <Layers className="w-4 h-4" />
+              <Layers className="w-[1.15rem] h-[1.15rem]" />
               <span className="hidden sm:inline">Plan month</span>
               {ideas.length > 0 && (
-                <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-white/25 text-[10px] font-black">
+                <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.35rem] h-[1.35rem] px-1 rounded-full bg-white/25 text-[11px] font-black">
                   {ideas.length}
                 </span>
               )}
@@ -797,17 +798,19 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           </div>
         </div>
 
-        <KawayanCalendar
-          currentDate={currentDate}
-          posts={posts}
-          ideas={ideas}
-          selectedDay={selectedDay}
-          viewMode={viewMode}
-          calendarDataVersion={calendarDataVersion}
-          onDayClick={handleDayClick}
-          onMonthChange={handleMonthChange}
-          onAddOn={handleAddOn}
-        />
+        <div data-tour="calendar-grid">
+          <KawayanCalendar
+            currentDate={currentDate}
+            posts={posts}
+            ideas={ideas}
+            selectedDay={selectedDay}
+            viewMode={viewMode}
+            calendarDataVersion={calendarDataVersion}
+            onDayClick={handleDayClick}
+            onMonthChange={handleMonthChange}
+            onAddOn={handleAddOn}
+          />
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-[var(--border)]">
           <div className="kw-cal-legend">

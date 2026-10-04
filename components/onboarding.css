@@ -514,6 +514,18 @@
   margin-bottom: 0.4rem;
 }
 
+/* Explains a field the user cannot edit (e.g. the verified business name). */
+.bs-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--fg-subtle);
+}
+.bs-hint svg { flex-shrink: 0; }
+
 .bs-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .bs-chip {
   padding: 4px 10px;

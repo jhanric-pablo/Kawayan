@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { BrandProfile } from '../types';
-import { ArrowRight, ArrowLeft, Store, Users, MessageCircle, PenTool, Check, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Store, Users, MessageCircle, PenTool, Check, Sparkles, Lock } from 'lucide-react';
+import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import './onboarding.css';
 
 interface Props {
   onComplete: (profile: BrandProfile) => void;
+  /** The verified business name from the user record; not editable here. */
+  businessName?: string;
 }
 
-const BrandSurvey: React.FC<Props> = ({ onComplete }) => {
+const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<BrandProfile>({
-    businessName: '',
+    businessName,
     industry: '',
     targetAudience: '',
     brandVoice: 'Friendly & Approachable',
@@ -49,7 +52,6 @@ const BrandSurvey: React.FC<Props> = ({ onComplete }) => {
   ];
   const SectionIcon = sections[step - 1].icon;
 
-  const industrySuggestions = ['Food & Beverage', 'Fashion & Apparel', 'Beauty & Wellness', 'Hardware & Home', 'Services'];
   const audienceSuggestions = ['Gen Z students', 'Working moms', 'Titas of Manila', 'Small business owners', 'OFW families'];
   const themeSuggestions = ['Product launches', 'Behind the scenes', 'Customer testimonials', 'Promos & sales', 'Tips & how-tos', 'Memes'];
 
@@ -131,36 +133,36 @@ const BrandSurvey: React.FC<Props> = ({ onComplete }) => {
                 <div className="space-y-5">
                   <div>
                     <label className="bs-label">Business Name</label>
+                    {/* Verified identity from sign-up — shown, not edited, so the
+                        brand profile can never drift from the approved name. */}
                     <input
                       type="text"
                       className="input"
-                      placeholder="e.g., Aling Nena's Pastries"
                       value={profile.businessName}
-                      onChange={(e) => handleChange('businessName', e.target.value)}
-                      autoFocus
+                      readOnly
+                      aria-describedby="bs-bizname-hint"
                     />
+                    <p id="bs-bizname-hint" className="bs-hint">
+                      <Lock className="w-3 h-3" /> From your verified business registration. Contact support to change it.
+                    </p>
                   </div>
                   <div>
-                    <label className="bs-label">Industry / Niche</label>
-                    <input
-                      type="text"
+                    <label className="bs-label" htmlFor="bs-industry">Industry / Niche</label>
+                    <select
+                      id="bs-industry"
                       className="input"
-                      placeholder="e.g., Food & Beverage, Fashion, Hardware"
                       value={profile.industry}
                       onChange={(e) => handleChange('industry', e.target.value)}
-                    />
-                    <div className="bs-chips">
-                      {industrySuggestions.map((s) => (
-                        <button
-                          type="button"
-                          key={s}
-                          className={`bs-chip${profile.industry.trim().toLowerCase() === s.toLowerCase() ? ' is-active' : ''}`}
-                          onClick={() => handleChange('industry', s)}
-                        >
-                          {s}
-                        </button>
+                      autoFocus
+                    >
+                      <option value="" disabled>Select an industry…</option>
+                      {isLegacyIndustry(profile.industry) && (
+                        <option value={profile.industry}>{profile.industry}</option>
+                      )}
+                      {INDUSTRY_OPTIONS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                 </div>
               )}
@@ -245,7 +247,8 @@ const BrandSurvey: React.FC<Props> = ({ onComplete }) => {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={step === 1 && !profile.businessName.trim()}
+                /* Business name is read-only here, so industry is the only step-1 input to gate on. */
+                disabled={step === 1 && !profile.industry.trim()}
                 className="btn btn-primary"
               >
                 {step === 4 ? 'Finish Setup' : 'Next Step'}
