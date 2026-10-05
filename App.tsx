@@ -11,6 +11,7 @@ import LandingNav from './components/landing/LandingNav';
 import Settings from './components/Settings';
 import SupportWidget from './components/SupportWidget';
 import InsightsDashboard from './components/InsightsDashboard';
+import SocialAccounts from './components/SocialAccounts';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
 import VerificationStatusScreen from './components/VerificationStatus';
@@ -31,7 +32,7 @@ import {
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
-import { CalendarDays, LogOut, Lock, ArrowRight, Settings as SettingsIcon, BarChart3, CreditCard, MessageSquare } from 'lucide-react';
+import { CalendarDays, LogOut, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -170,7 +171,10 @@ const App: React.FC = () => {
           return;
         }
 
-        const isPaymentSuccess = urlParams.get('success') === 'true';
+        // Back from PayMongo checkout (paid or cancelled): Billing reads these params.
+        const isPaymentSuccess = urlParams.get('success') === 'true' || urlParams.get('cancelled') === 'true';
+        // Back from connecting a social account (see /api/social/connect).
+        const isSocialReturn = urlParams.has('social');
 
         let currentUser = await dbService.getCurrentUserAsync();
         if (!currentUser) {
@@ -195,7 +199,7 @@ const App: React.FC = () => {
           console.log('Found existing session for user:', currentUser.email);
           await handleLoginRef.current(
             currentUser,
-            isPaymentSuccess ? ViewState.BILLING : readRestorableView() ?? undefined
+            isPaymentSuccess ? ViewState.BILLING : isSocialReturn ? ViewState.SOCIAL : readRestorableView() ?? undefined
           );
         }
 
@@ -351,6 +355,7 @@ const App: React.FC = () => {
       ViewState.CALENDAR,
       ViewState.SETTINGS,
       ViewState.INSIGHTS,
+      ViewState.SOCIAL,
       ViewState.BILLING,
     ].includes(view);
     if (!needsProfile) return;
@@ -469,7 +474,8 @@ const App: React.FC = () => {
               onClick={() => goTo(isLoggedIn && user ? getHomeViewForRole(user.role) : ViewState.LANDING)}
             >
               <img src="/logo.png" alt="Kawayan" className="w-8 h-8 rounded-xl object-contain" />
-              <span className="font-display text-xl font-bold" style={{ color: 'var(--fg)' }}>
+              {/* Logged in, the nav pills need the room on a phone; the logo stays. */}
+              <span className={`font-display text-xl font-bold ${isLoggedIn ? 'hidden sm:inline' : ''}`} style={{ color: 'var(--fg)' }}>
                 Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span>
               </span>
               {user?.role === 'admin' && (
@@ -493,6 +499,7 @@ const App: React.FC = () => {
                         { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
                         { id: ViewState.CALENDAR, label: 'Calendar', icon: CalendarDays, roles: ['user'] },
                         { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
+                        { id: ViewState.SOCIAL, label: 'Social', icon: Share2, roles: ['user'] },
                         { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
                         { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
                       ].filter(item => item.roles.includes(user?.role || '')).map((item) => (
@@ -637,7 +644,7 @@ const App: React.FC = () => {
                       );
                     }
                     return (user && brandProfile) ? (
-                      <ContentCalendar profile={brandProfile} userId={user.id} />
+                      <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} />
                     ) : user ? (
                       <AppHydrationLoader />
                     ) : (
@@ -646,7 +653,9 @@ const App: React.FC = () => {
                   case ViewState.SETTINGS:
                     return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
                   case ViewState.INSIGHTS:
-                    return <InsightsDashboard />;
+                    return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
+                  case ViewState.SOCIAL:
+                    return <SocialAccounts />;
                   case ViewState.BILLING:
                     return <Billing />;
                   case ViewState.SUPPORT_DASHBOARD:

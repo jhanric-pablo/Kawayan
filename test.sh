@@ -21,7 +21,7 @@ files=(
     "services/databaseService.ts"
     "services/migrationService.ts"
     "services/validationService.ts"
-    "services/geminiService.ts"
+    "services/aiService.ts"
     "utils/logger.ts"
     ".env.example"
 )
@@ -37,7 +37,7 @@ done
 # Test 3: Check dependencies
 echo ""
 echo "📦 Checking dependencies..."
-if npm list better-sqlite3 bcryptjs zod @google/genai > /dev/null 2>&1; then
+if npm list better-sqlite3 bcryptjs zod > /dev/null 2>&1; then
     echo "✅ All required dependencies installed"
 else
     echo "❌ Some dependencies missing"
@@ -47,10 +47,10 @@ fi
 echo ""
 echo "🔧 Checking environment setup..."
 if [ -f ".env.example" ]; then
-    if grep -q "GEMINI_API_KEY" .env.example; then
+    if grep -q "CLOUDFLARE_API_TOKEN" .env.example; then
         echo "✅ Environment variables configured"
     else
-        echo "❌ GEMINI_API_KEY not configured"
+        echo "❌ CLOUDFLARE_API_TOKEN not configured"
     fi
 else
     echo "❌ .env.example missing"
@@ -85,7 +85,7 @@ echo "🚀 System is ready for deployment!"
 echo ""
 echo "📋 Next Steps:"
 echo "1. Copy .env.example to .env"
-echo "2. Add your GEMINI_API_KEY to .env"
+echo "2. Add your CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to .env"
 echo "3. Run npm run dev to start development"
 echo "4. Visit http://localhost:3000"
 echo "5. Login with admin@kawayan.ph / admin123"

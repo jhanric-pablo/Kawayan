@@ -12,7 +12,10 @@ export interface Wallet {
   currency: string;
   transactions: Transaction[];
   subscription: 'FREE' | 'PRO' | 'ENTERPRISE';
+  paymentsTestMode?: boolean;
 }
+
+export type TopUpStatus = 'NONE' | 'PENDING' | 'COMPLETED' | 'FAILED';
 
 class PaymentService {
   private getAuthHeader() {
@@ -42,49 +45,28 @@ class PaymentService {
     return response.json();
   }
 
-  // Initiate Top-up (Returns Xendit Checkout URL)
-  async initiateTopUp(amount: number): Promise<{ checkoutUrl: string, referenceId: string }> {
-    const userId = this.getUserId();
-    if (!userId) throw new Error("Not authenticated");
-
-    const response = await fetch('/api/wallet/create-invoice', {
+  // Sends the browser to PayMongo's hosted checkout; it returns to /?success=true or /?cancelled=true.
+  async startTopUp(amount: number): Promise<void> {
+    const response = await fetch('/api/wallet/checkout', {
       method: 'POST',
       headers: this.getAuthHeader(),
-      body: JSON.stringify({
-        userId,
-        amount,
-        clientOrigin: window.location.origin // Send the actual browser origin
-      })
+      body: JSON.stringify({ amount }),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to create payment invoice");
-    }
-
-    const data = await response.json();
-    return {
-      checkoutUrl: data.checkoutUrl,
-      referenceId: data.externalId
-    };
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503) throw new Error("Online payments aren't switched on for this site yet.");
+    if (!response.ok) throw new Error(data.error || 'Could not start the payment.');
+    window.location.href = data.checkoutUrl;
   }
 
-  // Confirm Payment (Used after manual verification or webhook)
-  async confirmPayment(referenceId: string, amount: number): Promise<boolean> {
-    const userId = this.getUserId();
-    if (!userId) throw new Error("Not authenticated");
-
-    const response = await fetch('/api/wallet/topup', {
+  // Credits a paid top-up; safe to call any time.
+  async verifyTopUp(): Promise<{ status: TopUpStatus; amount?: number; checkoutUrl?: string }> {
+    const response = await fetch('/api/wallet/verify', {
       method: 'POST',
       headers: this.getAuthHeader(),
-      body: JSON.stringify({
-        userId,
-        amount,
-        description: `Wallet Top-up (${referenceId})`
-      })
     });
-
-    return response.ok;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not check the payment.');
+    return data;
   }
 
   async purchaseSubscription(plan: 'PRO' | 'ENTERPRISE', cost: number): Promise<boolean> {
@@ -172,60 +154,6 @@ class PaymentService {
     return response.json();
   }
 
-  async verifyPayment(): Promise<{ status: string, message: string }> {
-    const userId = this.getUserId();
-    if (!userId) throw new Error("Not authenticated");
-
-    const response = await fetch('/api/wallet/verify-payment', {
-      method: 'POST',
-      headers: this.getAuthHeader()
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to verify payment status");
-    }
-
-    return response.json();
-  }
-
-  async xenditCheckout(payload: {
-    type: 'topup' | 'subscription';
-    amount: number;
-    method: 'GCASH' | 'MAYA' | 'CARD';
-    plan?: 'PRO';
-  }): Promise<{
-    mode: 'redirect' | 'completed';
-    checkoutUrl?: string;
-    wallet?: Wallet;
-    receipt?: {
-      referenceId: string;
-      method: string;
-      amount: number;
-      type: string;
-      plan?: string;
-      completedAt: string;
-    };
-  }> {
-    const userId = this.getUserId();
-    if (!userId) throw new Error('Not authenticated');
-
-    const response = await fetch('/api/wallet/xendit-checkout', {
-      method: 'POST',
-      headers: this.getAuthHeader(),
-      body: JSON.stringify({
-        userId,
-        clientOrigin: window.location.origin,
-        ...payload,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Payment could not be completed');
-    }
-
-    return response.json();
-  }
 }
 
 export const paymentService = new PaymentService();

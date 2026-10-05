@@ -50,6 +50,7 @@ export interface PostVersion {
   caption: string;
   imagePrompt: string;
   viralityScore?: number;
+  viralityReason?: string;
   createdAt: string;
 }
 
@@ -96,6 +97,7 @@ export enum ViewState {
   CALENDAR = 'CALENDAR',
   SETTINGS = 'SETTINGS',
   INSIGHTS = 'INSIGHTS',
+  SOCIAL = 'SOCIAL',
   BILLING = 'BILLING',
   SUPPORT_DASHBOARD = 'SUPPORT_DASHBOARD',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',

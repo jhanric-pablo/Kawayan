@@ -620,19 +620,17 @@ export class SupabaseService {
   }
 
   async approveTransaction(transactionId: string): Promise<void> {
-    const { data: txn, error: fetchError } = await this.supabase
-      .from('transactions')
-      .select('*')
-      .eq('id', transactionId)
-      .eq('status', 'PENDING')
-      .maybeSingle();
-    if (fetchError || !txn) throw new Error('Pending transaction not found');
-
-    const { error: updateError } = await this.supabase
+    // Flip PENDING -> COMPLETED in one conditional update so two concurrent approvals
+    // (e.g. a double "verify" on page load) can't both credit the wallet.
+    const { data: txn, error: updateError } = await this.supabase
       .from('transactions')
       .update({ status: 'COMPLETED' })
-      .eq('id', transactionId);
+      .eq('id', transactionId)
+      .eq('status', 'PENDING')
+      .select()
+      .maybeSingle();
     if (updateError) throw updateError;
+    if (!txn) throw new Error('Pending transaction not found');
 
     const balanceChange = txn.type === 'CREDIT' ? txn.amount : -txn.amount;
     const { error: walletError } = await this.supabase.rpc('update_wallet_balance', {
@@ -707,61 +705,6 @@ export class SupabaseService {
   async adminUpdateSubscription(userId: string, plan: 'FREE' | 'PRO' | 'ENTERPRISE', expiresAt: string): Promise<void> {
     // expiresAt not used in schema; just update subscription
     await this.updateSubscription(userId, plan);
-  }
-
-  // Social Connections
-  async saveSocialConnection(userId: string, platform: string, data: any): Promise<void> {
-    const id = `${userId}-${platform}`;
-    const { data: existing } = await this.supabase
-      .from('social_connections')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('platform', platform)
-      .maybeSingle();
-
-    const payload = {
-      user_id: userId,
-      platform,
-      connected: data.connected ? 1 : 0,
-      username: data.username || null,
-      access_token: data.accessToken || null,
-      followers: data.followers || 0,
-      engagement: data.engagement || 0,
-      data: JSON.stringify(data),
-    };
-
-    if (existing) {
-      const { error } = await this.supabase
-        .from('social_connections')
-        .update(payload)
-        .eq('user_id', userId)
-        .eq('platform', platform);
-      if (error) throw error;
-    } else {
-      const { error } = await this.supabase
-        .from('social_connections')
-        .insert({ id, ...payload });
-      if (error) throw error;
-    }
-  }
-
-  async getSocialConnections(userId: string): Promise<any> {
-    const { data: rows, error } = await this.supabase
-      .from('social_connections')
-      .select('*')
-      .eq('user_id', userId);
-    if (error || !rows) return {};
-    const connections: any = {};
-    rows.forEach(row => {
-      connections[row.platform] = {
-        ...JSON.parse(row.data),
-        connected: row.connected === 1,
-        username: row.username,
-        followers: row.followers,
-        engagement: row.engagement,
-      };
-    });
-    return connections;
   }
 
   // Tickets

@@ -435,49 +435,6 @@
 }
 .bs-head p { font-size: 0.9rem; color: var(--fg-muted); margin: 0; }
 
-/* stepper */
-.bs-steps { display: flex; align-items: center; gap: 4px; margin-bottom: 0.9rem; }
-.bs-step {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 6px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--fg-subtle);
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
-}
-.bs-step svg { width: 13px; height: 13px; flex-shrink: 0; }
-.bs-step.is-done { color: var(--primary); background: var(--kw-green-pale); border-color: color-mix(in srgb, var(--kw-green) 20%, transparent); }
-.bs-step.is-active {
-  color: #fff; background: var(--primary); border-color: transparent;
-  box-shadow: 0 8px 20px -10px rgba(43, 87, 72, 0.5);
-}
-.dark .bs-step.is-active { color: var(--kw-forest); background: var(--kw-sage); }
-.bs-step__label { display: none; }
-@media (min-width: 480px) { .bs-step__label { display: inline; } }
-
-.bs-progress {
-  height: 5px;
-  border-radius: 999px;
-  background: var(--bg-alt);
-  overflow: hidden;
-  margin-bottom: 1.3rem;
-}
-.bs-progress b {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--secondary), var(--kw-green));
-  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.dark .bs-progress b { background: linear-gradient(90deg, var(--kw-sage), var(--kw-sage-light)); }
-
 .bs-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -487,8 +444,6 @@
   min-height: 300px;
 }
 .dark .bs-card { background: #1b2420; border-color: rgba(162, 183, 152, 0.2); }
-.bs-slide { animation: bs-slide 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes bs-slide { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 
 .bs-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 1.4rem; }
 .bs-sec-head__ico {
@@ -576,11 +531,6 @@
 .dark .bs-voice__check { background: var(--kw-sage); color: var(--kw-forest); }
 .bs-voice__check svg { width: 11px; height: 11px; }
 
-.bs-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 1.3rem; }
-.bs-dots { display: flex; gap: 6px; }
-.bs-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); transition: background 0.3s ease, width 0.3s ease; }
-.bs-dots i.is-on { background: var(--primary); }
-.bs-dots i.is-cur { width: 20px; }
 
 /* ── Live brand preview ── */
 .bs-preview {

@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BrandProfile, ContentIdea, GeneratedPost } from '../../types';
+import { BrandProfile, ContentIdea, GeneratedPost, PostVersion } from '../../types';
+import type { SocialAccount } from '../../services/socialService';
+import type { CaptionRewrite } from '../../services/aiService';
 import {
-  X, Wand2, RefreshCcw, Loader2, Flame, Upload, Image as ImageIcon,
-  Save, CalendarCheck, Share2, Sparkles, Heart, MessageCircle, Send, MoreHorizontal, History, Plus,
-  ThumbsUp, Globe, Bookmark, Music2, Facebook, Instagram,
+  X, Wand2, RefreshCcw, Loader2, Upload, Image as ImageIcon, Sparkles, Heart, MessageCircle, Send, MoreHorizontal,
+  Plus, ThumbsUp, Globe, Bookmark, Music2, Facebook, Instagram, Share2, Scissors, Smile, Briefcase, Megaphone,
+  Languages, Hash, ArrowUp, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine, CircleAlert,
+  History, Clock,
 } from 'lucide-react';
 import './postComposer.css';
 import './kawayanCalendar.css';
+import './studio.css';
 
 type PreviewPlatform = 'instagram' | 'facebook' | 'tiktok';
 
@@ -84,7 +88,7 @@ const PostPreview: React.FC<{
           <span className="kw-pv-fb__avatar">{initials}</span>
           <div className="kw-pv-fb__meta">
             <span className="kw-pv-fb__name">{businessName}</span>
-            <span className="kw-pv-fb__sub">Sponsored · <Globe className="w-3 h-3" /></span>
+            <span className="kw-pv-fb__sub">Just now · <Globe className="w-3 h-3" /></span>
           </div>
           <MoreHorizontal className="w-4 h-4" />
         </div>
@@ -136,7 +140,6 @@ const PostPreview: React.FC<{
         <span className="kw-pv-ig__ring"><span className="kw-pv-ig__avatar">{initials}</span></span>
         <div className="kw-pv-ig__meta">
           <span className="kw-pv-ig__name">{handle}</span>
-          <span className="kw-pv-ig__sub">Sponsored</span>
         </div>
         <MoreHorizontal className="w-4 h-4" />
       </div>
@@ -153,22 +156,103 @@ const PostPreview: React.FC<{
           <span className="kw-pv-ig__name">{handle}</span> {captionNode}
         </p>
         <p className="kw-pv-ig__more">View all {fmt(comments)} comments</p>
-        <p className="kw-pv-ig__time">2 hours ago</p>
+        <p className="kw-pv-ig__time">Just now</p>
       </div>
     </div>
   );
 };
 
+/* ── AI helpers ── */
+
+const QUICK_EDITS: { label: string; Icon: React.ElementType; instruction: string }[] = [
+  { label: 'Shorter', Icon: Scissors, instruction: 'Make it noticeably shorter, about half the length, keeping the main message and the hashtags.' },
+  { label: 'More playful', Icon: Smile, instruction: 'Make it more playful: light Pinoy humor, punchier lines and a few fitting emojis.' },
+  { label: 'More polished', Icon: Briefcase, instruction: 'Make it more polished and professional: clearer sentences, fewer emojis, no slang.' },
+  { label: 'Add a call to action', Icon: Megaphone, instruction: 'End with a clear, friendly call to action (order, message us, or visit) that fits the post.' },
+  { label: 'More Taglish', Icon: Languages, instruction: 'Use more natural Taglish, mixing Tagalog and English the way young Filipinos text.' },
+  { label: 'Fresh hashtags', Icon: Hash, instruction: 'Keep the text the same but replace the hashtags with 3 to 5 better, specific, local ones.' },
+];
+
+const MAX_REWRITES = 2; // full regenerations per post (ContentCalendar enforces it too)
+const IG_CAPTION_LIMIT = 2200;
+
+const scoreWord = (s: number) => (s >= 75 ? 'Strong' : s >= 50 ? 'Promising' : 'Needs work');
+
+const ScoreRing: React.FC<{ score: number }> = ({ score }) => {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className={`ps-ring ps-ring--${score >= 75 ? 'high' : score >= 50 ? 'mid' : 'low'}`}>
+      <svg viewBox="0 0 64 64" aria-hidden>
+        <circle cx="32" cy="32" r={r} className="ps-ring__track" />
+        <circle cx="32" cy="32" r={r} className="ps-ring__fill" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
+      </svg>
+      <span className="ps-ring__num">{score}</span>
+    </div>
+  );
+};
+
+/** Narrates the first draft while it's made (caption, then image), so the wait reads as progress. */
+const GeneratingSteps: React.FC = () => {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const a = setTimeout(() => setStep(1), 1200);
+    const b = setTimeout(() => setStep(2), 9000);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, []);
+  const steps = ['Reading your brand profile', 'Writing a Taglish caption', 'Creating a matching visual'];
+  return (
+    <ol className="ps-steps" aria-live="polite">
+      {steps.map((s, i) => (
+        <li key={s} className={i < step ? 'is-done' : i === step ? 'is-active' : ''}>
+          <span className="ps-steps__dot">{i < step ? <Check /> : i === step ? <Loader2 className="animate-spin" /> : null}</span>
+          {s}
+        </li>
+      ))}
+    </ol>
+  );
+};
+
+/* ── Scheduling helpers ── */
+
+// ponytail: fixed PH engagement peaks, not learned from the account's own data; swap in
+// real per-account timing once live analytics exist.
+const SUGGESTED_TIMES = [
+  { time: '12:00', label: 'Lunch break' },
+  { time: '18:00', label: 'After work' },
+  { time: '20:00', label: 'Prime time', best: true },
+];
+
+const to12h = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
+const pad = (n: number) => String(n).padStart(2, '0');
+const isoToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const isPast = (date: string, time: string) => new Date(`${date}T${time}:00`).getTime() <= Date.now() + 5 * 60_000;
+const longDate = (date: string) =>
+  new Date(`${date}T12:00:00`).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+
+const PlatformIcon: React.FC<{ platform: string; className?: string }> = ({ platform, className = 'w-3.5 h-3.5' }) =>
+  platform === 'facebook' ? <Facebook className={className} style={{ color: '#1877F2' }} /> : <Instagram className={className} style={{ color: '#E1306C' }} />;
+
+type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
+type Snapshot = Pick<GeneratedPost, 'caption' | 'viralityScore' | 'viralityReason'>;
+const snapOf = (p: GeneratedPost) => JSON.stringify([p.caption, p.imagePrompt, p.viralityScore, p.history?.map((h) => h.caption)]);
+
 /**
- * PostComposer — the content-creation "studio".
+ * PostComposer: the post studio.
  *
- * Replaces the old right-hand slide-out panel with a centred, two-pane dialog:
- *   • left  → editor controls (generate, caption, image, virality, history)
- *   • right → a live, read-only social-post preview
- *
- * This is a UI/UX shell only — every action is delegated straight back to the
- * handlers that already live in ContentCalendar; nothing about the data flow,
- * AI generation, pricing, saving, scheduling or posting changes.
+ * Left: the caption with an AI co-writer (one-tap edits, free-text asks, undo, re-scoring),
+ * the visual, the score and earlier versions. Right: a live platform preview. Bottom: the
+ * publish bar, where a "where and when" popover picks pages and a suggested time.
+ * Drafts save themselves; every network/AI call is delegated to ContentCalendar.
  */
 interface Props {
   open: boolean;
@@ -183,14 +267,18 @@ interface Props {
   loadingImage: boolean;
   addOnPrice: number;
   photoInputRef: React.RefObject<HTMLInputElement | null>;
+  accounts: SocialAccount[] | null;
+  accountsError: string;
+  publishing: boolean;
   onClose: () => void;
   onGeneratePost: (idea: ContentIdea) => void;
   onAddOn: (day: number) => void;
   onGenerateImage: () => void;
-  onSavePost: (post?: GeneratedPost) => void | Promise<void>;
-  onSchedule: () => void | Promise<void>;
+  onRewriteCaption: (caption: string, instruction: string) => Promise<CaptionRewrite | null>;
+  onAutosave: (post: GeneratedPost) => Promise<void>;
   onPhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPostNow: () => void;
+  onPublish: (accountIds: string[], scheduledFor?: string) => Promise<void>;
+  onOpenSocial: () => void;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -207,42 +295,98 @@ const PostComposer: React.FC<Props> = ({
   profile,
   posts,
   ideas,
-  generatedContent,
+  generatedContent: post,
   setGeneratedContent,
   generatingPost,
   loadingImage,
   addOnPrice,
   photoInputRef,
+  accounts,
+  accountsError,
+  publishing,
   onClose,
   onGeneratePost,
   onAddOn,
   onGenerateImage,
-  onSavePost,
-  onSchedule,
+  onRewriteCaption,
+  onAutosave,
   onPhotoUpload,
-  onPostNow,
+  onPublish,
+  onOpenSocial,
 }) => {
-  const [showHistory, setShowHistory] = useState(false);
   const [previewPlatform, setPreviewPlatform] = useState<PreviewPlatform>('instagram');
+  const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [ask, setAsk] = useState('');
+  const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
+  const [lastEdit, setLastEdit] = useState<{ label: string; delta: number | null } | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [redoing, setRedoing] = useState(false); // "New version" pressed (vs. the first draft still saving)
+  const [saveState, setSaveState] = useState<SaveState>('saved');
+  const [planOpen, setPlanOpen] = useState(false);
+  const [mode, setMode] = useState<'schedule' | 'now'>('schedule');
+  const [time, setTime] = useState('20:00');
+  const [chosen, setChosen] = useState<string[]>([]);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const planRef = useRef<HTMLDivElement>(null);
 
-  // Stable fake engagement number (was recomputed on every keystroke before).
-  const fakeLikes = useMemo(() => Math.floor(Math.random() * 500) + 10, [generatedContent?.id]);
+  const fakeLikes = useMemo(() => Math.floor(Math.random() * 500) + 10, [post?.id]);
 
-  // `onClose` is a fresh function reference on every keystroke in this panel
-  // (its parent re-renders on every setGeneratedContent), so it can't sit in
-  // this effect's deps — that used to re-run the effect (and its
-  // dialogRef.current?.focus()) on every character, yanking focus off the
-  // caption/visual textareas after each keystroke. A ref keeps Escape
-  // wired to the latest onClose without making the effect depend on it.
-  const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  // Latest values for listeners and timers that outlive a render.
+  const latest = useRef({ post, onClose, onAutosave, planOpen });
+  useEffect(() => {
+    latest.current = { post, onClose, onAutosave, planOpen };
+  });
 
-  // Esc to close + lock background scroll while open.
+  /* ── Autosave: edits save themselves ~1s after typing stops ── */
+  const baseline = useRef<{ id: string; snap: string } | null>(null);
+  const snap = post ? snapOf(post) : '';
+  useEffect(() => {
+    if (!post) return;
+    if (baseline.current?.id !== post.id) {
+      baseline.current = { id: post.id, snap };
+      setSaveState('saved');
+      return;
+    }
+    if (snap === baseline.current.snap) {
+      setSaveState('saved');
+      return;
+    }
+    setSaveState('dirty');
+    const timer = setTimeout(() => save(), 1100);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id, snap]);
+
+  const save = () => {
+    const target = latest.current.post;
+    if (!target) return;
+    const targetSnap = snapOf(target);
+    setSaveState('saving');
+    latest.current
+      .onAutosave(target)
+      .then(() => {
+        if (baseline.current?.id === target.id) baseline.current.snap = targetSnap;
+        const now = latest.current.post;
+        setSaveState(now && snapOf(now) !== targetSnap ? 'dirty' : 'saved');
+      })
+      .catch(() => setSaveState('error'));
+  };
+
+  const close = () => {
+    const current = latest.current.post;
+    if (current && baseline.current?.id === current.id && snapOf(current) !== baseline.current.snap) {
+      latest.current.onAutosave(current).catch(() => undefined); // keep edits made in the last second
+    }
+    latest.current.onClose();
+  };
+
+  // Esc closes the open popover first, then the studio; background scroll is locked while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
+      if (e.key !== 'Escape') return;
+      if (latest.current.planOpen) setPlanOpen(false);
+      else close();
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -252,34 +396,146 @@ const PostComposer: React.FC<Props> = ({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
-    if (!open) setShowHistory(false);
-  }, [open]);
+    if (!planOpen) return;
+    const onDown = (e: MouseEvent) => !planRef.current?.contains(e.target as Node) && setPlanOpen(false);
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [planOpen]);
+
+  // A different post: fresh undo history, and the best time still open on its day.
+  const canSchedule = !!post && post.date >= isoToday();
+  useEffect(() => {
+    setUndoStack([]);
+    setLastEdit(null);
+    setAsk('');
+    setShowPrompt(false);
+    setPlanOpen(false);
+    if (!post) return;
+    const slot = [...SUGGESTED_TIMES].sort((a, b) => Number(!!b.best) - Number(!!a.best)).find((s) => !isPast(post.date, s.time));
+    setTime(slot?.time || '20:00');
+    setMode(post.date >= isoToday() && slot ? 'schedule' : 'now');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
+
+  useEffect(() => {
+    if (accounts) setChosen(accounts.map((a) => a.id));
+  }, [accounts]);
+
+  useEffect(() => {
+    if (!generatingPost) setRedoing(false);
+  }, [generatingPost]);
 
   if (!open || selectedDay == null) return null;
 
   const currentPost = posts.find((p) => new Date(p.date).getDate() === selectedDay);
   const currentIdea = ideas.find((i) => i.day === selectedDay);
-  const heading = currentPost?.topic || currentIdea?.title || 'Create Post';
-  const dateLabel = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toLocaleDateString('default', {
+  const heading = post?.topic || currentPost?.topic || currentIdea?.title || 'New post';
+  const dateLabel = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toLocaleDateString('en-PH', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
-  const statusLabel = generatedContent?.status || 'New';
-  const score = generatedContent?.viralityScore || 0;
+  const statusLabel = post?.status || 'New';
+  const isPublished = post?.status === 'Published';
+  const isScheduled = post?.status === 'Scheduled';
+  const initials = profile.businessName.substring(0, 2).toUpperCase();
+  const rewritesLeft = Math.max(0, MAX_REWRITES - (post?.regenCount || 0));
 
   const runGenerate = () => {
-    const idea = currentIdea;
-    const fallbackIdea: ContentIdea = { day: selectedDay, title: 'Custom Post', topic: 'General Update', format: 'Image' };
-    onGeneratePost(idea || fallbackIdea);
+    onGeneratePost(currentIdea || { day: selectedDay, title: 'Custom Post', topic: 'General Update', format: 'Image' });
   };
 
-  const initials = profile.businessName.substring(0, 2).toUpperCase();
+  /* ── AI co-writer ── */
+  const runEdit = async (label: string, instruction: string) => {
+    if (!post || aiBusy) return;
+    const before: Snapshot = { caption: post.caption, viralityScore: post.viralityScore, viralityReason: post.viralityReason };
+    setAiBusy(label);
+    try {
+      const result = await onRewriteCaption(post.caption, instruction);
+      if (!result) return;
+      setUndoStack((s) => [...s, before]);
+      setGeneratedContent((prev) =>
+        prev && prev.id === post.id
+          ? {
+              ...prev,
+              caption: result.caption,
+              viralityScore: result.viralityScore ?? prev.viralityScore,
+              viralityReason: result.viralityReason ?? prev.viralityReason,
+            }
+          : prev,
+      );
+      const delta = result.viralityScore != null && before.viralityScore != null ? result.viralityScore - before.viralityScore : null;
+      setLastEdit({ label, delta });
+    } finally {
+      setAiBusy(null);
+    }
+  };
 
-  /* ── Live preview (read-only, platform-accurate mirror of the editor state) ── */
+  const submitAsk = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = ask.trim().slice(0, 200);
+    if (!text) return;
+    setAsk('');
+    runEdit(`“${text.length > 38 ? `${text.slice(0, 38)}…` : text}”`, text);
+  };
+
+  const undo = () => {
+    const snapBefore = undoStack[undoStack.length - 1];
+    if (!snapBefore) return;
+    setUndoStack((s) => s.slice(0, -1));
+    setGeneratedContent((prev) => (prev ? { ...prev, ...snapBefore } : prev));
+    setLastEdit(undoStack.length > 1 ? { label: 'Undid the last change', delta: null } : null);
+  };
+
+  const restoreVersion = (i: number) => {
+    if (!post) return;
+    const v = post.history[i];
+    const current: PostVersion = {
+      caption: post.caption,
+      imagePrompt: post.imagePrompt,
+      viralityScore: post.viralityScore,
+      viralityReason: post.viralityReason,
+      createdAt: new Date().toISOString(),
+    };
+    setGeneratedContent({
+      ...post,
+      caption: v.caption,
+      imagePrompt: v.imagePrompt,
+      viralityScore: v.viralityScore,
+      viralityReason: v.viralityReason,
+      history: post.history.map((h, j) => (j === i ? current : h)),
+    });
+    setUndoStack([]);
+    setLastEdit({ label: 'Switched to an earlier version', delta: null });
+  };
+
+  /* ── Publishing ── */
+  const chosenAccounts = (accounts || []).filter((a) => chosen.includes(a.id));
+  const timeOk = mode === 'now' || (!!post && !isPast(post.date, time));
+  const whereLabel =
+    accounts === null ? 'Loading pages…' : accounts.length === 0 ? 'No pages connected' : chosenAccounts.length === 0 ? 'No page picked' : chosenAccounts.map((a) => (a.platform === 'facebook' ? 'Facebook' : 'Instagram')).join(' + ');
+  const whenLabel = mode === 'now' ? 'Right away' : post ? `${longDate(post.date)} · ${to12h(time)}` : '';
+
+  const publish = () => {
+    if (!post) return;
+    if (accounts && accounts.length === 0) return onOpenSocial();
+    setPlanOpen(false);
+    onPublish(chosen, mode === 'schedule' ? `${post.date}T${time}:00` : undefined);
+  };
+
+  const ctaDisabled = !post || publishing || accounts === null || (accounts.length > 0 && (chosen.length === 0 || !timeOk));
+  const ctaLabel =
+    accounts && accounts.length === 0 ? 'Connect a page' : mode === 'now' ? 'Post now' : `Schedule · ${to12h(time)}`;
+
+  const busyLabel = aiBusy ? `Rewriting: ${aiBusy}` : redoing && generatingPost ? 'Writing a new version…' : null;
+  const counts = post ? { chars: [...post.caption].length, tags: (post.caption.match(/#[\p{L}\p{N}_]+/gu) || []).length } : null;
+  const score = post?.viralityScore ?? 0;
+
+  /* ── Pieces ── */
   const previewBlock = (
     <>
       <PreviewTabs value={previewPlatform} onChange={setPreviewPlatform} />
@@ -287,17 +543,31 @@ const PostComposer: React.FC<Props> = ({
         platform={previewPlatform}
         businessName={profile.businessName}
         initials={initials}
-        caption={generatedContent?.caption}
-        imageUrl={generatedContent?.imageUrl}
+        caption={post?.caption}
+        imageUrl={post?.imageUrl}
         likes={fakeLikes}
         loadingImage={loadingImage}
       />
     </>
   );
 
+  const saveIndicator = post && (
+    <span className={`ps-save ps-save--${saveState}`} aria-live="polite">
+      {saveState === 'saved' && <><Check /> Saved</>}
+      {saveState === 'saving' && <><Loader2 className="animate-spin" /> Saving…</>}
+      {saveState === 'dirty' && <><i /> Unsaved changes</>}
+      {saveState === 'error' && (
+        <>
+          <CircleAlert /> Couldn’t save
+          <button type="button" onClick={save}>Retry</button>
+        </>
+      )}
+    </span>
+  );
+
   return (
     <div className="kw-composer-overlay" role="presentation">
-      <div className="kw-composer-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="kw-composer-backdrop" onClick={close} aria-hidden="true" />
 
       <div
         ref={dialogRef}
@@ -305,222 +575,366 @@ const PostComposer: React.FC<Props> = ({
         aria-modal="true"
         aria-label={`Compose post for ${dateLabel}`}
         tabIndex={-1}
-        className="kw-composer"
+        className="kw-composer ps"
       >
-        {/* ── Top bar ── */}
-        <header className="kw-composer__bar">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="kw-composer__date">{dateLabel}</span>
-            <div className="min-w-0">
-              <h2 className="font-display text-lg font-bold text-[var(--fg)] truncate leading-tight" title={heading}>
-                {heading}
-              </h2>
+        {/* ── Header ── */}
+        <header className="ps-head">
+          <span className="ps-head__date">{dateLabel}</span>
+          <div className="ps-head__title">
+            <h2 title={heading}>{heading}</h2>
+            <div className="ps-head__meta">
               <span className={STATUS_STYLE[statusLabel] || STATUS_STYLE.New}>{statusLabel}</span>
+              {post?.format && <span className="ps-head__format">{post.format} post</span>}
+              {saveIndicator}
             </div>
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={runGenerate}
-              disabled={generatingPost}
-              className="kw-composer__generate"
-            >
-              {generatingPost ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : generatedContent ? (
-                <RefreshCcw className="w-3.5 h-3.5" />
-              ) : (
-                <Wand2 className="w-3.5 h-3.5" />
-              )}
-              {generatedContent ? 'Rewrite' : 'AI Draft'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close composer"
-              className="kw-composer__close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button type="button" onClick={close} aria-label="Close composer" className="kw-composer__close">
+            <X className="w-5 h-5" />
+          </button>
         </header>
 
         {/* ── Body ── */}
-        <div className="kw-composer__body">
-          {/* Editor pane */}
-          <div className="kw-composer__editor">
-            {!generatedContent ? (
-              <div className="kw-composer__start">
-                <div className="kw-composer__start-icon">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="font-display text-xl text-[var(--fg)]">Let&apos;s make something</h3>
-                <p className="text-sm text-[var(--fg-muted)] max-w-sm mt-1.5 leading-relaxed">
-                  {currentIdea
-                    ? `Idea for this day: “${currentIdea.topic}”`
-                    : 'Generate a Taglish caption + visual for this day, or bring your own.'}
-                </p>
-                <button type="button" onClick={runGenerate} disabled={generatingPost} className="kw-composer__start-cta">
-                  {generatingPost ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                  {generatingPost ? 'Generating…' : 'Generate with AI'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAddOn(selectedDay)}
-                  className="kw-composer__start-secondary"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Buy single post · ₱{addOnPrice}
-                </button>
+        <div className="ps-body">
+          <div className="ps-main">
+            {!post ? (
+              <div className="ps-start">
+                {generatingPost ? (
+                  <>
+                    <span className="ps-start__icon is-busy"><Sparkles /></span>
+                    <h3>Kawayan is drafting your post</h3>
+                    <p>This takes about 20 seconds.</p>
+                    <GeneratingSteps />
+                  </>
+                ) : (
+                  <>
+                    <span className="ps-start__icon"><Sparkles /></span>
+                    <h3>{currentIdea ? 'Ready when you are' : 'Nothing planned for this day yet'}</h3>
+                    {currentIdea ? (
+                      <div className="ps-brief">
+                        <span className="ps-brief__k">From your monthly plan</span>
+                        <b>{currentIdea.title}</b>
+                        <p>{currentIdea.topic}</p>
+                        <span className="ps-brief__tag">{currentIdea.format} post</span>
+                      </div>
+                    ) : (
+                      <p>Kawayan can write a Taglish caption and make a matching visual for this day.</p>
+                    )}
+                    <button type="button" onClick={runGenerate} className="ps-start__cta">
+                      <Wand2 className="w-4 h-4" /> Write it with AI
+                    </button>
+                    <span className="ps-start__note">Caption, virality score and visual in one go.</span>
+                    <button type="button" onClick={() => onAddOn(selectedDay)} className="ps-start__addon">
+                      <Plus className="w-3.5 h-3.5" /> Or buy a single extra post · ₱{addOnPrice}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <>
-                {/* Virality */}
-                <section className="kw-composer__card">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="kw-composer__label">
-                      <Flame className="w-3.5 h-3.5 text-[var(--primary)]" /> Virality potential
-                    </span>
-                    <span className="text-lg font-black text-[var(--primary)]">{score}/100</span>
+                {isPublished && (
+                  <p className="ps-note ps-note--live">
+                    <Check /> This post is live, so editing is turned off.
+                    {post.externalLink && (
+                      <a href={post.externalLink} target="_blank" rel="noreferrer">View post <ExternalLink /></a>
+                    )}
+                  </p>
+                )}
+                {isScheduled && (
+                  <p className="ps-note">
+                    <Clock /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
+                  </p>
+                )}
+
+                {/* Caption + AI co-writer */}
+                <section className={`ps-card ps-caption${busyLabel ? ' is-busy' : ''}`}>
+                  <div className="ps-card__head">
+                    <label htmlFor="ps-caption-text">Caption</label>
+                    {counts && (
+                      <span className={`ps-count${counts.chars > IG_CAPTION_LIMIT ? ' is-over' : ''}`}>
+                        {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
+                      </span>
+                    )}
                   </div>
-                  <div className="kw-composer__meter">
-                    <div className="kw-composer__meter-fill" style={{ width: `${score}%` }} />
+                  <div className="ps-caption__field">
+                    <textarea
+                      id="ps-caption-text"
+                      rows={7}
+                      value={post.caption}
+                      readOnly={isPublished || !!busyLabel}
+                      onChange={(e) => setGeneratedContent({ ...post, caption: e.target.value })}
+                      placeholder="Write your Taglish caption…"
+                    />
+                    {busyLabel && (
+                      <div className="ps-caption__busy" aria-live="polite">
+                        <Sparkles /> {busyLabel}
+                      </div>
+                    )}
                   </div>
-                  {generatedContent.viralityReason && (
-                    <p className="text-xs text-[var(--fg-muted)] italic mt-2.5 leading-relaxed">
-                      “{generatedContent.viralityReason}”
-                    </p>
+
+                  {lastEdit && !busyLabel && (
+                    <div className="ps-change">
+                      <Check className="ps-change__ok" />
+                      <span>{lastEdit.label}</span>
+                      {lastEdit.delta != null && lastEdit.delta !== 0 && (
+                        <span className={`ps-change__delta ${lastEdit.delta > 0 ? 'is-up' : 'is-down'}`}>
+                          Score {lastEdit.delta > 0 ? '+' : '−'}{Math.abs(lastEdit.delta)}
+                        </span>
+                      )}
+                      {undoStack.length > 0 && (
+                        <button type="button" onClick={undo} className="ps-change__undo">
+                          <Undo2 /> Undo
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!isPublished && (
+                    <div className="ps-ai">
+                      <div className="ps-ai__chips" role="group" aria-label="Quick AI edits">
+                        {QUICK_EDITS.map(({ label, Icon, instruction }) => (
+                          <button key={label} type="button" disabled={!!aiBusy} onClick={() => runEdit(label, instruction)}>
+                            {aiBusy === label ? <Loader2 className="animate-spin" /> : <Icon />} {label}
+                          </button>
+                        ))}
+                      </div>
+                      <form className="ps-ai__ask" onSubmit={submitAsk}>
+                        <Sparkles aria-hidden />
+                        <input
+                          value={ask}
+                          onChange={(e) => setAsk(e.target.value)}
+                          maxLength={200}
+                          disabled={!!aiBusy}
+                          placeholder="Tell Kawayan what to change, e.g. “mention our 20% weekend promo”"
+                          aria-label="Tell Kawayan what to change"
+                        />
+                        <button type="submit" disabled={!ask.trim() || !!aiBusy} aria-label="Rewrite with this instruction">
+                          <ArrowUp />
+                        </button>
+                      </form>
+                    </div>
                   )}
                 </section>
 
-                {/* Caption */}
-                <section>
-                  <label className="kw-composer__label mb-1.5" htmlFor="kw-caption">
-                    <MessageCircle className="w-3.5 h-3.5 text-[var(--primary)]" /> Caption
-                  </label>
-                  <textarea
-                    id="kw-caption"
-                    className="kw-composer__textarea"
-                    rows={6}
-                    value={generatedContent.caption}
-                    onChange={(e) => setGeneratedContent({ ...generatedContent, caption: e.target.value })}
-                    placeholder="Write your Taglish caption…"
-                  />
-                </section>
-
-                {/* Visual */}
-                <section>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="kw-composer__label">
-                      <ImageIcon className="w-3.5 h-3.5 text-[var(--primary)]" /> Visual
-                    </span>
-                    <button
-                      type="button"
-                      onClick={onGenerateImage}
-                      disabled={loadingImage}
-                      className="kw-composer__mini-btn"
-                    >
-                      {loadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
-                      {generatedContent.imageUrl ? 'Regenerate' : 'Generate'}
-                    </button>
-                  </div>
-                  <textarea
-                    className="kw-composer__textarea kw-composer__textarea--sm"
-                    rows={2}
-                    value={generatedContent.imagePrompt}
-                    onChange={(e) => setGeneratedContent({ ...generatedContent, imagePrompt: e.target.value })}
-                    placeholder="Describe the image you want…"
-                  />
-                  <button type="button" onClick={() => photoInputRef.current?.click()} className="kw-composer__dropzone">
-                    <Upload className="w-4 h-4 text-[var(--primary)]" />
-                    <span className="text-xs font-medium text-[var(--fg)]">Upload your own photo</span>
-                    <span className="text-[10px] text-[var(--fg-subtle)]">JPG / PNG · replaces the AI visual</span>
-                  </button>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    className="hidden"
-                    onChange={onPhotoUpload}
-                  />
-                </section>
-
-                {/* History */}
-                {generatedContent.history && generatedContent.history.length > 0 && (
-                  <section>
-                    <button
-                      type="button"
-                      onClick={() => setShowHistory((v) => !v)}
-                      className="kw-composer__label kw-composer__history-toggle"
-                    >
-                      <History className="w-3.5 h-3.5 text-[var(--primary)]" />
-                      {generatedContent.history.length} previous version{generatedContent.history.length === 1 ? '' : 's'}
-                      <span className="ml-auto text-[var(--fg-subtle)]">{showHistory ? 'Hide' : 'Show'}</span>
-                    </button>
-                    {showHistory && (
-                      <div className="space-y-2 mt-2">
-                        {generatedContent.history.map((h, i) => (
-                          <div key={i} className="kw-composer__history-item">
-                            <span className="blur-[3px] opacity-60 select-none">{h.caption.substring(0, 64)}…</span>
-                            <span className="kw-composer__history-tag">Archived</span>
-                          </div>
-                        ))}
+                <div className="ps-row">
+                  {/* Visual */}
+                  <section className="ps-card ps-visual">
+                    <div className="ps-card__head">
+                      <span>Visual</span>
+                    </div>
+                    <div className={`ps-visual__frame${loadingImage ? ' is-busy' : ''}`}>
+                      {post.imageUrl ? <img src={post.imageUrl} alt="Post visual" /> : <ImageIcon className="ps-visual__empty" />}
+                      {loadingImage && <span className="ps-visual__busy"><Loader2 className="animate-spin" /> Creating a new visual…</span>}
+                    </div>
+                    {!isPublished && (
+                      <div className="ps-visual__actions">
+                        <button type="button" onClick={onGenerateImage} disabled={loadingImage}>
+                          <RefreshCcw /> {post.imageUrl ? 'New image' : 'Create image'}
+                        </button>
+                        <button type="button" onClick={() => photoInputRef.current?.click()}>
+                          <Upload /> Upload photo
+                        </button>
+                        <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
+                          <PencilLine /> Prompt <ChevronDown className={showPrompt ? 'is-flipped' : ''} />
+                        </button>
                       </div>
                     )}
+                    {showPrompt && (
+                      <div className="ps-visual__prompt">
+                        <textarea
+                          rows={3}
+                          value={post.imagePrompt}
+                          onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })}
+                          aria-label="Image prompt"
+                        />
+                        <span>Describe the picture in English. “New image” uses this.</span>
+                      </div>
+                    )}
+                    <input ref={photoInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={onPhotoUpload} />
                   </section>
-                )}
 
-                {/* Preview on small screens */}
-                <section className="lg:hidden">
-                  <span className="kw-composer__label mb-2">
-                    <Sparkles className="w-3.5 h-3.5 text-[var(--primary)]" /> Preview
-                  </span>
+                  {/* Score + versions */}
+                  <div className="ps-side">
+                    <section className="ps-card ps-score">
+                      <div className="ps-card__head">
+                        <span>Virality score</span>
+                        <span className="ps-score__word">{scoreWord(score)}</span>
+                      </div>
+                      <div className="ps-score__body">
+                        <ScoreRing score={score} />
+                        <p>{post.viralityReason || 'Kawayan’s AI rates how likely the caption is to get shared.'}</p>
+                      </div>
+                    </section>
+
+                    {!isPublished && (
+                      <section className="ps-card ps-redo">
+                        <div>
+                          <b>Start over</b>
+                          <span>New caption, score and visual from the same idea.</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRedoing(true);
+                            runGenerate();
+                          }}
+                          disabled={generatingPost || rewritesLeft === 0}
+                        >
+                          {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
+                          {rewritesLeft === 0 ? 'No rewrites left' : `New version · ${rewritesLeft} left`}
+                        </button>
+                      </section>
+                    )}
+
+                    {post.history?.length > 0 && (
+                      <section className="ps-card ps-versions">
+                        <div className="ps-card__head">
+                          <span><History /> Earlier versions</span>
+                        </div>
+                        {post.history.map((v, i) => (
+                          <div key={`${v.createdAt}-${i}`} className="ps-version">
+                            <p>{v.caption}</p>
+                            <div>
+                              {v.viralityScore != null && <span className="ps-version__score">{v.viralityScore}</span>}
+                              {!isPublished && (
+                                <button type="button" onClick={() => restoreVersion(i)}>Use this</button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    )}
+                  </div>
+                </div>
+
+                <details className="ps-mpreview">
+                  <summary>Preview on Instagram, Facebook and TikTok</summary>
                   {previewBlock}
-                </section>
+                </details>
               </>
             )}
           </div>
 
-          {/* Preview pane (desktop) */}
-          <aside className="kw-composer__preview">
-            <span className="kw-composer__label mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-[var(--primary)]" /> Live preview
-            </span>
+          <aside className="ps-rail">
+            <span className="ps-rail__label">Live preview</span>
             {previewBlock}
           </aside>
         </div>
 
-        {/* ── Footer ── */}
-        <footer className="kw-composer__footer">
-          <button
-            type="button"
-            onClick={() => onSavePost()}
-            disabled={!generatedContent}
-            className="kw-composer__footer-btn kw-composer__footer-btn--ghost"
-          >
-            <Save className="w-4 h-4" /> Save draft
-          </button>
-          <button
-            type="button"
-            disabled={!generatedContent || generatedContent.status === 'Scheduled'}
-            onClick={onSchedule}
-            className={`kw-composer__footer-btn ${
-              generatedContent?.status === 'Scheduled'
-                ? 'kw-composer__footer-btn--done'
-                : 'kw-composer__footer-btn--soft'
-            }`}
-          >
-            <CalendarCheck className="w-4 h-4" />
-            {generatedContent?.status === 'Scheduled' ? 'Scheduled' : 'Schedule'}
-          </button>
-          <button
-            type="button"
-            onClick={onPostNow}
-            disabled={!generatedContent}
-            className="kw-composer__footer-btn kw-composer__footer-btn--primary"
-          >
-            <Share2 className="w-4 h-4" /> Post now
-          </button>
+        {/* ── Publish bar ── */}
+        <footer className="ps-foot">
+          {isPublished ? (
+            <div className="ps-foot__state">
+              <span className="ps-foot__live"><Check /> Published</span>
+              {post?.externalLink && (
+                <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
+                  View post <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          ) : isScheduled ? (
+            <div className="ps-foot__state">
+              <span className="ps-foot__queued"><CalendarClock /> Scheduled for {longDate(post!.date)}</span>
+            </div>
+          ) : (
+            <div className="ps-foot__publish" ref={planRef}>
+              <button
+                type="button"
+                className="ps-plan"
+                onClick={() => setPlanOpen((v) => !v)}
+                disabled={!post}
+                aria-expanded={planOpen}
+                aria-haspopup="dialog"
+              >
+                <span className="ps-plan__avatars" aria-hidden>
+                  {chosenAccounts.length > 0
+                    ? chosenAccounts.map((a) => <span key={a.id}><PlatformIcon platform={a.platform} /></span>)
+                    : <span><Globe className="w-3.5 h-3.5" /></span>}
+                </span>
+                <span className="ps-plan__text">
+                  <b>{whereLabel}</b>
+                  <small>{whenLabel}</small>
+                </span>
+                <ChevronDown className={`ps-plan__chev${planOpen ? ' is-flipped' : ''}`} />
+              </button>
+
+              <button type="button" className="ps-cta" onClick={publish} disabled={ctaDisabled}>
+                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'now' ? <Send className="w-4 h-4" /> : <CalendarClock className="w-4 h-4" />}
+                {publishing ? 'Sending…' : ctaLabel}
+              </button>
+
+              {planOpen && post && (
+                <div className="ps-pop" role="dialog" aria-label="Where and when to post">
+                  <div className="ps-seg" role="radiogroup" aria-label="When">
+                    <button type="button" role="radio" aria-checked={mode === 'schedule'} disabled={!canSchedule} onClick={() => setMode('schedule')}>
+                      <CalendarClock /> Schedule
+                    </button>
+                    <button type="button" role="radio" aria-checked={mode === 'now'} onClick={() => setMode('now')}>
+                      <Send /> Post now
+                    </button>
+                  </div>
+
+                  <div className="ps-pop__sec">
+                    <span className="ps-pop__label">Post to</span>
+                    {accounts === null ? (
+                      <span className="ps-pop__muted"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading your pages…</span>
+                    ) : accounts.length === 0 ? (
+                      <div className="ps-pop__empty">
+                        <span>{accountsError || 'Connect your Facebook Page or Instagram account first.'}</span>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={onOpenSocial}>Connect a page</button>
+                      </div>
+                    ) : (
+                      <div className="ps-pop__accounts">
+                        {accounts.map((a) => {
+                          const on = chosen.includes(a.id);
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={on}
+                              className={on ? 'is-on' : ''}
+                              onClick={() => setChosen((ids) => (on ? ids.filter((id) => id !== a.id) : [...ids, a.id]))}
+                            >
+                              <PlatformIcon platform={a.platform} className="w-4 h-4" />
+                              <span>@{a.username}</span>
+                              <i>{on && <Check />}</i>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {mode === 'schedule' ? (
+                    <div className="ps-pop__sec">
+                      <span className="ps-pop__label">Time on {longDate(post.date)}</span>
+                      <div className="ps-slots">
+                        {SUGGESTED_TIMES.map((s) => {
+                          const past = isPast(post.date, s.time);
+                          return (
+                            <button key={s.time} type="button" aria-pressed={time === s.time} disabled={past} onClick={() => setTime(s.time)}>
+                              <b>{to12h(s.time)}</b>
+                              <small>{past ? 'Passed' : s.label}</small>
+                              {s.best && !past && <em>Best</em>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <label className="ps-custom">
+                        <Clock /> Other time
+                        <input type="time" value={time} onChange={(e) => e.target.value && setTime(e.target.value)} />
+                      </label>
+                      {!timeOk && <span className="ps-pop__warn">That time has passed. Pick a later one.</span>}
+                      <span className="ps-pop__muted">Suggested times are when Filipino audiences are usually online. All times are in your local time zone.</span>
+                    </div>
+                  ) : (
+                    <p className="ps-pop__muted ps-pop__sec">Goes out as soon as you press Post now.</p>
+                  )}
+                  {!canSchedule && <span className="ps-pop__muted">This day has passed, so the post can only go out now.</span>}
+                </div>
+              )}
+            </div>
+          )}
         </footer>
       </div>
     </div>

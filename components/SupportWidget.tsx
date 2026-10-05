@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, X, Send, Phone, FileText, Loader2, ArrowLeft, Bot, Headset, Brain, ChevronDown, ChevronUp } from 'lucide-react';
-import { chatWithSupportBot } from '../services/geminiService';
+import { chatWithSupportBot } from '../services/aiService';
 import { supportService } from '../services/supportService';
 import { supportRealtime } from '../services/supportRealtime';
 import CallOverlay from './CallOverlay';

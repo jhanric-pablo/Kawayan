@@ -1,5 +1,14 @@
 import { ContentIdea, GeneratedPost, AIResponseSchema } from '../types';
 
+/** Models name formats freely ("Reel", "IGTV", "Carousel Image"); fold them into the four we support. */
+export const normalizeFormat = (format: unknown): ContentIdea['format'] => {
+  const f = String(format ?? '').toLowerCase();
+  if (/reel|video|tiktok|igtv|live|vlog|short/.test(f)) return 'Video';
+  if (/carousel|album|slide/.test(f)) return 'Carousel';
+  if (/text|quote|poll|tweet|status/.test(f)) return 'Text';
+  return 'Image';
+};
+
 export class ValidationService {
   // Validate AI content ideas response
   static validateContentIdeas(data: any): ContentIdea[] {
@@ -10,7 +19,8 @@ export class ValidationService {
       
       const validIdeas: ContentIdea[] = [];
       
-      for (const item of data) {
+      for (const raw of data) {
+        const item = raw && typeof raw === 'object' ? { ...raw, format: normalizeFormat(raw.format) } : raw;
         if (AIResponseSchema.contentIdea(item)) {
           // Additional validation
           if (item.day >= 1 && item.day <= 31 &&

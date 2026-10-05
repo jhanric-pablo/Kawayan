@@ -40,28 +40,22 @@ services:
       - key: MAIL_FROM
         sync: false
 
-      # Google Gemini AI (text generation)
-      - key: GEMINI_API_KEY
-        sync: false
-
-      # Cloudflare Workers AI (image generation)
+      # Cloudflare Workers AI (post text and images)
       - key: CLOUDFLARE_ACCOUNT_ID
         sync: false
       - key: CLOUDFLARE_API_TOKEN
         sync: false
 
-      # Payments (Xendit)
-      - key: XENDIT_SECRET_KEY
-        sync: false
-      - key: XENDIT_WEBHOOK_VERIFICATION_TOKEN
+      # Optional: Groq, tried before Cloudflare for faster text generation
+      - key: GROQ_API_KEY
         sync: false
 
-      # Social (TikTok)
-      - key: TIKTOK_CLIENT_KEY
+      # Payments (PayMongo) — sk_test_... for the sandbox, sk_live_... once activated
+      - key: PAYMONGO_SECRET_KEY
         sync: false
-      - key: TIKTOK_CLIENT_SECRET
-        sync: false
-      - key: VITE_TIKTOK_CLIENT_KEY
+
+      # Social auto-posting (Facebook/Instagram) via Zernio — key from zernio.com
+      - key: ZERNIO_API_KEY
         sync: false
 
       - key: LOG_LEVEL

@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import multer from 'multer';
-import { GoogleGenAI } from '@google/genai';
 import { SupabaseService } from './services/supabaseService.ts';
 import { JWTService } from './services/jwtService.ts';
 import { logger } from './utils/logger.ts';
@@ -479,7 +478,64 @@ app.get('/api/plans/:userId/:month', authenticateToken, async (req, res) => {
   }
 });
 
-// Wallet & Payments
+// Errors from third-party APIs (PayMongo, Zernio) carry their own HTTP status.
+const sendUpstreamError = (res, error, fallback) => {
+  logger.error(fallback, { error: error.message });
+  res.status(error.status || 500).json({ error: error.message || fallback });
+};
+
+// Wallet & Payments — top-ups go through PayMongo Checkout (docs.paymongo.com).
+// The pending CREDIT transaction carries the checkout session id in its description;
+// the balance only changes once PayMongo reports that session as paid.
+const PAYMONGO_API = 'https://api.paymongo.com/v1';
+const PLAN_PRICES = { PRO: 499 };
+const TOPUP_MIN = 100;
+const TOPUP_MAX = 50000;
+const checkoutSessionIdOf = (description = '') => /\((cs_[A-Za-z0-9]+)\)/.exec(description)?.[1];
+
+async function paymongo(path, { method = 'GET', body } = {}) {
+  const key = process.env.PAYMONGO_SECRET_KEY;
+  if (!key) throw Object.assign(new Error('Payments are not set up yet (PAYMONGO_SECRET_KEY is missing).'), { status: 503 });
+  const res = await fetch(`${PAYMONGO_API}${path}`, {
+    method,
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(`${key}:`).toString('base64'),
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Never pass PayMongo's 401 through: the client treats that as an expired Kawayan session.
+    const detail = data.errors?.[0]?.detail || `PayMongo request failed (${res.status})`;
+    throw Object.assign(new Error(detail), { status: res.status === 400 ? 400 : 502 });
+  }
+  return data;
+}
+
+// Credits the user's pending PayMongo top-up once PayMongo says it's paid.
+async function settlePendingTopUp(userId) {
+  const pending = await dbService.getPendingTransaction(userId);
+  const sessionId = checkoutSessionIdOf(pending?.description);
+  if (!sessionId) return { status: 'NONE', pending };
+  const { data: session } = await paymongo(`/checkout_sessions/${sessionId}`);
+  if (session.attributes.payments?.some((p) => p.attributes?.status === 'paid')) {
+    try {
+      await dbService.approveTransaction(pending.id);
+      const who = await dbService.describeUser(userId);
+      await dbService.logAudit(userId, 'wallet_topup', `${who} added ₱${pending.amount} via PayMongo (${sessionId})`);
+    } catch (error) {
+      if (!/not found/i.test(error.message)) throw error; // a parallel request already credited it
+    }
+    return { status: 'COMPLETED', amount: pending.amount };
+  }
+  if (session.attributes.status === 'expired') {
+    await dbService.failTransaction(pending.id);
+    return { status: 'FAILED' };
+  }
+  return { status: 'PENDING', pending, sessionId, checkoutUrl: session.attributes.checkout_url };
+}
+
 app.get('/api/wallet/:userId', authenticateToken, async (req, res) => {
   const userId = req.params.userId;
   const user = req.user;
@@ -490,206 +546,79 @@ app.get('/api/wallet/:userId', authenticateToken, async (req, res) => {
 
   try {
     const wallet = await dbService.getWallet(userId);
-    res.json(wallet);
+    res.json({ ...wallet, paymentsTestMode: (process.env.PAYMONGO_SECRET_KEY || '').startsWith('sk_test_') });
   } catch (error) {
     logger.error('Get wallet error', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch wallet' });
   }
 });
 
+// Start a PayMongo hosted checkout for a wallet top-up.
+app.post('/api/wallet/checkout', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const amount = Number(req.body.amount);
+  if (!Number.isInteger(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) {
+    return res.status(400).json({ error: `Enter a whole amount from ₱${TOPUP_MIN} to ₱${TOPUP_MAX.toLocaleString()}.` });
+  }
+  try {
+    await dbService.getWallet(userId); // expires pending top-ups older than 12h
+    if (await dbService.getPendingTransaction(userId)) {
+      return res.status(409).json({ error: 'You already have a payment in progress. Finish or cancel it first.' });
+    }
+    const origin = new URL(req.get('referer') || process.env.APP_URL || `${req.protocol}://${req.get('host')}`).origin;
+    const { data: session } = await paymongo('/checkout_sessions', {
+      method: 'POST',
+      body: {
+        data: {
+          attributes: {
+            line_items: [{ name: 'Kawayan wallet top-up', amount: amount * 100, currency: 'PHP', quantity: 1 }],
+            payment_method_types: ['gcash', 'paymaya', 'card'],
+            description: `Wallet top-up for ${req.user.email}`,
+            reference_number: `${userId}-${Date.now()}`,
+            success_url: `${origin}/?success=true`,
+            cancel_url: `${origin}/?cancelled=true`,
+          },
+        },
+      },
+    });
+    await dbService.createTransaction(userId, amount, `Wallet top-up via PayMongo (${session.id})`, 'CREDIT', 'PENDING');
+    res.json({ checkoutUrl: session.attributes.checkout_url });
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to start checkout');
+  }
+});
+
+// Called when the user returns from PayMongo (and on Billing load) to credit a paid top-up.
+app.post('/api/wallet/verify', authenticateToken, async (req, res) => {
+  try {
+    const { status, amount, checkoutUrl } = await settlePendingTopUp(req.user.userId);
+    res.json({ status, amount, checkoutUrl });
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to check payment');
+  }
+});
+
 app.post('/api/wallet/cancel-transaction', authenticateToken, async (req, res) => {
   const { transactionId } = req.body;
-  const user = req.user;
+  const userId = req.user.userId;
 
   try {
-    await dbService.cancelTransaction(transactionId, user.userId);
-    const wallet = await dbService.getWallet(user.userId);
-    res.json(wallet);
+    // If PayMongo isn't configured we can't check the session; still let the user clear it locally.
+    const result = await settlePendingTopUp(userId).catch((error) => {
+      if (error.status === 503) return { status: 'UNCHECKED' };
+      throw error;
+    });
+    if (result.status === 'COMPLETED') {
+      return res.status(409).json({ error: `That payment already went through. ₱${result.amount} was added to your wallet.` });
+    }
+    if (result.status === 'PENDING' && result.pending.id === transactionId) {
+      // Close the PayMongo page too, so it can't be paid after we've cancelled it here.
+      await paymongo(`/checkout_sessions/${result.sessionId}/expire`, { method: 'POST' }).catch(() => undefined);
+    }
+    await dbService.cancelTransaction(transactionId, userId);
+    res.json(await dbService.getWallet(userId));
   } catch (error) {
-    logger.error('Cancel transaction error', { error: error.message });
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/wallet/verify-payment', authenticateToken, async (req, res) => {
-  const user = req.user;
-  try {
-    const pendingTxn = await dbService.getPendingTransaction(user.userId);
-
-    if (!pendingTxn) {
-      return res.json({ status: 'NO_PENDING', message: "No pending transaction found." });
-    }
-
-    const match = pendingTxn.description.match(/Xendit Invoice: (invoice_.*)/);
-    if (!match) {
-       return res.json({ status: 'PENDING', message: "Pending transaction is not verifiable via Xendit." });
-    }
-    const externalId = match[1];
-
-    const xenditSecret = process.env.XENDIT_SECRET_KEY;
-    const response = await fetch(`https://api.xendit.co/v2/invoices?external_id=${externalId}`, {
-        headers: {
-            'Authorization': 'Basic ' + Buffer.from(xenditSecret + ':').toString('base64')
-        }
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to reach payment provider');
-    }
-    
-    const data = await response.json();
-
-    if (data && data.length > 0) {
-        const invoice = data[0];
-        if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
-            await dbService.approveTransaction(pendingTxn.id);
-            return res.json({ status: 'COMPLETED', message: 'Payment verified and balance updated.' });
-        } else if (invoice.status === 'EXPIRED') {
-             await dbService.failTransaction(pendingTxn.id);
-             return res.json({ status: 'FAILED', message: 'Payment expired.' });
-        }
-    }
-
-    res.json({ status: 'PENDING', message: 'Payment not yet confirmed by provider.' });
-
-  } catch (error) {
-    logger.error('Verify payment error', { error: error.message });
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/wallet/create-invoice', authenticateToken, async (req, res) => {
-  const { userId, amount, clientOrigin } = req.body;
-  const user = req.user;
-
-  if (userId !== user.userId && user.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    const externalId = `invoice_${userId}_${Date.now()}`;
-    const xenditSecret = process.env.XENDIT_SECRET_KEY;
-    const authHeader = 'Basic ' + Buffer.from(xenditSecret + ':').toString('base64');
-
-    // Determine the base URL dynamically
-    // Priority: Client-provided Origin (Most reliable for SPAs) -> Headers -> Fallback
-    const origin = req.get('origin');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    const baseUrl = clientOrigin || origin || `${protocol}://${host}`;
-    
-    logger.info(`Creating Xendit Invoice. Base URL determined as: ${baseUrl}`);
-
-    const response = await fetch('https://api.xendit.co/v2/invoices', {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        external_id: externalId,
-        amount: Number(amount),
-        currency: 'PHP',
-        customer: {
-          email: user.email
-        },
-        success_redirect_url: `${baseUrl}/billing?success=true`,
-        failure_redirect_url: `${baseUrl}/billing?failed=true`
-      })
-    });
-
-    const invoice = await response.json();
-    
-    if (!response.ok) {
-      logger.error('Xendit API Failure', { status: response.status, data: invoice });
-      throw new Error(invoice.message || 'Xendit Invoice creation failed');
-    }
-
-    // Create a pending transaction record
-    await dbService.createTransaction(userId, amount, `Xendit Invoice: ${externalId}`, 'CREDIT', 'PENDING');
-
-    res.json({
-      checkoutUrl: invoice.invoice_url,
-      externalId: externalId
-    });
-  } catch (error) {
-    logger.error('Xendit Invoice error', { error: error.message });
-    res.status(500).json({ error: 'Failed to create payment invoice' });
-  }
-});
-
-// Xendit Webhook Handler
-app.post('/api/webhooks/xendit', async (req, res) => {
-  // ... (existing code)
-});
-
-// --- Social Auth Token Exchange ---
-
-app.post('/api/auth/facebook/callback', async (req, res) => {
-  // ... (existing facebook code)
-});
-
-app.post('/api/auth/tiktok/callback', async (req, res) => {
-  const { code, redirectUri } = req.body;
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || process.env.VITE_TIKTOK_CLIENT_KEY;
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
-
-  try {
-    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Cache-Control': 'no-cache'
-      },
-      body: new URLSearchParams({
-        client_key: clientKey,
-        client_secret: clientSecret,
-        code: code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri
-      })
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(data.error_description || data.error);
-    }
-
-    // Get user info to show in the dashboard (Display API)
-    const userResponse = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name', {
-      headers: {
-        'Authorization': `Bearer ${data.access_token}`
-      }
-    });
-    const userData = await userResponse.json();
-
-    res.json({
-      accessToken: data.access_token,
-      user: userData.data?.user || {}
-    });
-  } catch (error) {
-    logger.error('TikTok Auth Error', { error: error.message });
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/wallet/topup', authenticateToken, async (req, res) => {
-  const { userId, amount, description } = req.body;
-  const user = req.user;
-
-  if (userId !== user.userId && user.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    // Top-ups are now PENDING by default for manual verification
-    await dbService.createTransaction(userId, amount, description || 'Wallet Top-up', 'CREDIT', 'PENDING');
-    const wallet = await dbService.getWallet(userId);
-    res.json(wallet);
-  } catch (error) {
-    logger.error('Topup error', { error: error.message });
-    res.status(500).json({ error: 'Failed to initiate top up' });
+    sendUpstreamError(res, error, 'Failed to cancel payment');
   }
 });
 
@@ -715,124 +644,6 @@ app.get('/api/admin/pending-transactions', authenticateToken, requireAdmin, asyn
   }
 });
 
-app.post('/api/wallet/xendit-checkout', authenticateToken, async (req, res) => {
-  const { userId, type, amount, method, plan, clientOrigin } = req.body;
-  const user = req.user;
-
-  if (userId !== user.userId && user.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-
-  const validMethods = ['GCASH', 'MAYA', 'CARD'];
-  const paymentMethod = validMethods.includes(method) ? method : 'GCASH';
-  const numericAmount = Number(amount);
-
-  if (!numericAmount || numericAmount <= 0) {
-    return res.status(400).json({ error: 'Invalid amount' });
-  }
-
-  const externalId = `invoice_${userId}_${Date.now()}`;
-  const methodLabel = paymentMethod === 'GCASH' ? 'GCash' : paymentMethod === 'MAYA' ? 'Maya' : 'Card';
-  const xenditSecret = process.env.XENDIT_SECRET_KEY;
-  const hasLiveXendit =
-    xenditSecret &&
-    !xenditSecret.includes('your_') &&
-    xenditSecret.length > 8;
-
-  try {
-    if (type === 'topup' && hasLiveXendit) {
-      const authHeader = 'Basic ' + Buffer.from(xenditSecret + ':').toString('base64');
-      const origin = req.get('origin');
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const host = req.headers['x-forwarded-host'] || req.get('host');
-      const baseUrl = clientOrigin || origin || `${protocol}://${host}`;
-
-      const response = await fetch('https://api.xendit.co/v2/invoices', {
-        method: 'POST',
-        headers: {
-          Authorization: authHeader,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          external_id: externalId,
-          amount: numericAmount,
-          currency: 'PHP',
-          customer: { email: user.email },
-          success_redirect_url: `${baseUrl}/billing?success=true`,
-          failure_redirect_url: `${baseUrl}/billing?failed=true`,
-        }),
-      });
-
-      const invoice = await response.json();
-
-      if (response.ok && invoice.invoice_url) {
-        await dbService.createTransaction(
-          userId,
-          numericAmount,
-          `Xendit Invoice: ${externalId}`,
-          'CREDIT',
-          'PENDING'
-        );
-        logger.logUserAction('xendit_checkout_redirect', userId, { externalId, amount: numericAmount });
-        return res.json({
-          mode: 'redirect',
-          checkoutUrl: invoice.invoice_url,
-          externalId,
-        });
-      }
-
-      logger.warn('Xendit invoice failed, using local checkout completion', { status: response.status });
-    }
-
-    if (type === 'subscription') {
-      const wallet = await dbService.getWallet(userId);
-      if (wallet.balance < numericAmount) {
-        return res.status(400).json({ error: 'Insufficient balance. Please top up your wallet first.' });
-      }
-      await dbService.createTransaction(
-        userId,
-        numericAmount,
-        `Xendit Wallet · Pro Subscription via ${methodLabel} (${externalId})`,
-        'DEBIT',
-        'COMPLETED'
-      );
-      await dbService.updateSubscription(userId, plan || 'PRO');
-    } else {
-      await dbService.createTransaction(
-        userId,
-        numericAmount,
-        `Xendit Invoice: ${externalId} · ${methodLabel}`,
-        'CREDIT',
-        'COMPLETED'
-      );
-    }
-
-    const updatedWallet = await dbService.getWallet(userId);
-    logger.logUserAction('xendit_checkout_completed', userId, {
-      type,
-      amount: numericAmount,
-      method: paymentMethod,
-      externalId,
-    });
-
-    res.json({
-      mode: 'completed',
-      wallet: updatedWallet,
-      receipt: {
-        referenceId: externalId,
-        method: paymentMethod,
-        amount: numericAmount,
-        type: type || 'topup',
-        plan: plan || undefined,
-        completedAt: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    logger.error('Xendit checkout error', { error: error.message });
-    res.status(500).json({ error: error.message || 'Payment could not be completed' });
-  }
-});
-
 app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
   const { userId, amount, description, plan } = req.body;
   const user = req.user;
@@ -841,17 +652,24 @@ app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
+  // Plan prices come from the server, never the client.
+  if (plan && !PLAN_PRICES[plan]) return res.status(400).json({ error: 'Unknown plan' });
+  const price = plan ? PLAN_PRICES[plan] : Number(amount);
+  if (!(price > 0)) return res.status(400).json({ error: 'Invalid amount' });
+
   try {
     const wallet = await dbService.getWallet(userId);
-    if (wallet.balance < amount) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+    if (wallet.balance < price) {
+      return res.status(400).json({ error: `Not enough balance. You need ₱${price}, you have ₱${wallet.balance}.` });
     }
 
-    await dbService.createTransaction(userId, amount, description, 'DEBIT');
+    const planName = plan && plan.charAt(0) + plan.slice(1).toLowerCase();
+    await dbService.createTransaction(userId, price, plan ? `${planName} plan (monthly)` : description, 'DEBIT');
     if (plan) {
       await dbService.updateSubscription(userId, plan);
+      await dbService.logAudit(userId, 'upgrade_plan', `${await dbService.describeUser(userId)} upgraded to ${plan} for ₱${price}`);
     }
-    
+
     const updatedWallet = await dbService.getWallet(userId);
     res.json(updatedWallet);
   } catch (error) {
@@ -1160,61 +978,169 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Social Routes (DB Persisted) ---
+// --- Social publishing via Zernio (docs.zernio.com) ---
+// Each Kawayan user maps to one Zernio profile found by name, and each Zernio post
+// carries the Kawayan post id in `title` — so no extra DB columns are needed.
+const ZERNIO_API = 'https://zernio.com/api/v1';
+const SOCIAL_PLATFORMS = ['facebook', 'instagram'];
+const zernioProfileIds = new Map();
 
-app.get('/api/social/connections', authenticateToken, async (req, res) => {
-  const user = req.user;
+async function zernio(path, { method = 'GET', body } = {}) {
+  const key = process.env.ZERNIO_API_KEY;
+  if (!key) throw Object.assign(new Error('Social posting is not set up yet (ZERNIO_API_KEY is missing).'), { status: 503 });
+  const res = await fetch(`${ZERNIO_API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Never pass Zernio's 401/403 through: the client treats those as an expired Kawayan session.
+    const status = [400, 409, 422].includes(res.status) ? 400 : 502;
+    throw Object.assign(new Error(data.message || data.error || `Zernio request failed (${res.status})`), { status });
+  }
+  return data;
+}
+
+async function getZernioProfileId(userId) {
+  if (zernioProfileIds.has(userId)) return zernioProfileIds.get(userId);
+  const name = `kawayan:${userId}`;
+  const { profiles = [] } = await zernio(`/profiles?name=${encodeURIComponent(name)}`);
+  const id = profiles.find((p) => p.name === name)?._id
+    || (await zernio('/profiles', { method: 'POST', body: { name } })).profile._id;
+  zernioProfileIds.set(userId, id);
+  return id;
+}
+
+async function listSocialAccounts(userId) {
+  const profileId = await getZernioProfileId(userId);
+  const { accounts = [] } = await zernio(`/accounts?profileId=${profileId}`);
+  return accounts
+    .filter((a) => SOCIAL_PLATFORMS.includes(a.platform))
+    .map((a) => ({ id: a._id, platform: a.platform, username: a.username, displayName: a.displayName, isActive: a.isActive }));
+}
+
+// Zernio needs a public HTTPS media URL; our AI images are stored as base64 data URLs.
+async function toPublicMediaUrl(imageUrl, postId) {
+  if (!imageUrl) return null;
+  if (!imageUrl.startsWith('data:')) return imageUrl;
+  const match = /^data:([^;]+);base64,(.+)$/.exec(imageUrl);
+  if (!match) return null;
+  const [, contentType, b64] = match;
+  const ext = contentType.split('/')[1] || 'png';
+  const { uploadUrl, publicUrl } = await zernio('/media/presign', {
+    method: 'POST',
+    body: { filename: `kawayan-${postId}.${ext}`, contentType },
+  });
+  const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: Buffer.from(b64, 'base64') });
+  if (!put.ok) throw Object.assign(new Error(`Image upload failed (${put.status})`), { status: 502 });
+  return publicUrl;
+}
+
+const firstPlatformUrl = (zPost) => zPost.platforms?.find((p) => p.platformPostUrl)?.platformPostUrl;
+
+app.get('/api/social/accounts', authenticateToken, async (req, res) => {
   try {
-    const connections = await dbService.getSocialConnections(user.userId);
-    res.json(connections);
+    res.json(await listSocialAccounts(req.user.userId));
   } catch (error) {
-    logger.error('Get social connections error', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch connections' });
+    sendUpstreamError(res, error, 'Failed to load social accounts');
   }
 });
 
-app.post('/api/social/connections', authenticateToken, async (req, res) => {
-  const { platform, data } = req.body;
-  const user = req.user;
-
-  try {
-    // Ensure the data object has the username/platform set
-    const connectionData = {
-      ...data,
-      connected: true,
-      platform
-    };
-    
-    await dbService.saveSocialConnection(user.userId, platform, connectionData);
-    
-    // Log the audit
-    logger.logUserAction('connect_social_account', user.userId, { platform });
-    
-    res.json({ message: 'Connection saved' });
-  } catch (error) {
-    logger.error('Save social connection error', { error: error.message });
-    res.status(500).json({ error: 'Failed to save connection' });
-  }
-});
-
-app.delete('/api/social/connections/:platform', authenticateToken, async (req, res) => {
+app.get('/api/social/connect/:platform', authenticateToken, async (req, res) => {
   const { platform } = req.params;
-  const user = req.user;
-
+  if (!SOCIAL_PLATFORMS.includes(platform)) return res.status(400).json({ error: 'Unsupported platform' });
   try {
-    // We can "soft delete" by setting connected = 0, or hard delete?
-    // Let's set connected = false for now so we keep history?
-    // Actually, `saveSocialConnection` handles update.
-    
-    const data = { connected: false };
-    await dbService.saveSocialConnection(user.userId, platform, data);
-    
-    logger.logUserAction('disconnect_social_account', user.userId, { platform });
-    
-    res.json({ message: 'Disconnected successfully' });
+    const profileId = await getZernioProfileId(req.user.userId);
+    // Send the user back to whichever host they started from (localhost in dev, the live URL in prod).
+    const origin = new URL(req.get('referer') || process.env.APP_URL || `${req.protocol}://${req.get('host')}`).origin;
+    const redirect = encodeURIComponent(`${origin}/?social=${platform}`);
+    const { authUrl } = await zernio(`/connect/${platform}?profileId=${profileId}&redirect_url=${redirect}`);
+    res.json({ authUrl });
   } catch (error) {
-    logger.error('Disconnect social error', { error: error.message });
-    res.status(500).json({ error: 'Failed to disconnect' });
+    sendUpstreamError(res, error, 'Failed to start account connection');
+  }
+});
+
+app.delete('/api/social/accounts/:accountId', authenticateToken, async (req, res) => {
+  try {
+    const account = (await listSocialAccounts(req.user.userId)).find((a) => a.id === req.params.accountId);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    await zernio(`/accounts/${account.id}`, { method: 'DELETE' });
+    const who = await dbService.describeUser(req.user.userId);
+    await dbService.logAudit(req.user.userId, 'disconnect_social', `${who} disconnected ${account.platform} @${account.username}`);
+    res.json({ message: 'Disconnected' });
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to disconnect account');
+  }
+});
+
+// Publish now, or schedule when `scheduledFor` (local "YYYY-MM-DDTHH:mm:ss" in `timezone`) is given.
+app.post('/api/social/publish', authenticateToken, async (req, res) => {
+  const { postId, accountIds, scheduledFor, timezone } = req.body;
+  if (!postId || !Array.isArray(accountIds) || accountIds.length === 0) {
+    return res.status(400).json({ error: 'Pick at least one account to post to.' });
+  }
+  try {
+    const post = (await dbService.getUserPosts(req.user.userId)).find((p) => p.id === postId);
+    if (!post) return res.status(404).json({ error: 'Post not found. Save it first.' });
+    const accounts = (await listSocialAccounts(req.user.userId)).filter((a) => accountIds.includes(a.id));
+    if (accounts.length !== accountIds.length) return res.status(400).json({ error: 'One of the selected accounts is no longer connected.' });
+
+    const mediaUrl = await toPublicMediaUrl(post.imageUrl, post.id);
+    const { post: zPost } = await zernio('/posts', {
+      method: 'POST',
+      body: {
+        title: post.id,
+        content: post.caption,
+        ...(mediaUrl ? { mediaItems: [{ url: mediaUrl, type: 'image' }] } : {}),
+        platforms: accounts.map((a) => ({ platform: a.platform, accountId: a.id })),
+        ...(scheduledFor ? { scheduledFor, timezone: timezone || 'Asia/Manila' } : { publishNow: true }),
+      },
+    });
+
+    const published = zPost.status === 'published' || zPost.status === 'partial';
+    const updated = published
+      ? { ...post, status: 'Published', publishedAt: zPost.publishedAt || new Date().toISOString(), externalLink: firstPlatformUrl(zPost) || post.externalLink }
+      : { ...post, status: 'Scheduled' };
+    await dbService.savePost(updated);
+
+    const who = await dbService.describeUser(req.user.userId);
+    const where = accounts.map((a) => `${a.platform} @${a.username}`).join(', ');
+    await dbService.logAudit(
+      req.user.userId,
+      published ? 'publish_post' : 'schedule_post',
+      `${who} ${published ? 'published' : `scheduled for ${scheduledFor} (${timezone || 'Asia/Manila'})`} "${post.topic}" to ${where}`
+    );
+    res.json(updated);
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to publish post');
+  }
+});
+
+// Pull back publish results for scheduled posts (matched by Zernio post title = Kawayan post id).
+app.post('/api/social/sync', authenticateToken, async (req, res) => {
+  try {
+    const scheduled = (await dbService.getUserPosts(req.user.userId)).filter((p) => p.status === 'Scheduled');
+    if (scheduled.length === 0) return res.json({ published: 0, failed: 0 });
+    const profileId = await getZernioProfileId(req.user.userId);
+    const { posts: zPosts = [] } = await zernio(`/posts?profileId=${profileId}&limit=500`);
+    let published = 0;
+    let failed = 0;
+    for (const post of scheduled) {
+      const z = zPosts.find((zp) => zp.title === post.id);
+      if (!z) continue;
+      if (z.status === 'published' || z.status === 'partial') {
+        await dbService.savePost({ ...post, status: 'Published', publishedAt: z.publishedAt || new Date().toISOString(), externalLink: firstPlatformUrl(z) || post.externalLink });
+        published++;
+      } else if (z.status === 'failed') {
+        await dbService.savePost({ ...post, status: 'Draft' });
+        failed++;
+      }
+    }
+    res.json({ published, failed });
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to sync post status');
   }
 });
 
@@ -1360,235 +1286,60 @@ app.post('/api/support/calls/unregister', authenticateToken, async (req, res) =>
   }
 });
 
-// --- Social Media Scraper Helper ---
-async function scrapeSocialStats(platform, username) {
-  const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
-  ];
-  
-  const headers = {
-    'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9'
-  };
+// --- Text AI (content plans, captions, trending topics, support bot) ---
+// Any OpenAI-compatible chat API works. Providers are tried in order and the next one takes
+// over on a quota error, outage or timeout, so one free tier running dry doesn't stop a demo.
+// Default: OpenAI's open-weight gpt-oss-120b on Cloudflare Workers AI, the same account the
+// images use (about 100 month plans a day on the free allocation). Setting GROQ_API_KEY puts
+// Groq first: same model, a few times faster, with its own free daily limit.
+const TEXT_AI_PROVIDERS = [
+  process.env.GROQ_API_KEY && {
+    name: 'Groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    key: process.env.GROQ_API_KEY,
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
+  },
+  process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN && {
+    name: 'Cloudflare Workers AI',
+    url: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
+    key: process.env.CLOUDFLARE_API_TOKEN,
+    model: process.env.CLOUDFLARE_TEXT_MODEL || '@cf/openai/gpt-oss-120b',
+  },
+].filter(Boolean);
 
-  try {
-    if (platform === 'instagram') {
-      // 1. Imginn (Public Viewer)
-      try {
-        const response = await fetch(`https://imginn.com/${username}/`, { headers });
-        if (response.ok) {
-          const html = await response.text();
-          const followersMatch = html.match(/<span class="followers">([0-9.,kKmM]+)<\/span>/i) ||
-                                 html.match(/Followers\s*<[^>]+>\s*([0-9.,kKmM]+)/i);
-          if (followersMatch) {
-            return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'imginn' };
-          }
-        }
-      } catch (e) { logger.warn(`Imginn failed: ${e.message}`); }
+app.post('/api/ai/text', authenticateToken, async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+  if (TEXT_AI_PROVIDERS.length === 0) return res.status(503).json({ error: 'AI service not configured', degraded: true });
 
-      // 2. GreatFon/InstaNavigation Fallback
-      const response2 = await fetch(`https://greatfon.com/v/${username}`, { headers });
-      if (response2.ok) {
-        const html = await response2.text();
-        const followersMatch = html.match(/Followers\s*<[^>]+>\s*([0-9.,kKmM]+)/i) ||
-                               html.match(/<li[^>]*>\s*([0-9.,kKmM]+)\s*<span>Followers<\/span>/i);
-        if (followersMatch) {
-          return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'greatfon' };
-        }
+  let rateLimited = false;
+  for (const provider of TEXT_AI_PROVIDERS) {
+    try {
+      const response = await fetch(provider.url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${provider.key}`, 'Content-Type': 'application/json' },
+        // Cloudflare stops at 256 tokens unless told otherwise, which cuts a month plan mid-JSON.
+        body: JSON.stringify({ model: provider.model, messages: [{ role: 'user', content: prompt }], max_tokens: 4096 }),
+        signal: AbortSignal.timeout(Number(process.env.AI_TIMEOUT_MS) || 45000),
+      });
+      if (!response.ok) {
+        rateLimited ||= response.status === 429;
+        throw new Error(`${response.status} ${(await response.text().catch(() => '')).slice(0, 200)}`);
       }
-
-    } else if (platform === 'tiktok') {
-      const cleanUser = username.startsWith('@') ? username.substring(1) : username;
-      
-      // 1. TikWM Public API (JSON)
-      try {
-        const response = await fetch(`https://www.tikwm.com/api/user/info?unique_id=${cleanUser}`, { headers });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.code === 0 && data.data && data.data.user) {
-             return {
-               followers: data.data.user.follower_count,
-               likes: data.data.user.total_favorited,
-               isReal: true,
-               source: 'tikwm-api'
-             };
-          }
-        }
-      } catch (e) { logger.warn(`TikWM failed: ${e.message}`); }
-
-      // 2. Countik API (often open)
-      try {
-        const response2 = await fetch(`https://countik.com/api/user/${cleanUser}`, { headers });
-        if (response2.ok) {
-           const data = await response2.json();
-           if (data && data.followerCount) {
-             return {
-               followers: parseSocialNumber(data.followerCount),
-               likes: parseSocialNumber(data.heartCount),
-               isReal: true,
-               source: 'countik-api'
-             };
-           }
-        }
-      } catch (e) { logger.warn(`Countik failed: ${e.message}`); }
-
-      // 3. Urlebird Fallback
-      const response3 = await fetch(`https://urlebird.com/user/@${cleanUser}/`, { headers });
-      if (response3.ok) {
-         const html = await response3.text();
-         const followersMatch = html.match(/>\s*([0-9.,kKmM]+)\s*<\/b>\s*Followers/i);
-         if (followersMatch) {
-            return { followers: parseSocialNumber(followersMatch[1]), isReal: true, source: 'urlebird' };
-         }
-      }
-
-    } else if (platform === 'facebook') {
-       // FB Public Page Scraping
-       const response = await fetch(`https://www.facebook.com/${username}`, { headers });
-       if (response.ok) {
-         const html = await response.text();
-         const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) ||
-                           html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
-                           
-         if (metaMatch) {
-           const content = metaMatch[1];
-           const followersMatch = content.match(/([0-9.,kKmM]+)\s+followers/i);
-           const likesMatch = content.match(/([0-9.,kKmM]+)\s+likes/i);
-           
-           if (followersMatch) {
-             return {
-               followers: parseSocialNumber(followersMatch[1]),
-               likes: parseSocialNumber(likesMatch ? likesMatch[1] : '0'),
-               isReal: true,
-               source: 'facebook-meta'
-             };
-           }
-         }
-       }
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Empty response');
+      return res.json({ text });
+    } catch (error) {
+      logger.warn('Text AI provider failed', { provider: provider.name, message: error?.message });
     }
-    
-    throw new Error('All scraping methods failed');
-
-  } catch (error) {
-    logger.warn(`Scraping failed for ${platform}/${username}: ${error.message}`);
-    // Return error state - no fake data
-    return {
-      error: error.message,
-      isReal: false,
-      followers: null,
-      engagement: null
-    };
   }
-}
-
-function parseSocialNumber(str) {
-  if (!str) return 0;
-  str = str.toUpperCase().replace(/,/g, '');
-  if (str.includes('K')) return parseFloat(str) * 1000;
-  if (str.includes('M')) return parseFloat(str) * 1000000;
-  if (str.includes('B')) return parseFloat(str) * 1000000000;
-  return parseFloat(str);
-}
-
-// Route for stats
-
-app.get('/api/social/stats/:platform/:username', async (req, res) => {
-
-  const { platform, username } = req.params;
-
-  const data = await scrapeSocialStats(platform, username);
-
-  res.json(data);
-
-});
-
-
-
-// --- Local AI Proxy ---
-app.post('/api/ai/local', async (req, res) => {
-  try {
-    const response = await fetch('http://127.0.0.1:11434/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    
-    if (!response.ok) throw new Error("Local AI Server Offline");
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(503).json({ error: "Local AI currently unavailable" });
-  }
-});
-
-// --- Gemini AI Proxy (text generation: content plans, captions, support bot) ---
-// Free-tier Flash model — API key stays server-side, never sent to the browser.
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
-
-app.post('/api/ai/gemini', async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
-  if (!genAI) return res.status(503).json({ error: 'AI service not configured', degraded: true });
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS) || 20000);
-
-  try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: prompt,
-      config: { abortSignal: controller.signal },
-    });
-    res.json({ text: response.text || '' });
-  } catch (error) {
-    const aborted = error?.name === 'AbortError';
-    const isQuota = /RESOURCE_EXHAUSTED|429/.test(error?.message || '');
-    logger.warn('Gemini AI proxy error', { aborted, isQuota, message: error?.message });
-    const message = aborted ? 'AI request timed out' : isQuota ? 'Gemini API quota exceeded' : 'AI service unavailable';
-    res.status(isQuota ? 429 : 503).json({ error: message, degraded: true });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
-// --- Gemini Image Proxy (post images) ---
-// NOTE: every Gemini image model (flash-image, flash-lite-image, pro-image) currently
-// returns free-tier quota limit: 0 for this project — image generation needs billing
-// enabled on the Google Cloud project tied to this API key. Route is wired and correct,
-// just unreachable on the free tier; the frontend calls Pollinations.ai directly instead.
-// Flip services/geminiService.ts's generateImageFromPrompt back to hit this route first
-// once billing is on.
-app.post('/api/ai/gemini-image', async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
-  if (!genAI) return res.status(503).json({ error: 'AI service not configured', degraded: true });
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.GEMINI_TIMEOUT_MS) || 30000);
-
-  try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3.1-flash-image',
-      contents: prompt,
-      config: { responseModalities: ['IMAGE'], abortSignal: controller.signal },
-    });
-    const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error('No image returned');
-    const dataUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-    res.json({ imageUrl: dataUrl });
-  } catch (error) {
-    const aborted = error?.name === 'AbortError';
-    logger.warn('Gemini image proxy error', { aborted, message: error?.message });
-    res.status(503).json({ error: aborted ? 'Image request timed out' : 'Image service unavailable', degraded: true });
-  } finally {
-    clearTimeout(timeout);
-  }
+  // Every provider failed. The calendar shows its daily-limit notice when the error mentions "quota".
+  res.status(rateLimited ? 429 : 503).json({ error: rateLimited ? 'AI quota reached for today' : 'AI service unavailable', degraded: true });
 });
 
 // --- Cloudflare Workers AI Image Proxy (post images, free tier) ---
-app.post('/api/ai/cloudflare-image', async (req, res) => {
+app.post('/api/ai/cloudflare-image', authenticateToken, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 

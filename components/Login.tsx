@@ -7,7 +7,7 @@ import TermsOfServiceModal from './TermsOfServiceModal';
 import AuthShell from './auth/AuthShell';
 import AuthField from './auth/AuthField';
 import AuthTabs from './auth/AuthTabs';
-import StepProgress from './auth/StepProgress';
+import Stepper, { Step } from './ui/Stepper';
 import PasswordMeter from './auth/PasswordMeter';
 import {
   ArrowRight, X, Mail, Lock, Building2, MapPin, Phone, Eye, EyeOff,
@@ -23,7 +23,7 @@ interface Props {
   toggleTheme?: () => void;
 }
 
-const SIGNUP_STEPS = ['Your account', 'Your business', 'Verification'];
+const SIGNUP_STEPS = ['Account', 'Business', 'Verify'];
 
 /* Honest, on-brand cycling line — the kinds of shops Kawayan is built for. */
 const BUILT_FOR = [
@@ -278,6 +278,35 @@ const Login: React.FC<Props> = ({
     </>
   );
 
+  // Email + password: the whole sign-in form, and step 1 of sign-up.
+  const accountFields = (
+    <>
+      <AuthField
+        id="af-email"
+        label="Email address"
+        type="email"
+        inputMode="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        autoComplete="email"
+        icon={<Mail />}
+      />
+      <AuthField
+        id="af-pw"
+        label="Password"
+        type={showPassword ? 'text' : 'password'}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        autoComplete={isSignUp ? 'new-password' : 'current-password'}
+        icon={<Lock />}
+        trailing={eyeToggle}
+      />
+      {isSignUp && !isAdminLogin && <PasswordMeter password={password} />}
+    </>
+  );
+
   /* ── Heading copy per mode ── */
   const heading = forgotMode
     ? { eyebrow: 'Account recovery', title: <>Reset your <em>password.</em></>, sub: 'We’ll email you a secure link to set a new one.' }
@@ -354,125 +383,103 @@ const Login: React.FC<Props> = ({
       ) : (
         <>
           {!isAdminLogin && <AuthTabs isSignUp={isSignUp} onChange={switchMode} />}
-          {isSignUp && !isAdminLogin && <StepProgress steps={SIGNUP_STEPS} current={step} />}
-
           <form onSubmit={handleSubmit} className="ax-form">
-            {/* Step 1 — account (also the whole form for sign-in / admin) */}
-            {(!isSignUp || isAdminLogin || step === 0) && (
-              <>
-                <AuthField
-                  id="af-email"
-                  label="Email address"
-                  type="email"
-                  inputMode="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  icon={<Mail />}
-                />
-                <AuthField
-                  id="af-pw"
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                  icon={<Lock />}
-                  trailing={eyeToggle}
-                />
-                {isSignUp && !isAdminLogin && <PasswordMeter password={password} />}
-              </>
-            )}
+            {isSignUp && !isAdminLogin ? (
+              /* Submit (Continue / Enter) still drives the wizard and its validation; the stepper animates it. */
+              <Stepper index={step} onStepChange={(i) => { clearMessages(); setStep(i); }} showNav={false}>
+                <Step label={SIGNUP_STEPS[0]}>
+                  <div className="ax-form">{accountFields}</div>
+                </Step>
 
-            {/* Step 2 — business details */}
-            {isSignUp && !isAdminLogin && step === 1 && (
-              <>
-                <AuthField
-                  id="af-biz"
-                  label="Business name"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  required
-                  autoFocus
-                  autoComplete="organization"
-                  icon={<Building2 />}
-                />
-                <AuthField
-                  id="af-addr"
-                  label="Business address"
-                  value={businessAddress}
-                  onChange={(e) => setBusinessAddress(e.target.value)}
-                  required
-                  autoComplete="street-address"
-                  icon={<MapPin />}
-                />
-                <AuthField
-                  id="af-phone"
-                  label="Contact number"
-                  type="tel"
-                  inputMode="tel"
-                  value={businessPhone}
-                  onChange={(e) => setBusinessPhone(e.target.value)}
-                  required
-                  autoComplete="tel"
-                  icon={<Phone />}
-                />
-              </>
-            )}
+                <Step label={SIGNUP_STEPS[1]}>
+                  <div className="ax-form">
+                    <AuthField
+                      id="af-biz"
+                      label="Business name"
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      required
+                      autoFocus
+                      autoComplete="organization"
+                      icon={<Building2 />}
+                    />
+                    <AuthField
+                      id="af-addr"
+                      label="Business address"
+                      value={businessAddress}
+                      onChange={(e) => setBusinessAddress(e.target.value)}
+                      required
+                      autoComplete="street-address"
+                      icon={<MapPin />}
+                    />
+                    <AuthField
+                      id="af-phone"
+                      label="Contact number"
+                      type="tel"
+                      inputMode="tel"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      required
+                      autoComplete="tel"
+                      icon={<Phone />}
+                    />
+                  </div>
+                </Step>
 
-            {/* Step 3 — permit + terms */}
-            {isSignUp && !isAdminLogin && step === 2 && (
-              <>
-                <div className="ax-doc">
-                  <span className="ax-doc__label"><ShieldCheck /> Business permit</span>
-                  {document ? (
-                    <div className="ax-doc__chip">
-                      <Check className="ax-doc__ok" />
-                      <span>{document.name}</span>
-                      <button
-                        type="button"
-                        aria-label="Remove file"
-                        onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                <Step label={SIGNUP_STEPS[2]}>
+                  <div className="ax-form">
+                    <div className="ax-doc">
+                      <span className="ax-doc__label"><ShieldCheck /> Business permit</span>
+                      {document ? (
+                        <div className="ax-doc__chip">
+                          <Check className="ax-doc__ok" />
+                          <span>{document.name}</span>
+                          <button
+                            type="button"
+                            aria-label="Remove file"
+                            onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button type="button" className="ax-doc__add" onClick={() => fileInputRef.current?.click()}>
+                          <UploadCloud /> Attach Mayor&apos;s Permit / DTI / SEC
+                        </button>
+                      )}
+                      <p className="ax-doc__hint">JPG, PNG or PDF · max 5&nbsp;MB</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        hidden
+                        onChange={handleFileChange}
+                      />
                     </div>
-                  ) : (
-                    <button type="button" className="ax-doc__add" onClick={() => fileInputRef.current?.click()}>
-                      <UploadCloud /> Attach Mayor&apos;s Permit / DTI / SEC
-                    </button>
-                  )}
-                  <p className="ax-doc__hint">JPG, PNG or PDF · max 5&nbsp;MB</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf"
-                    hidden
-                    onChange={handleFileChange}
-                  />
-                </div>
 
-                <label className="ax-tos">
-                  <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  />
-                  <span>
-                    I agree to the{' '}
-                    <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('terms'); }}>
-                      Terms of Service
-                    </button>{' '}
-                    and{' '}
-                    <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('privacy'); }}>
-                      Privacy Policy
-                    </button>
-                    . Verification is required before full platform access.
-                  </span>
-                </label>
-              </>
+                    <label className="ax-tos">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      />
+                      <span>
+                        I agree to the{' '}
+                        <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('terms'); }}>
+                          Terms of Service
+                        </button>{' '}
+                        and{' '}
+                        <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('privacy'); }}>
+                          Privacy Policy
+                        </button>
+                        . Verification is required before full platform access.
+                      </span>
+                    </label>
+                  </div>
+                </Step>
+              </Stepper>
+            ) : (
+              accountFields
             )}
 
             {messages}

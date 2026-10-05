@@ -1,4 +1,4 @@
-import { Sparkles, CalendarDays, Layers, BarChart3, CreditCard, Settings as SettingsIcon, MessageSquare, Rocket } from 'lucide-react';
+import { Sparkles, CalendarDays, Layers, BarChart3, Share2, CreditCard, Settings as SettingsIcon, MessageSquare, Rocket } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface TourStep {
@@ -42,22 +42,29 @@ export const TOUR_STEPS: TourStep[] = [
   {
     anchor: 'nav-insights',
     name: 'Insights',
-    title: 'See what is working',
-    body: 'Engagement from Facebook, Instagram and TikTok in one place, charted channel by channel.',
+    title: "See what's working",
+    body: 'Compare this period with the last one, find your best posts, put up to three side by side, and download your numbers.',
     icon: BarChart3,
+  },
+  {
+    anchor: 'nav-social',
+    name: 'Social',
+    title: 'Connect your pages',
+    body: 'Link your Facebook Page and Instagram once. After that, Post now and Schedule in the calendar publish to them for you.',
+    icon: Share2,
   },
   {
     anchor: 'nav-billing',
     name: 'Billing',
     title: 'Top up and go Pro',
-    body: 'Your prepaid wallet, funded through Xendit. Free gives you 8 posts a month, Pro gives you 16, and extra posts are ₱150 each.',
+    body: 'Your prepaid wallet, funded through PayMongo (GCash, Maya or card). Free gives you 8 posts a month, Pro gives you 16, and extra posts are ₱150 each.',
     icon: CreditCard,
   },
   {
     anchor: 'nav-settings',
     name: 'Settings',
     title: 'Tune your brand anytime',
-    body: 'Change your brand voice, audience and themes, switch light or dark mode, and connect your social accounts.',
+    body: 'Change your brand voice, audience and themes, and switch between light and dark mode.',
     icon: SettingsIcon,
   },
   {

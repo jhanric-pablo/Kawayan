@@ -70,6 +70,7 @@ const VIEWS_BY_ROLE: Record<string, ViewState[]> = {
   user: [
     ViewState.CALENDAR,
     ViewState.INSIGHTS,
+    ViewState.SOCIAL,
     ViewState.BILLING,
     ViewState.SETTINGS,
     ViewState.VERIFICATION,

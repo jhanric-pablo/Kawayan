@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { BrandProfile } from '../types';
-import { ArrowRight, ArrowLeft, Store, Users, MessageCircle, PenTool, Check, Sparkles, Lock } from 'lucide-react';
+import { Store, Users, MessageCircle, PenTool, Check, Sparkles, Lock } from 'lucide-react';
 import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
+import { BRAND_VOICES } from '../constants/brandVoices';
+import Stepper, { Step } from './ui/Stepper';
 import './onboarding.css';
 
 interface Props {
@@ -11,7 +13,6 @@ interface Props {
 }
 
 const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
-  const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<BrandProfile>({
     businessName,
     industry: '',
@@ -20,37 +21,19 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
     keyThemes: ''
   });
 
-  const handleNext = () => {
-    if (step < 4) setStep(step + 1);
-    else onComplete(profile);
-  };
-
   const handleChange = (field: keyof BrandProfile, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const tones = [
-    { label: 'Professional & Trustworthy', desc: 'Corporate, serious, expert' },
-    { label: 'Makulit & Fun (Kwelang Pinoy)', desc: 'Meme-style, energetic, relatable' },
-    { label: 'Inspirational (Hugot)', desc: 'Emotional, motivational, deep' },
-    { label: 'Premium & Minimalist', desc: 'Sleek, high-end, few words' },
-    { label: 'Friendly Tita', desc: 'Caring, warm, gossipy but nice' },
-  ];
-
-  const steps = [
-    { num: 1, icon: Store, label: 'Business' },
-    { num: 2, icon: Users, label: 'Audience' },
-    { num: 3, icon: MessageCircle, label: 'Voice' },
-    { num: 4, icon: PenTool, label: 'Themes' },
-  ];
-
-  const sections = [
-    { icon: Store, title: 'Business Basics', sub: 'Tell us about your business' },
-    { icon: Users, title: 'Target Audience', sub: 'Who are your ideal customers?' },
-    { icon: MessageCircle, title: 'Brand Voice', sub: 'How should your brand sound?' },
-    { icon: PenTool, title: 'Content Themes', sub: 'Key topics you want to cover' },
-  ];
-  const SectionIcon = sections[step - 1].icon;
+  const sectionHead = (Icon: React.ElementType, title: string, sub: string) => (
+    <div className="bs-sec-head">
+      <div className="bs-sec-head__ico"><Icon /></div>
+      <div>
+        <h2>{title}</h2>
+        <p>{sub}</p>
+      </div>
+    </div>
+  );
 
   const audienceSuggestions = ['Gen Z students', 'Working moms', 'Titas of Manila', 'Small business owners', 'OFW families'];
   const themeSuggestions = ['Product launches', 'Behind the scenes', 'Customer testimonials', 'Promos & sales', 'Tips & how-tos', 'Memes'];
@@ -98,38 +81,16 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
             <p>This helps Kawayan AI create content that truly sounds like you.</p>
           </div>
 
-          {/* stepper */}
-          <div className="bs-steps">
-            {steps.map((s) => {
-              const Icon = s.icon;
-              const done = s.num < step;
-              const active = s.num === step;
-              return (
-                <div key={s.num} className={`bs-step${active ? ' is-active' : done ? ' is-done' : ''}`}>
-                  {done ? <Check /> : <Icon />}
-                  <span className="bs-step__label">{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* progress */}
-          <div className="bs-progress">
-            <b style={{ width: `${(step / 4) * 100}%` }} />
-          </div>
-
-          {/* card */}
           <div className="bs-card">
-            <div className="bs-slide" key={step}>
-              <div className="bs-sec-head">
-                <div className="bs-sec-head__ico"><SectionIcon /></div>
-                <div>
-                  <h2>{sections[step - 1].title}</h2>
-                  <p>{sections[step - 1].sub}</p>
-                </div>
-              </div>
-
-              {step === 1 && (
+            <Stepper
+              onComplete={() => onComplete(profile)}
+              /* Business name is read-only, so industry is the only step-1 input to gate on. */
+              canAdvance={(i) => i !== 0 || !!profile.industry.trim()}
+              nextLabel="Continue"
+              finishLabel="Finish setup"
+            >
+              <Step label="Business">
+                {sectionHead(Store, 'Business Basics', 'Tell us about your business')}
                 <div className="space-y-5">
                   <div>
                     <label className="bs-label">Business Name</label>
@@ -165,9 +126,10 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
                     </select>
                   </div>
                 </div>
-              )}
+              </Step>
 
-              {step === 2 && (
+              <Step label="Audience">
+                {sectionHead(Users, 'Target Audience', 'Who are your ideal customers?')}
                 <div>
                   <label className="bs-label">Describe your audience</label>
                   <textarea
@@ -185,11 +147,12 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
                     ))}
                   </div>
                 </div>
-              )}
+              </Step>
 
-              {step === 3 && (
+              <Step label="Voice">
+                {sectionHead(MessageCircle, 'Brand Voice', 'How should your brand sound?')}
                 <div className="bs-voice">
-                  {tones.map((t) => {
+                  {BRAND_VOICES.map((t) => {
                     const active = profile.brandVoice === t.label;
                     return (
                       <button
@@ -205,9 +168,10 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
                     );
                   })}
                 </div>
-              )}
+              </Step>
 
-              {step === 4 && (
+              <Step label="Themes">
+                {sectionHead(PenTool, 'Content Themes', 'Key topics you want to cover')}
                 <div>
                   <label className="bs-label">Key content themes</label>
                   <textarea
@@ -225,36 +189,8 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* navigation */}
-            <div className="bs-nav">
-              <button
-                type="button"
-                onClick={() => step > 1 && setStep(step - 1)}
-                className={`btn btn-outline ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-
-              <div className="bs-dots">
-                {[1, 2, 3, 4].map((n) => (
-                  <i key={n} className={`${n <= step ? 'is-on' : ''} ${n === step ? 'is-cur' : ''}`} />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNext}
-                /* Business name is read-only here, so industry is the only step-1 input to gate on. */
-                disabled={step === 1 && !profile.industry.trim()}
-                className="btn btn-primary"
-              >
-                {step === 4 ? 'Finish Setup' : 'Next Step'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+              </Step>
+            </Stepper>
           </div>
         </div>
 

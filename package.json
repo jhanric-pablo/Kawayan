@@ -14,7 +14,6 @@
     "guide:system-pdf": "node scripts/generate-system-guide-pdf.mjs"
   },
   "dependencies": {
-    "@google/genai": "^1.33.0",
     "@preact/signals": "^2.9.2",
     "@supabase/supabase-js": "^2.116.0",
     "@toast-ui/calendar": "^2.1.3",

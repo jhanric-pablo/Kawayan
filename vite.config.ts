@@ -24,8 +24,6 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.DB_PATH': JSON.stringify(env.DB_PATH || './kawayan.db'),
         'process.env.NODE_ENV': JSON.stringify(env.NODE_ENV || 'development'),
         'process.env.JWT_SECRET': JSON.stringify(env.JWT_SECRET || 'default-secret-change-in-production'),

@@ -3,19 +3,23 @@ import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
 import { normalizeIdeasToBatchCount } from "../utils/tierLimits";
 
-// --- GEMINI LLM API (BACKEND PROXIED — key never reaches the browser) ---
-const callGeminiLLM = async (prompt: string): Promise<string> => {
-  const response = await fetch('/api/ai/gemini', {
+// The AI routes need a login: they spend the app's free AI allowance.
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('kawayan_jwt');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
+
+// --- Text AI (server-proxied, so provider keys never reach the browser; see /api/ai/text) ---
+const callTextAI = async (prompt: string): Promise<string> => {
+  const response = await fetch('/api/ai/text', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: authHeaders(),
     body: JSON.stringify({ prompt })
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Gemini Proxy Error: ${response.status} - ${errText}`);
+    throw new Error(`AI error: ${response.status} - ${errText}`);
   }
 
   const data = await response.json();
@@ -42,15 +46,16 @@ const extractJson = (text: string) => {
   return JSON.parse(cleaned);
 };
 
-const generateWithFallback = async (prompt: string) => {
-  return await callGeminiLLM(prompt);
-};
-
 export const generateContentPlan = async (
   profile: BrandProfile,
   month: string,
-  itemCount: number = 8
+  itemCount: number = 8,
+  /** The owner's focus for the month, e.g. "Promo / limited-time sale". */
+  focus = ''
 ): Promise<ContentIdea[]> => {
+    const focusRule = focus.trim()
+      ? `- THIS MONTH'S FOCUS, set by the owner: "${focus.trim()}". Build most ideas around it, mixed with a few evergreen posts.`
+      : '';
     const prompt = `
     Analyze the following brand profile:
     - Business Name: ${profile.businessName}
@@ -67,15 +72,18 @@ export const generateContentPlan = async (
     - NO GENERIC CONTENT. Avoid phrases like "Start the month right" or "Check out our products".
     - BE SPECIFIC. Create content that only makes sense for THIS brand.
     - USE TAGLISH. The 'title' and 'topic' must be in natural, modern Taglish (mix of Tagalog/English) or Filipino.
+    - PHILIPPINE CONTEXT. Tie ideas to Philippine seasons, events and paydays (15th and 30th). Never use holidays Filipinos don't celebrate, like Thanksgiving.
+    ${focusRule}
+    - NO MADE-UP OFFERS. Unless the owner's focus names them, never invent prices, percentages, "buy X get Y" deals, freebies or giveaways. Say "a special promo" or "a bundle deal" and let the owner add the details.
     - Spread 'day' values evenly across the month (1–28), starting from today when planning the current month.
     - OUTPUT ONLY JSON. No explanation before or after.
     
     The output must be ONLY a valid JSON array of exactly ${itemCount} objects:
-    [{"day": number, "title": "string", "topic": "string", "format": "string"}]
+    [{"day": number, "title": "string", "topic": "string", "format": "Image" | "Carousel" | "Text" | "Video"}]
   `;
   try {
     logger.info("Generating content plan with prompt:", prompt);
-    const res = await generateWithFallback(prompt);
+    const res = await callTextAI(prompt);
     const data = extractJson(res);
     logger.info("Received and parsed content plan:", data);
     const validated = ValidationService.validateContentIdeas(data);
@@ -103,6 +111,8 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
         - DO NOT use generic phrases like "Check out our amazing..." or "Perfect for you".
         - BE CREATIVE. Use "Hugot", storytelling, or relatable humor that matches the brand voice.
         - Include relevant emojis and 3-5 hyper-local hashtags.
+        - Keep it Philippine: local events, places and humor. Never mention holidays Filipinos don't celebrate, like Thanksgiving.
+        - Don't invent offer details (prices, percentages, "buy X get Y", freebies, giveaways) unless the topic states them.
     2.  **Image Prompt:** Detailed English prompt for an AI image generator. Specific style, lighting, and composition.
     3.  **Virality Score:** 0-100.
     4.  **Virality Reason:** Brief English explanation.
@@ -111,7 +121,7 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
   `;
   try {
     logger.info("Generating post with prompt:", prompt);
-    const res = await generateWithFallback(prompt);
+    const res = await callTextAI(prompt);
     const data = extractJson(res);
     logger.info("Received and parsed post:", data);
     return ValidationService.validatePostResponse(data);
@@ -124,15 +134,50 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
   }
 };
 
+export interface CaptionRewrite {
+  caption: string;
+  viralityScore?: number;
+  viralityReason?: string;
+}
+
+/** One targeted edit of an existing caption ("make it shorter"), re-scored. */
+export const rewriteCaption = async (profile: BrandProfile, caption: string, instruction: string): Promise<CaptionRewrite> => {
+  const prompt = `
+    You are the social media manager for "${profile.businessName}" (${profile.industry}).
+    Brand voice: ${profile.brandVoice}. Audience: ${profile.targetAudience}.
+
+    Rewrite the caption below. Instruction: ${instruction}
+
+    Rules:
+    - Keep natural, modern Taglish unless the instruction says otherwise.
+    - Keep it Philippine: local context only, never holidays Filipinos don't celebrate.
+    - Don't invent prices, dates or promos that aren't in the caption or the instruction.
+    - Then rate the new caption's virality from 0 to 100 with a one-sentence English reason.
+
+    Caption:
+    <<<
+    ${caption}
+    >>>
+
+    OUTPUT ONLY JSON. Format: {"caption": "string", "viralityScore": number, "viralityReason": "string"}
+  `;
+  const data = extractJson(await callTextAI(prompt));
+  if (typeof data?.caption !== 'string' || !data.caption.trim()) throw new Error('The AI did not return a caption');
+  const score = Number(data.viralityScore);
+  return {
+    caption: data.caption.trim(),
+    viralityScore: Number.isFinite(score) && score >= 0 && score <= 100 ? Math.round(score) : undefined,
+    viralityReason: typeof data.viralityReason === 'string' && data.viralityReason.trim() ? data.viralityReason.trim() : undefined,
+  };
+};
+
 // Cloudflare Workers AI (free tier, Stable Diffusion XL) is the primary image source.
 // Falls back to Pollinations.ai (free, no key) if Cloudflare isn't configured or errors.
-// (Gemini's image models all return free-tier quota limit: 0 on this project — see
-// server.js's /api/ai/gemini-image, wired and ready if billing is ever enabled there.)
 export const generateImageFromPrompt = async (prompt: string): Promise<string | null> => {
   try {
     const response = await fetch('/api/ai/cloudflare-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ prompt }),
     });
     if (!response.ok) throw new Error(`Cloudflare image proxy error: ${response.status}`);
@@ -148,7 +193,7 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string | 
 export const getTrendingTopicsPH = async (industry?: string): Promise<string[]> => {
   const prompt = `List 5 trending topics in the Philippines for ${industry || 'general'} industry. Return ONLY a JSON string array like ["topic1", "topic2"].`;
   try {
-    const res = await generateWithFallback(prompt);
+    const res = await callTextAI(prompt);
     const data = extractJson(res);
     return ValidationService.validateTrendingTopics(data);
   } catch (error) {
@@ -159,7 +204,7 @@ export const getTrendingTopicsPH = async (industry?: string): Promise<string[]> 
 export const chatWithSupportBot = async (message: string, history: {sender: 'user'|'bot', text: string}[]): Promise<string> => {
   const fullPrompt = `History:\n${history.map(h => `${h.sender}: ${h.text}`).join('\n')}\nUser: ${message}\nResponse (Taglish, concise):`;
   try {
-    return await generateWithFallback(fullPrompt);
+    return await callTextAI(fullPrompt);
   } catch (e) {
     // FINAL REDUNDANCY: Tell user to talk to human instead of fake replies
     return "I apologize, my AI systems are currently overloaded. Please click 'New Ticket' above or use the 'Call Us' button to speak with a human agent directly!";

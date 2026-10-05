@@ -50,3 +50,4 @@ uploads/
 
 # Local Impeccable design-tool cache/config
 .impeccable/
+.claude/settings.local.json

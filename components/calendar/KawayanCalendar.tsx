@@ -14,6 +14,7 @@ interface SelectDateTimeInfo {
   start: Date | string | number;
   end: Date | string | number;
   isAllday: boolean;
+  nativeEvent?: MouseEvent;
 }
 type CalendarInfo = NonNullable<Options['calendars']>[number];
 
@@ -169,6 +170,10 @@ const KawayanCalendar: React.FC<Props> = ({
 
   const handleSelectDateTime = (info: SelectDateTimeInfo) => {
     calRef.current?.clearGridSelections();
+    // TOAST follows the pointer by position, so a click on a dialog sitting over the grid
+    // (e.g. "Write it with AI") reads as selecting the day underneath and moved the post there.
+    const target = info.nativeEvent?.target;
+    if (target instanceof Node && !rootRef.current?.contains(target)) return;
     const start = new Date(info.start);
     const cur = currentDateRef.current;
     if (start.getMonth() === cur.getMonth() && start.getFullYear() === cur.getFullYear()) {

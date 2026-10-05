@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, CheckCircle2, KeyRound, MessageCircle, Palette, PlayCircle, ShieldCheck, Store, X } from 'lucide-react';
 import { BrandProfile, User } from '../types';
-import { Save, User as UserIcon, MessageCircle, Target, Briefcase, Moon, Sun, Monitor, ArrowLeft, Lock, CreditCard, AlertTriangle, CheckCircle, PlayCircle } from 'lucide-react';
 import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
-import { paymentService, Wallet } from '../services/paymentService';
+import { BRAND_VOICES, isCustomVoice } from '../constants/brandVoices';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
-import { useOrganicDialog } from './OrganicDialog';
+import PasswordMeter from './auth/PasswordMeter';
+import { useToast } from './ui/Toast';
+import './settings.css';
 
 interface Props {
   profile?: BrandProfile | null;
@@ -19,534 +21,438 @@ interface Props {
   onClose?: () => void;
 }
 
-const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, onUserUpdate, darkMode, toggleDarkMode, onReplayTour, onClose }) => {
-  const dialog = useOrganicDialog();
-  const [formData, setFormData] = useState<BrandProfile>({
-    userId: user?.id || '',
-    // Always the verified name on the user record; saving re-syncs the brand
-    // profile copy rather than preserving a divergent one.
-    businessName: user?.businessName || profile?.businessName || '',
-    industry: profile?.industry || '',
-    targetAudience: profile?.targetAudience || '',
-    brandVoice: profile?.brandVoice || '',
-    keyThemes: profile?.keyThemes || '',
-    brandColors: profile?.brandColors && profile?.brandColors.length > 0 
-      ? profile.brandColors 
-      : ['#10b981', '#3b82f6', '#f59e0b']
-  });
-  
-  // Account State
-  const [accountForm, setAccountForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
+type Tab = 'business' | 'voice' | 'security' | 'appearance';
 
-  // Billing State
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+const NAV: { group: string; items: { id: Tab; label: string; Icon: React.ElementType; brand?: boolean }[] }[] = [
+  {
+    group: 'Brand',
+    items: [
+      { id: 'business', label: 'Business', Icon: Store, brand: true },
+      { id: 'voice', label: 'Voice & audience', Icon: MessageCircle, brand: true },
+    ],
+  },
+  {
+    group: 'Account',
+    items: [
+      { id: 'security', label: 'Login & security', Icon: KeyRound },
+      { id: 'appearance', label: 'Appearance', Icon: Palette },
+    ],
+  },
+];
 
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'billing'>(user?.role === 'support' ? 'account' : 'profile');
+const DEFAULT_COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
+const COLOR_NAMES = ['Primary', 'Secondary', 'Accent'];
+
+const toForm = (profile: BrandProfile | null | undefined, user: User | null): BrandProfile => ({
+  ...(profile || { industry: '', targetAudience: '', brandVoice: '', keyThemes: '' }),
+  userId: user?.id || profile?.userId || '',
+  // The verified name on the user record always wins over the brand-profile copy.
+  businessName: user?.businessName || profile?.businessName || '',
+  brandColors: profile?.brandColors?.length ? profile.brandColors : DEFAULT_COLORS,
+});
+
+const splitThemes = (s: string) => s.split(',').map((t) => t.trim()).filter(Boolean);
+
+const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, toggleDarkMode, onReplayTour, onClose }) => {
+  const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
+  const isSupport = user?.role === 'support';
+  const nav = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !(isSupport && i.brand)) })).filter((g) => g.items.length);
+  const [tab, setTab] = useState<Tab>(isSupport ? 'security' : 'business');
 
-  useEffect(() => {
-    if (profile) {
-      setFormData({
-        ...profile,
-        // The verified user record wins over the brand-profile copy, so a
-        // profile that drifted in the past is corrected on the next save.
-        businessName: user?.businessName || profile.businessName,
-        brandColors: profile.brandColors && profile.brandColors.length > 0 
-          ? profile.brandColors 
-          : ['#10b981', '#3b82f6', '#f59e0b']
-      });
-    }
-  }, [profile, user?.businessName]);
+  // ── Sliding highlight behind the active nav item (vertical rail on desktop, tab strip on phones) ──
+  const navRef = useRef<HTMLElement>(null);
+  const [ink, setInk] = useState<React.CSSProperties>({ opacity: 0 });
+  useLayoutEffect(() => {
+    const navEl = navRef.current;
+    if (!navEl) return;
+    const place = () => {
+      const active = navEl.querySelector<HTMLElement>('[aria-current="page"]');
+      if (active) setInk({ top: active.offsetTop, left: active.offsetLeft, width: active.offsetWidth, height: active.offsetHeight });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(navEl);
+    return () => observer.disconnect();
+  }, [tab]);
 
-  useEffect(() => {
-    if (activeTab === 'billing') {
-      paymentService.getWalletData().then(setWallet);
-    }
-  }, [activeTab]);
+  // ── Brand profile (Business + Voice tabs share one draft and one save bar) ──
+  const [brand, setBrand] = useState<BrandProfile>(() => toForm(profile, user));
+  const [brandDirty, setBrandDirty] = useState(false);
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [themeDraft, setThemeDraft] = useState('');
 
-  const handleChange = (field: keyof BrandProfile, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setSaved(false);
+  // Pick up a profile that arrives after mount, without clobbering unsaved edits.
+  const [syncedProfile, setSyncedProfile] = useState(profile);
+  if (profile !== syncedProfile) {
+    setSyncedProfile(profile);
+    if (!brandDirty) setBrand(toForm(profile, user));
+  }
+
+  const setBrandField = (field: keyof BrandProfile, value: any) => {
+    setBrand((prev) => ({ ...prev, [field]: value }));
+    setBrandDirty(true);
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const setColor = (i: number, value: string) => {
+    const colors = [...(brand.brandColors || DEFAULT_COLORS)];
+    colors[i] = value;
+    setBrandField('brandColors', colors);
+  };
+
+  const themes = splitThemes(brand.keyThemes);
+  const addTheme = (raw: string) => {
+    const t = raw.replace(/,/g, '').trim();
+    setThemeDraft('');
+    if (t && !themes.some((x) => x.toLowerCase() === t.toLowerCase())) setBrandField('keyThemes', [...themes, t].join(', '));
+  };
+  const removeTheme = (i: number) => setBrandField('keyThemes', themes.filter((_, j) => j !== i).join(', '));
+
+  const discardBrand = () => {
+    setBrand(toForm(profile, user));
+    setThemeDraft('');
+    setBrandDirty(false);
+  };
+
+  const saveBrand = async () => {
+    // A theme typed but not yet turned into a tag still counts.
+    const draft = themeDraft.replace(/,/g, '').trim();
+    const toSave = draft && !themes.some((x) => x.toLowerCase() === draft.toLowerCase())
+      ? { ...brand, keyThemes: [...themes, draft].join(', ') }
+      : brand;
+    setBrandSaving(true);
     try {
-      await onProfileUpdate(formData);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      await dialog.alert("Failed to save settings. Please try again.");
+      await onProfileUpdate(toSave);
+      setBrand(toSave);
+      setThemeDraft('');
+      setBrandDirty(false);
+      toast.success('Brand profile saved');
+    } catch {
+      toast.error('Could not save your brand profile. Please try again.');
+    } finally {
+      setBrandSaving(false);
     }
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
+  // ── Password ──
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [pwErrors, setPwErrors] = useState<string[]>([]);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const updatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setValidationErrors([]);
-    
     if (!user) return;
-
-    // Validate Password Strength
-    const passwordValidation = ValidationService.validatePassword(accountForm.newPassword);
-    if (!passwordValidation.isValid) {
-      setValidationErrors(passwordValidation.errors);
-      return;
-    }
-
-    if (accountForm.newPassword !== accountForm.confirmPassword) {
-      setError("New passwords do not match.");
-      return;
-    }
-
-    if (!accountForm.currentPassword) {
-      setError("Please enter your current password.");
-      return;
-    }
-
+    const strength = ValidationService.validatePassword(pw.next);
+    if (!strength.isValid) return setPwErrors(strength.errors);
+    if (pw.next !== pw.confirm) return setPwErrors(['The new passwords don’t match.']);
+    setPwErrors([]);
+    setPwSaving(true);
     try {
-        // Verify current password via login check
-        const loginCheck = await dbService.loginUser(user.email, accountForm.currentPassword);
-        if (!loginCheck) {
-             setError("Current password is incorrect.");
-             return;
-        }
-
-        // Update to new password
-        await dbService.updateUserPassword(user.id, accountForm.newPassword);
-        
-        setSaved(true);
-        setAccountForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        setTimeout(() => setSaved(false), 2000);
-        
-    } catch (e: any) {
-        setError(e.message || "Failed to update password");
-    }
-  };
-
-  const handleCancelSubscription = async () => {
-    const confirmed = await dialog.confirm("Are you sure you want to cancel your Pro plan? You will lose access to premium features at the end of the billing cycle.");
-    if (confirmed) {
-      await paymentService.cancelSubscription();
-      const updated = await paymentService.getWalletData();
-      setWallet(updated);
-    }
-  };
-
-  const handleUpgrade = async () => {
-    if (!wallet) return;
-    const cost = 499;
-    if (wallet.balance < cost) {
-      await dialog.alert("Insufficient balance. Please top up in the Billing section.");
-      return;
-    }
-
-    const confirmed = await dialog.confirm(`Upgrade to PRO for ₱${cost}/mo?`);
-    if (confirmed) {
-      try {
-        await paymentService.purchaseSubscription('PRO', cost);
-        const updated = await paymentService.getWalletData();
-        setWallet(updated);
-        await dialog.alert({ message: "Upgrade Successful! Welcome to Pro.", title: "Welcome to Pro" });
-      } catch (e: any) {
-        await dialog.alert(e.message);
+      // loginUser throws "Invalid credentials" on a wrong password rather than returning null.
+      const ok = await dbService.loginUser(user.email, pw.current).catch(() => null);
+      if (!ok) {
+        setPwErrors(['Your current password is incorrect.']);
+        return;
       }
+      await dbService.updateUserPassword(user.id, pw.next);
+      setPw({ current: '', next: '', confirm: '' });
+      toast.success('Password updated');
+    } catch (err: any) {
+      setPwErrors([err.message || 'Could not update your password.']);
+    } finally {
+      setPwSaving(false);
     }
   };
 
-  const handleDownloadInvoices = async () => {
-    if (!wallet || wallet.transactions.length === 0) {
-      await dialog.alert("No transactions found.");
-      return;
-    }
-    const headers = "Date,ID,Description,Status,Amount\n";
-    const rows = wallet.transactions.map(t => 
-      `${new Date(t.date).toLocaleDateString()},${t.id},"${t.description}",${t.status},${t.type === 'CREDIT' ? '+' : '-'}₱${t.amount}`
-    ).join("\n");
-    
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Kawayan_Invoices_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
+  const displayName = user?.businessName || user?.email || 'Your account';
+  const voices = isCustomVoice(brand.brandVoice)
+    ? [{ label: brand.brandVoice, desc: 'Your current voice' }, ...BRAND_VOICES]
+    : BRAND_VOICES;
 
-  const tabs = [
-    ...(user?.role !== 'support' ? [{ id: 'profile' as const, label: 'Brand Profile' }] : []),
-    { id: 'account' as const, label: 'Account' },
-    ...(user?.role !== 'support' ? [{ id: 'billing' as const, label: 'Billing' }] : []),
-  ];
-
-  const fieldLabel = 'block text-sm font-semibold mb-1.5';
-  const labelStyle = { color: 'var(--fg)' };
+  const panelHead = (title: string, sub: string) => (
+    <div className="st-panel__head">
+      <h2>{title}</h2>
+      <p>{sub}</p>
+    </div>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-
-      <div className="page-head">
-        <div className="flex items-center gap-3">
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="btn btn-ghost btn-sm !p-2"
-              title="Go back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-          <div>
-            <h1 className="page-head__title">Settings</h1>
-            <p className="page-head__sub">Manage your brand preferences and experience.</p>
-          </div>
+    <div className="st animate-fade-in">
+      <div className="st-head">
+        {onClose && (
+          <button onClick={onClose} className="btn btn-ghost btn-sm !p-2" title="Go back" aria-label="Go back">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
+        <div>
+          <h1>Settings</h1>
+          <p>Manage your brand, login and preferences.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Navigation Sidebar */}
-        <div className="md:col-span-1 space-y-3">
-           <div className="surface p-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 px-2" style={{ color: 'var(--fg-subtle)' }}>Preferences</p>
-              <nav className="space-y-0.5">
-                 {tabs.map((t) => (
-                   <button
-                     key={t.id}
-                     onClick={() => setActiveTab(t.id)}
-                     className={`w-full text-left px-3 py-2.5 text-sm font-semibold rounded-[var(--r)] transition ${activeTab === t.id ? 'nav-item-active' : 'btn-ghost'}`}
-                   >
-                     {t.label}
-                   </button>
-                 ))}
-              </nav>
-           </div>
+      <div className="st-shell surface">
+        <aside className="st-rail">
+          <div className="st-me">
+            <div className="st-me__avatar" aria-hidden>{displayName[0]?.toUpperCase()}</div>
+            <div className="min-w-0">
+              <div className="st-me__name">{displayName}</div>
+              {user?.businessName && <div className="st-me__email">{user.email}</div>}
+            </div>
+          </div>
 
-           {/* Theme Toggle Card */}
-           <div className="surface p-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3" style={{ color: 'var(--fg-subtle)' }}>Appearance</p>
-              <div className="flex gap-1 p-1 rounded-[var(--r)] border" style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
-                 <button
-                   onClick={() => darkMode && toggleDarkMode()}
-                   className="flex-1 py-2 rounded-[var(--r-sm)] text-xs font-bold flex items-center justify-center gap-1.5 transition"
-                   style={!darkMode
-                     ? { background: 'var(--card)', boxShadow: 'var(--shadow-xs)', color: 'var(--fg)' }
-                     : { color: 'var(--fg-subtle)' }}
-                 >
-                   <Sun className="w-3.5 h-3.5"/> Light
-                 </button>
-                 <button
-                   onClick={() => !darkMode && toggleDarkMode()}
-                   className="flex-1 py-2 rounded-[var(--r-sm)] text-xs font-bold flex items-center justify-center gap-1.5 transition"
-                   style={darkMode
-                     ? { background: 'var(--card)', boxShadow: 'var(--shadow-xs)', color: 'var(--fg)' }
-                     : { color: 'var(--fg-subtle)' }}
-                 >
-                   <Moon className="w-3.5 h-3.5"/> Dark
-                 </button>
+          <nav ref={navRef} className="st-nav" aria-label="Settings sections">
+            <span className="st-nav__ink" style={ink} aria-hidden />
+            {nav.map((g) => (
+              <React.Fragment key={g.group}>
+                <div className="st-nav__group">{g.group}</div>
+                {g.items.map(({ id, label, Icon, brand: isBrand }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="st-nav__item"
+                    aria-current={tab === id ? 'page' : undefined}
+                    onClick={() => setTab(id)}
+                  >
+                    <Icon /> {label}
+                    {isBrand && brandDirty && <span className="st-nav__dot" title="Unsaved changes" />}
+                  </button>
+                ))}
+              </React.Fragment>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="st-main">
+          {tab === 'business' && (
+            <div key="business" className="st-panel">
+              {panelHead('Business', 'The details Kawayan uses to introduce your brand.')}
+              <div className="st-stack">
+                <div>
+                  <label className="st-label" htmlFor="st-biz">Business name</label>
+                  <div className="st-locked">
+                    <input id="st-biz" className="input" value={brand.businessName} readOnly aria-describedby="st-biz-hint" />
+                    <span className="st-badge"><ShieldCheck /> Verified</span>
+                  </div>
+                  <p id="st-biz-hint" className="st-hint">From your approved business documents. Contact support to change it.</p>
+                </div>
+
+                <div>
+                  <label className="st-label" htmlFor="st-industry">Industry</label>
+                  <select id="st-industry" className="input" value={brand.industry} onChange={(e) => setBrandField('industry', e.target.value)}>
+                    <option value="" disabled>Select an industry…</option>
+                    {isLegacyIndustry(brand.industry) && <option value={brand.industry}>{brand.industry}</option>}
+                    {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+
+                <div className="st-row2">
+                  <div>
+                    <label className="st-label" htmlFor="st-email">Contact email</label>
+                    <input id="st-email" type="email" className="input" placeholder="hello@yourshop.ph" value={brand.contactEmail || ''} onChange={(e) => setBrandField('contactEmail', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="st-label" htmlFor="st-phone">Contact number</label>
+                    <input id="st-phone" type="tel" className="input" placeholder="0917 123 4567" value={brand.contactPhone || ''} onChange={(e) => setBrandField('contactPhone', e.target.value)} />
+                  </div>
+                </div>
+
+                <fieldset>
+                  <legend className="st-label">Brand colors</legend>
+                  <div className="st-swatches">
+                    {COLOR_NAMES.map((name, i) => {
+                      const color = brand.brandColors?.[i] || DEFAULT_COLORS[i];
+                      return (
+                        <label key={name} className="st-swatch">
+                          <input type="color" value={color} onChange={(e) => setColor(i, e.target.value)} aria-label={`${name} brand color`} />
+                          <span className="st-swatch__chip" style={{ background: color }} />
+                          <span>
+                            <span className="st-swatch__name">{name}</span>
+                            <span className="st-swatch__hex">{color}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
               </div>
+            </div>
+          )}
 
-              {onReplayTour && (
-                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-                   <div className="min-w-0">
-                      <p className="text-xs font-bold" style={{ color: 'var(--fg)' }}>Product walkthrough</p>
-                      <p className="text-[11px] leading-snug" style={{ color: 'var(--fg-muted)' }}>A quick tour of the calendar, insights and billing.</p>
-                   </div>
-                   <button
-                     type="button"
-                     onClick={onReplayTour}
-                     className="btn btn-outline btn-sm shrink-0"
-                   >
-                     <PlayCircle className="w-3.5 h-3.5"/> Replay
-                   </button>
-                </div>
-              )}
-           </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="md:col-span-2">
-           {activeTab === 'profile' && (
-             <form onSubmit={handleSaveProfile} className="surface p-6 sm:p-8 space-y-6">
-
-                <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                   <div className="w-10 h-10 rounded-[var(--r)] flex items-center justify-center shrink-0" style={{ background: 'var(--kw-green-pale)', color: 'var(--primary)' }}>
-                      <UserIcon className="w-5 h-5"/>
-                   </div>
-                   <div>
-                      <h3 className="font-display text-lg font-semibold" style={{ color: 'var(--fg)' }}>Brand identity</h3>
-                      <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>This info guides the AI to write like you.</p>
-                   </div>
+          {tab === 'voice' && (
+            <div key="voice" className="st-panel">
+              {panelHead('Voice & audience', 'How your captions sound and who they speak to.')}
+              <div className="st-stack">
+                <div>
+                  <span className="st-label" id="st-voice-label">Brand voice</span>
+                  <div className="st-voices" role="radiogroup" aria-labelledby="st-voice-label">
+                    {voices.map((v) => {
+                      const active = brand.brandVoice === v.label;
+                      return (
+                        <button
+                          key={v.label}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          className="st-voice"
+                          onClick={() => setBrandField('brandVoice', v.label)}
+                        >
+                          <div className="st-voice__t">{v.label}</div>
+                          <div className="st-voice__d">{v.desc}</div>
+                          <span className="st-voice__check">{active && <Check />}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                   <div>
-                      <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><Lock className="w-3.5 h-3.5"/> Business name</label>
-                      <input
-                        type="text"
-                        value={formData.businessName}
-                        readOnly
-                        disabled
-                        className="input"
-                        style={{ opacity: 0.7, cursor: 'not-allowed' }}
-                        aria-describedby="settings-bizname-hint"
-                      />
-                      <p id="settings-bizname-hint" className="text-xs mt-1.5" style={{ color: 'var(--fg-subtle)' }}>
-                        This is your verified business name from your registration document. Contact support to change it.
-                      </p>
-                   </div>
-
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                         <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle} htmlFor="settings-industry"><Briefcase className="w-3.5 h-3.5"/> Industry</label>
-                         <select
-                           id="settings-industry"
-                           value={formData.industry}
-                           onChange={(e) => handleChange('industry', e.target.value)}
-                           className="input"
-                         >
-                           <option value="" disabled>Select an industry…</option>
-                           {/* Keep a pre-dropdown free-text value selectable so saving never silently rewrites it. */}
-                           {isLegacyIndustry(formData.industry) && (
-                             <option value={formData.industry}>{formData.industry}</option>
-                           )}
-                           {INDUSTRY_OPTIONS.map((opt) => (
-                             <option key={opt} value={opt}>{opt}</option>
-                           ))}
-                         </select>
-                      </div>
-                      <div>
-                         <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><Target className="w-3.5 h-3.5"/> Target audience</label>
-                         <input
-                           type="text"
-                           value={formData.targetAudience}
-                           onChange={(e) => handleChange('targetAudience', e.target.value)}
-                           className="input"
-                         />
-                      </div>
-                   </div>
-
-                   <div>
-                      <label className={`${fieldLabel} flex items-center gap-2`} style={labelStyle}><MessageCircle className="w-3.5 h-3.5"/> Brand voice</label>
-                      <input
-                        type="text"
-                        value={formData.brandVoice}
-                        onChange={(e) => handleChange('brandVoice', e.target.value)}
-                        className="input"
-                        placeholder="e.g. Fun, Professional, Friendly"
-                      />
-                   </div>
-
-                   {/* Brand Colors & Contact */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                         <label className={fieldLabel} style={labelStyle}>Brand colors (hex)</label>
-                         <div className="flex gap-2">
-                           {[0,1,2].map(i => {
-                             const currentColor = (formData.brandColors && formData.brandColors[i]) || '#10b981';
-                             return (
-                               <div key={i} className="flex items-center gap-1">
-                                 <input
-                                   type="color"
-                                   value={currentColor}
-                                   onChange={(e) => {
-                                     const newColors = [...(formData.brandColors || ['#10b981', '#3b82f6', '#f59e0b'])];
-                                     while (newColors.length <= i) newColors.push('#000000');
-                                     newColors[i] = e.target.value;
-                                     handleChange('brandColors', newColors);
-                                   }}
-                                   className="w-9 h-9 rounded-[var(--r-sm)] cursor-pointer border p-0 overflow-hidden"
-                                   style={{ borderColor: 'var(--border-strong)' }}
-                                 />
-                               </div>
-                             );
-                           })}
-                         </div>
-                      </div>
-                      <div className="space-y-2">
-                         <input
-                           type="email"
-                           value={formData.contactEmail || ''}
-                           onChange={(e) => handleChange('contactEmail', e.target.value)}
-                           placeholder="Contact email"
-                           className="input"
-                         />
-                         <input
-                           type="tel"
-                           value={formData.contactPhone || ''}
-                           onChange={(e) => handleChange('contactPhone', e.target.value)}
-                           placeholder="Contact phone"
-                           className="input"
-                         />
-                      </div>
-                   </div>
-
-                   <div>
-                      <label className={fieldLabel} style={labelStyle}>Content themes (topics)</label>
-                      <textarea
-                        value={formData.keyThemes}
-                        onChange={(e) => handleChange('keyThemes', e.target.value)}
-                        rows={4}
-                        className="input resize-none"
-                      />
-                   </div>
+                <div>
+                  <label className="st-label" htmlFor="st-audience">Target audience</label>
+                  <input id="st-audience" className="input" placeholder="e.g. Working moms in Quezon City" value={brand.targetAudience} onChange={(e) => setBrandField('targetAudience', e.target.value)} />
                 </div>
 
-                <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border)' }}>
-                   <button type="submit" className="btn btn-primary">
-                     {saved ? 'Changes saved' : 'Save changes'} <Save className="w-4 h-4"/>
-                   </button>
+                <div>
+                  <label className="st-label" htmlFor="st-themes">Content themes</label>
+                  <div className="st-tags" onClick={() => document.getElementById('st-themes')?.focus()}>
+                    {themes.map((t, i) => (
+                      <span key={t} className="st-tag">
+                        {t}
+                        <button type="button" aria-label={`Remove ${t}`} onClick={(e) => { e.stopPropagation(); removeTheme(i); }}>
+                          <X />
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      id="st-themes"
+                      value={themeDraft}
+                      placeholder={themes.length ? 'Add another…' : 'e.g. Promos, Behind the scenes'}
+                      onChange={(e) => {
+                        if (e.target.value.includes(',')) addTheme(e.target.value);
+                        else setThemeDraft(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); addTheme(themeDraft); }
+                        else if (e.key === 'Backspace' && !themeDraft && themes.length) removeTheme(themes.length - 1);
+                      }}
+                      onBlur={() => themeDraft && addTheme(themeDraft)}
+                    />
+                  </div>
+                  <p className="st-hint">Press Enter or a comma after each topic.</p>
                 </div>
-             </form>
-           )}
+              </div>
+            </div>
+          )}
 
-           {activeTab === 'account' && (
-             <form onSubmit={handleUpdatePassword} className="surface p-6 sm:p-8 space-y-6">
-                <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                   <div className="w-10 h-10 rounded-[var(--r)] flex items-center justify-center shrink-0" style={{ background: 'var(--kw-green-pale)', color: 'var(--primary)' }}>
-                      <Lock className="w-5 h-5"/>
-                   </div>
-                   <div>
-                      <h3 className="font-display text-lg font-semibold" style={{ color: 'var(--fg)' }}>Security &amp; login</h3>
-                      <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Update your account credentials.</p>
-                   </div>
-                </div>
-
-                <div className="space-y-4">
-                   <div>
-                      <label className={fieldLabel} style={labelStyle}>Email address</label>
-                      <input
-                        type="email"
-                        value={user?.email || ''}
-                        disabled
-                        className="input opacity-60 cursor-not-allowed"
-                      />
-                      <p className="text-xs mt-1" style={{ color: 'var(--fg-subtle)' }}>Email cannot be changed.</p>
-                   </div>
-
-                   <hr className="divider my-4"/>
-
-                   <div>
-                      <label className={fieldLabel} style={labelStyle}>Current password</label>
-                      <input
-                        type="password"
-                        value={accountForm.currentPassword}
-                        onChange={(e) => setAccountForm({...accountForm, currentPassword: e.target.value})}
-                        className="input"
-                      />
-                   </div>
-                   <div>
-                      <label className={fieldLabel} style={labelStyle}>New password</label>
-                      <input
-                        type="password"
-                        value={accountForm.newPassword}
-                        onChange={(e) => setAccountForm({...accountForm, newPassword: e.target.value})}
-                        className="input"
-                      />
-                   </div>
-                   <div>
-                      <label className={fieldLabel} style={labelStyle}>Confirm new password</label>
-                      <input
-                        type="password"
-                        value={accountForm.confirmPassword}
-                        onChange={(e) => setAccountForm({...accountForm, confirmPassword: e.target.value})}
-                        className="input"
-                      />
-                   </div>
+          {tab === 'security' && (
+            <form key="security" className="st-panel" onSubmit={updatePassword}>
+              {panelHead('Login & security', 'Your sign-in email and password.')}
+              <div className="st-stack">
+                <div>
+                  <label className="st-label" htmlFor="st-login">Email</label>
+                  <div className="st-locked">
+                    <input id="st-login" className="input" value={user?.email || ''} readOnly aria-describedby="st-login-hint" />
+                  </div>
+                  <p id="st-login-hint" className="st-hint">You sign in with this email. It can't be changed.</p>
                 </div>
 
-                {validationErrors.length > 0 && (
-                  <div className="p-3 rounded-[var(--r)] border" style={{ background: 'color-mix(in srgb, var(--danger) 8%, transparent)', borderColor: 'color-mix(in srgb, var(--danger) 24%, transparent)' }}>
-                    <div className="flex items-center gap-2 text-sm font-bold mb-1" style={{ color: 'var(--danger)' }}>
-                      <AlertTriangle className="w-4 h-4" /> Password requirements
+                <div>
+                  <label className="st-label" htmlFor="st-pw-current">Current password</label>
+                  <input id="st-pw-current" type="password" autoComplete="current-password" className="input" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
+                </div>
+                <div className="st-row2">
+                  <div>
+                    <label className="st-label" htmlFor="st-pw-new">New password</label>
+                    <input id="st-pw-new" type="password" autoComplete="new-password" className="input" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+                    <div className="mt-2"><PasswordMeter password={pw.next} /></div>
+                  </div>
+                  <div>
+                    <label className="st-label" htmlFor="st-pw-confirm">Confirm new password</label>
+                    <input id="st-pw-confirm" type="password" autoComplete="new-password" className="input" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
+                  </div>
+                </div>
+
+                {pwErrors.length > 0 && (
+                  <ul className="st-errors" role="alert">
+                    {pwErrors.map((err) => <li key={err}>{err}</li>)}
+                  </ul>
+                )}
+
+                <div>
+                  <button type="submit" disabled={pwSaving || !pw.current || !pw.next || !pw.confirm} className="btn btn-primary">
+                    {pwSaving ? 'Updating…' : 'Update password'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {tab === 'appearance' && (
+            <div key="appearance" className="st-panel">
+              {panelHead('Appearance', 'How Kawayan looks on this device.')}
+              <div className="st-stack">
+                <div>
+                  <span className="st-label" id="st-theme-label">Theme</span>
+                  <div className="st-themes" role="radiogroup" aria-labelledby="st-theme-label">
+                    {[{ dark: false, label: 'Light' }, { dark: true, label: 'Dark' }].map(({ dark, label }) => {
+                      const active = darkMode === dark;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          className="st-theme"
+                          onClick={() => !active && toggleDarkMode()}
+                        >
+                          <div className={`st-theme__art st-theme__art--${dark ? 'dark' : 'light'}`} aria-hidden>
+                            <div className="st-theme__side">
+                              <i className="is-accent" style={{ height: 6, width: '70%' }} />
+                              <i style={{ height: 5 }} />
+                              <i style={{ height: 5, width: '80%' }} />
+                              <i style={{ height: 5, width: '60%' }} />
+                            </div>
+                            <div className="st-theme__body">
+                              <i style={{ height: 7, width: '45%' }} />
+                              <i style={{ height: 5 }} />
+                              <i style={{ height: 5, width: '85%' }} />
+                              <i className="is-accent" style={{ height: 12, width: '35%', marginTop: 'auto', borderRadius: 4 }} />
+                            </div>
+                          </div>
+                          <div className="st-theme__foot">
+                            {label}
+                            {active && <CheckCircle2 />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {onReplayTour && (
+                  <div className="st-row">
+                    <div>
+                      <div className="st-row__t">Product walkthrough</div>
+                      <div className="st-row__d">A quick tour of the calendar, insights, social accounts and billing.</div>
                     </div>
-                    <ul className="list-disc list-inside text-xs space-y-1" style={{ color: 'var(--danger)' }}>
-                      {validationErrors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
+                    <button type="button" onClick={onReplayTour} className="btn btn-outline btn-sm">
+                      <PlayCircle className="w-3.5 h-3.5" /> Replay tour
+                    </button>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
 
-                {error && (
-                  <div className="p-3 rounded-[var(--r)] text-sm flex items-center gap-2 border" style={{ background: 'color-mix(in srgb, var(--danger) 8%, transparent)', borderColor: 'color-mix(in srgb, var(--danger) 24%, transparent)', color: 'var(--danger)' }}>
-                    <AlertTriangle className="w-4 h-4"/> {error}
-                  </div>
-                )}
-
-                <div className="pt-4 border-t flex justify-end" style={{ borderColor: 'var(--border)' }}>
-                   <button type="submit" className="btn btn-primary">
-                     {saved ? 'Updated' : 'Update password'} <Save className="w-4 h-4"/>
-                   </button>
-                </div>
-             </form>
-           )}
-
-           {activeTab === 'billing' && wallet && (
-             <div className="surface p-6 sm:p-8 space-y-6 animate-fade-in">
-                <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                   <div className="w-10 h-10 rounded-[var(--r)] flex items-center justify-center shrink-0" style={{ background: 'var(--kw-green-pale)', color: 'var(--primary)' }}>
-                      <CreditCard className="w-5 h-5"/>
-                   </div>
-                   <div>
-                      <h3 className="font-display text-lg font-semibold" style={{ color: 'var(--fg)' }}>Subscription status</h3>
-                      <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Manage your plan and billing details.</p>
-                   </div>
-                </div>
-
-                <div className="rounded-[var(--r-lg)] p-6 border" style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
-                   <div className="flex justify-between items-start gap-3">
-                      <div>
-                         <p className="text-[11px] font-bold uppercase tracking-[0.1em] mb-1" style={{ color: 'var(--fg-muted)' }}>Current plan</p>
-                         <h2 className="font-display text-2xl font-semibold flex items-center gap-2" style={{ color: 'var(--fg)' }}>
-                           {wallet.subscription}
-                           {wallet.subscription === 'PRO' && <span className="badge badge-green">Active</span>}
-                         </h2>
-                         <p className="text-sm mt-2" style={{ color: 'var(--fg-muted)' }}>
-                           {wallet.subscription === 'FREE' ? 'Upgrade to Pro for more features.' : 'Next billing date: Feb 14, 2026'}
-                         </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                         <p className="text-[11px] font-bold uppercase tracking-[0.1em] mb-1" style={{ color: 'var(--fg-muted)' }}>Wallet balance</p>
-                         <p className="font-display text-xl font-semibold" style={{ color: 'var(--primary)' }}>₱{wallet.balance.toFixed(2)}</p>
-                      </div>
-                   </div>
-
-                   {wallet.subscription === 'PRO' && (
-                     <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
-                       <h4 className="text-sm font-bold mb-2" style={{ color: 'var(--fg)' }}>Plan benefits</h4>
-                       <ul className="space-y-2 mb-6">
-                         {['16 auto-generated posts', 'Advanced analytics', 'Priority support'].map((b) => (
-                           <li key={b} className="flex items-center gap-2 text-sm" style={{ color: 'var(--fg-muted)' }}>
-                             <CheckCircle className="w-4 h-4" style={{ color: 'var(--success)' }}/> {b}
-                           </li>
-                         ))}
-                       </ul>
-                       <button onClick={handleCancelSubscription} className="btn btn-danger btn-sm">
-                         Cancel subscription
-                       </button>
-                     </div>
-                   )}
-                </div>
-
-                <div className="flex justify-end gap-3">
-                   {wallet.subscription === 'FREE' && (
-                     <button onClick={handleUpgrade} className="btn btn-primary">
-                       Upgrade to Pro
-                     </button>
-                   )}
-                   <button onClick={handleDownloadInvoices} className="btn btn-outline">
-                     View invoices
-                   </button>
-                </div>
-             </div>
-           )}
+          {brandDirty && (
+            <div className="st-savebar" role="status">
+              <span className="st-savebar__msg">Unsaved changes</span>
+              <button type="button" className="btn btn-ghost btn-sm st-savebar__discard" onClick={discardBrand} disabled={brandSaving}>
+                Discard
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={saveBrand} disabled={brandSaving}>
+                {brandSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

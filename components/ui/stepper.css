@@ -1,0 +1,111 @@
+/* Animated stepper — see components/ui/Stepper.tsx */
+.kw-stepper { --kw-step-ease: cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── progress track: numbered dots joined by a line that fills as steps complete ── */
+.kw-stepper__track {
+  display: flex;
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+}
+.kw-stepper__item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.kw-stepper__dot {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  transition: color 0.3s var(--kw-step-ease), background-color 0.3s var(--kw-step-ease),
+    border-color 0.3s var(--kw-step-ease), box-shadow 0.3s var(--kw-step-ease);
+}
+.kw-stepper__dot svg { width: 14px; height: 14px; }
+.kw-stepper__dot:disabled { cursor: default; }
+.is-current .kw-stepper__dot {
+  color: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.is-done .kw-stepper__dot {
+  color: var(--card);
+  background: var(--primary);
+  border-color: var(--primary);
+  cursor: pointer;
+}
+.is-done .kw-stepper__dot:hover { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent); }
+
+.kw-stepper__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  transition: color 0.3s var(--kw-step-ease);
+}
+.is-current .kw-stepper__label,
+.is-done .kw-stepper__label { color: var(--fg); }
+
+/* runs from this dot's edge to the next dot's edge */
+.kw-stepper__line {
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 20px);
+  right: calc(-50% + 20px);
+  height: 1px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+.kw-stepper__line b {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s var(--kw-step-ease);
+}
+.is-done .kw-stepper__line b { transform: scaleX(1); }
+
+/* ── step content: height eases between steps, panels slide in from the travel direction ── */
+.kw-stepper__viewport {
+  /* height is set to the panel's height, so the padding below must sit outside it */
+  box-sizing: content-box;
+  overflow: hidden;
+  /* room for focus rings, which overflow:hidden would otherwise clip */
+  margin: -4px;
+  padding: 4px;
+  transition: height 0.4s var(--kw-step-ease);
+}
+.kw-stepper__panel.is-forward { animation: kw-step-in-forward 0.4s var(--kw-step-ease) both; }
+.kw-stepper__panel.is-back { animation: kw-step-in-back 0.4s var(--kw-step-ease) both; }
+@keyframes kw-step-in-forward { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+@keyframes kw-step-in-back { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
+
+.kw-stepper__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-stepper__panel.is-forward,
+  .kw-stepper__panel.is-back { animation: none; }
+  .kw-stepper__viewport,
+  .kw-stepper__line b,
+  .kw-stepper__dot,
+  .kw-stepper__label { transition: none; }
+}

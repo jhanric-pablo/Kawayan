@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
-import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, getTrendingTopicsPH } from '../services/geminiService';
+import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, getTrendingTopicsPH, rewriteCaption } from '../services/aiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
+import { socialService, SocialAccount } from '../services/socialService';
 import {
-  LayoutList, LayoutGrid, ChevronLeft, ChevronRight, X, Layers
+  LayoutList, LayoutGrid, ChevronLeft, ChevronRight, Layers
 } from 'lucide-react';
 import KawayanCalendar from './calendar/KawayanCalendar';
 import PostComposer from './calendar/PostComposer';
@@ -25,21 +26,24 @@ import {
 interface Props {
   profile: BrandProfile;
   userId: string;
+  /** Opens the Social page, where Facebook and Instagram get connected. */
+  onOpenSocial: () => void;
+  onOpenBilling: () => void;
 }
 
 // Layout: full-screen calendar + sliding right preview panel
 
-const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
+const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [batchStrategy, setBatchStrategy] = useState('');
-  const [showBatchIdeas, setShowBatchIdeas] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
   const [currentDate, setCurrentDate] = useState(new Date()); 
   const [dateInputValue, setDateInputValue] = useState("");
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [creatingDay, setCreatingDay] = useState<number | null>(null);
   const [ideas, setIdeas] = useState<ContentIdea[]>([]);
   const [dbService] = useState(() => new UniversalDatabaseService());
 
@@ -105,7 +109,12 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [generatingPost, setGeneratingPost] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedPost | null>(null);
-  const [showPostModal, setShowPostModal] = useState(false);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[] | null>(null);
+  const [socialError, setSocialError] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  // The post as it is now, for handlers that finish after a slow AI call.
+  const contentRef = useRef<GeneratedPost | null>(null);
+  contentRef.current = generatedContent;
   const [loadingImage, setLoadingImage] = useState(false);
   const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<GeneratedPost[]>([]);
@@ -116,6 +125,26 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   const batchPostCount = getBatchLimitForSubscription(subscription);
   const monthlyPostCount = countPostsInMonth(posts, currentDate);
   const trialLimitReached = isAtTierLimit(subscription, monthlyPostCount);
+
+  // Each day's post status this month (date strings, so no time-zone shift), for the planner.
+  const monthPrefix = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-`;
+  const postStatusByDay: Record<number, GeneratedPost['status']> = {};
+  posts.forEach((p) => {
+    if (p.date.startsWith(monthPrefix)) postStatusByDay[Number(p.date.slice(8, 10))] = p.status;
+  });
+
+  // The ideas a batch run would turn into posts: exactly the ones on screen that are still
+  // ahead, have no post yet, and one per day.
+  const pendingIdeas = () => {
+    const { minDay, maxDay } = getScheduleDayRange(currentDate);
+    const seenDays = new Set<number>();
+    return ideas.filter((idea) => {
+      if (idea.day < minDay || idea.day > maxDay || postStatusByDay[idea.day] || seenDays.has(idea.day)) return false;
+      seenDays.add(idea.day);
+      return true;
+    });
+  };
+  const createCount = Math.min(pendingIdeas().length, Math.max(0, batchPostCount - monthlyPostCount));
 
   const showTierLimitDialog = async () => {
     await dialog.alert({
@@ -243,7 +272,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         range
       );
       setIdeas(normalized);
-      if (normalized.length > 0) setShowBatchIdeas(true);
     } else if (planRes.status === 'fulfilled') {
       setIdeas([]);
     }
@@ -252,24 +280,27 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   };
 
   const handleGeneratePlan = async () => {
+    if (
+      ideas.length > 0 &&
+      !(await dialog.confirm({
+        title: 'Re-plan the month?',
+        message: 'This replaces your current ideas, including any edits. Posts you already created stay on the calendar.',
+        confirmLabel: 'Re-plan',
+      }))
+    ) {
+      return;
+    }
     setLoadingPlan(true);
     try {
       const monthName = currentDate.toLocaleString('default', { month: 'long' });
-      let newIdeas = await generateContentPlan(profile, monthName, batchPostCount);
-      if (batchStrategy.trim()) {
-        newIdeas = newIdeas.map((idea) => ({
-          ...idea,
-          topic: `${batchStrategy.trim()} — ${idea.topic}`,
-        }));
-      }
+      let newIdeas = await generateContentPlan(profile, monthName, batchPostCount, batchStrategy);
       newIdeas = normalizeIdeasToBatchCount(newIdeas, batchPostCount, getScheduleDayRange(currentDate));
       setIdeas(newIdeas);
-      setShowBatchIdeas(true);
       setPlanningOpen(true);
       await dbService.savePlan(userId, monthName, newIdeas);
     } catch (e: any) {
       if (e.message.includes('quota')) {
-        await dialog.alert("You have exceeded your daily quota for the Gemini API. Please wait for it to reset or upgrade to a paid plan.");
+        await dialog.alert("Kawayan's AI has used up today's free allowance. Please try again later.");
       } else {
         await dialog.alert(`Failed to generate content plan. Please try again.\n\nError: ${e.message}`);
       }
@@ -283,11 +314,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     await dbService.savePlan(userId, monthName, updated);
   };
 
+  // Idea edits save once typing pauses, not once per keystroke.
+  const ideaSaveTimer = useRef<ReturnType<typeof setTimeout>>();
   const handleUpdateIdea = (index: number, field: keyof ContentIdea, value: string | number) => {
     setIdeas((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      persistIdeas(next).catch(() => undefined);
+      clearTimeout(ideaSaveTimer.current);
+      ideaSaveTimer.current = setTimeout(() => persistIdeas(next).catch(() => undefined), 700);
       return next;
     });
   };
@@ -332,10 +366,11 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
         const result = await generatePostCaptionAndImagePrompt(profile, idea.topic);
         const imageUrl = await generateImageFromPrompt(result.imagePrompt + IMAGE_PROMPT_SUFFIX);
-        const newPostVersion = {
-          caption: result.caption,
-          imagePrompt: result.imagePrompt,
-          viralityScore: result.viralityScore,
+        const replacedVersion = {
+          caption: generatedContent.caption,
+          imagePrompt: generatedContent.imagePrompt,
+          viralityScore: generatedContent.viralityScore,
+          viralityReason: generatedContent.viralityReason,
           createdAt: new Date().toISOString(),
         };
 
@@ -347,7 +382,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
           viralityScore: result.viralityScore,
           viralityReason: result.viralityReason,
           regenCount: generatedContent.regenCount + 1,
-          history: [...(generatedContent.history || []), newPostVersion],
+          history: [...(generatedContent.history || []), replacedVersion],
         };
         setGeneratedContent(updated);
         await persistPost(updated);
@@ -365,7 +400,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     } catch (e: any) {
       if (e.message?.includes('TIER_LIMIT')) return;
       if (e.message.includes('quota')) {
-        await dialog.alert('You have exceeded your daily quota for the Gemini API. Please wait for it to reset or upgrade to a paid plan.');
+        await dialog.alert("Kawayan's AI has used up today's free allowance. Please try again later.");
       } else {
         await dialog.alert(`Failed to generate content. Please try again.\n\nError: ${e.message}`);
       }
@@ -375,18 +410,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
   };
 
   const handleBatchGenerate = async () => {
-    const scheduleRange = getScheduleDayRange(currentDate);
-    const ideasToRun = normalizeIdeasToBatchCount(ideas, batchPostCount, scheduleRange);
-    const seenDays = new Set<number>();
-    const pending = ideasToRun.filter((idea) => {
-      if (idea.day < scheduleRange.minDay || idea.day > scheduleRange.maxDay) return false;
-      if (postExistsForDay(idea.day)) return false;
-      if (seenDays.has(idea.day)) return false;
-      seenDays.add(idea.day);
-      return true;
-    });
+    const pending = pendingIdeas();
 
-    if (!ideasToRun.length) {
+    if (!ideas.length) {
       await dialog.alert({ message: 'Plan the month first to get content ideas.', title: 'No Ideas' });
       return;
     }
@@ -413,6 +439,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       for (let i = 0; i < cappedPending.length; i++) {
         const idea = cappedPending[i];
         setBatchProgress({ current: i, total: cappedPending.length });
+        setCreatingDay(idea.day);
 
         const post = await createPostFromIdea(idea, `${Date.now()}-${idea.day}-${i}`);
         await persistPost(post);
@@ -429,20 +456,18 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         }
       }
 
-      await dialog.alert({
-        message: `Created ${created} post${created === 1 ? '' : 's'} with AI captions and images. They're saved as drafts on your calendar.`,
-        title: 'Batch Complete',
-      });
+      toast.success(`Created ${created} post${created === 1 ? '' : 's'}. They're drafts on your calendar.`);
       await refreshPostsFromDb();
     } catch (e: any) {
       if (e.message?.includes('quota')) {
-        await dialog.alert('You have exceeded your daily quota for the Gemini API. Partial batch may have been saved.');
+        await dialog.alert(`Kawayan's AI has used up today's free allowance. ${created} post${created === 1 ? '' : 's'} were saved before it stopped.`);
       } else {
         await dialog.alert(`Batch generation stopped. ${created} post${created === 1 ? '' : 's'} were saved.\n\nError: ${e.message}`);
       }
     } finally {
       setLoadingPlan(false);
       setBatchProgress(null);
+      setCreatingDay(null);
     }
   };
 
@@ -500,7 +525,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
       // Cache-busting query param only makes sense for real URLs (Pollinations fallback);
       // a data: URL is already unique per generation and a query string corrupts it.
       const imageUrl = base.startsWith('data:') ? base : `${base}${base.includes('?') ? '&' : '?'}seed=${Date.now()}`;
-      const updated: GeneratedPost = { ...generatedContent, imageUrl };
+      const latest = contentRef.current;
+      if (!latest || latest.id !== generatedContent.id) return; // the composer moved on to another post
+      const updated: GeneratedPost = { ...latest, imageUrl };
       setGeneratedContent(updated);
       if (updated.id) {
         await persistPost(updated);
@@ -512,116 +539,76 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
     }
   };
 
-  const handleSavePost = async (postToSave?: GeneratedPost) => {
-    const target = postToSave || generatedContent;
-    if (!target) return;
+  // The composer saves edits on its own; this writes without pushing the saved copy back
+  // into the editor, so typing that happened during the save isn't overwritten.
+  const handleAutosave = async (post: GeneratedPost) => {
+    await dbService.savePost(post);
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? post : p)));
+    setCalendarDataVersion((v) => v + 1);
+  };
+
+  const handleRewriteCaption = async (caption: string, instruction: string) => {
     try {
-      await persistPost(target);
-      if (!postToSave) toast.success('Draft saved');
-    } catch (error) {
-      console.error('Error saving post:', error);
-      toast.error('Could not save the post — please retry.');
+      return await rewriteCaption(profile, caption, instruction);
+    } catch (e: any) {
+      toast.error(
+        e.message?.includes('quota')
+          ? "Kawayan's AI has used up today's free allowance. Please try again later."
+          : 'Could not rewrite the caption. Please try again.',
+      );
+      return null;
     }
   };
 
-  const downloadImage = async (url: string, filename: string) => {
-    try {
-      // If it's base64, we can download directly
-      if (url.startsWith('data:')) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-
-      // Try fetching for blob (works if CORS allowed)
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-      console.warn("Direct download failed, opening in new tab", e);
-      window.open(url, '_blank');
-    }
-  };
-
-  const handlePostNow = async (platform: 'tiktok' | 'facebook' | 'instagram') => {
-    if (!generatedContent) return;
-    
-    // 1. Force save to DB and State first so it exists in the calendar
-    await handleSavePost(generatedContent);
-
-    // 2. Trigger Download
-    if (generatedContent.imageUrl) {
-      const filename = `kawayan_${platform}_${generatedContent.date}_${Date.now()}.png`;
-      downloadImage(generatedContent.imageUrl, filename);
-    }
-
-    // 3. Send Message to Extension
-    window.postMessage({
-      type: 'KAWAYAN_POST_REQUEST',
-      data: {
-        id: generatedContent.id, // Pass ID for tracking
-        title: generatedContent.topic, // Pass topic as title
-        caption: generatedContent.caption,
-        imageUrl: generatedContent.imageUrl,
-        platform: platform
-      }
-    }, '*');
-    
-    setShowPostModal(false);
-  };
-
-  // Listen for Post Success from Extension
+  // Connected pages, fetched each time the composer opens.
+  const composerOpen = selectedDay !== null;
   useEffect(() => {
-    const handleExtensionMessage = async (event: MessageEvent) => {
-      if (event.data.type === 'KAWAYAN_POST_SUCCESS_CLIENT') {
-        const { postId, platform, link } = event.data.data;
-        console.log("Received post success from extension:", postId, platform, link);
-        
-        setPosts(currentPosts => {
-          const postIndex = currentPosts.findIndex(p => p.id === postId);
-          
-          // If for some reason it's not in the list, we can't update it easily here 
-          // without the full object, but handlePostNow ensures it's there.
-          if (postIndex !== -1) {
-            const updatedPost = { 
-              ...currentPosts[postIndex], 
-              status: 'Published' as const,
-              publishedAt: new Date().toISOString(),
-              externalLink: link 
-            };
-            
-            // Update DB
-            dbService.savePost(updatedPost).catch(e => console.error("Failed to update post status in DB", e));
-            
-            // If this is the currently viewed post, update the editor too
-            if (generatedContent && generatedContent.id === postId) {
-              setGeneratedContent(updatedPost);
-            }
-
-            const newPosts = [...currentPosts];
-            newPosts[postIndex] = updatedPost;
-            setCalendarDataVersion((v) => v + 1);
-            return newPosts;
-          }
-          return currentPosts;
-        });
-      }
+    if (!composerOpen) return;
+    let cancelled = false;
+    setSocialError('');
+    socialService
+      .listAccounts()
+      .then((accounts) => !cancelled && setSocialAccounts(accounts))
+      .catch((e: any) => {
+        if (cancelled) return;
+        setSocialAccounts([]);
+        setSocialError(e.message);
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [composerOpen]);
 
-    window.addEventListener('message', handleExtensionMessage);
-    return () => window.removeEventListener('message', handleExtensionMessage);
-  }, [generatedContent, dbService]);
+  const handlePublish = async (accountIds: string[], scheduledFor?: string) => {
+    if (!generatedContent) return;
+    setPublishing(true);
+    try {
+      await persistPost(generatedContent); // publish the latest edits, not the last saved copy
+      const updated = await socialService.publish(generatedContent.id, accountIds, scheduledFor);
+      mergePostIntoState(updated);
+      const when = scheduledFor
+        ? new Date(scheduledFor).toLocaleString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '';
+      toast.success(updated.status === 'Published' ? 'Posted. It’s live now.' : `Scheduled for ${when}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Could not publish the post.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // Scheduled posts publish on Zernio's side; pull their results back when the calendar opens.
+  useEffect(() => {
+    socialService.sync()
+      .then(({ published, failed }) => {
+        if (!published && !failed) return;
+        refreshPostsFromDb();
+        if (published) toast.success(`${published} scheduled post${published > 1 ? 's' : ''} went live`);
+        if (failed) toast.error(`${failed} scheduled post${failed > 1 ? 's' : ''} failed to publish and went back to Draft`);
+      })
+      .catch(() => undefined); // social posting not set up yet: nothing to sync
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleMonthChange = (date: Date) => {
     setCurrentDate(date);
@@ -654,61 +641,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
 
   return (
     <div className="relative w-full flex flex-col gap-4 pb-16 font-sans text-[var(--fg)]">
-
-      {/* Post Modal */}
-      {showPostModal && (
-        <div className="kw-overlay" onClick={() => setShowPostModal(false)}>
-          <div className="kw-sheet p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="font-display text-lg font-bold text-[var(--fg)]">Post to…</h3>
-              <button onClick={() => setShowPostModal(false)} className="rounded-lg p-1.5 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-alt)] transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              <button
-                onClick={() => handlePostNow('tiktok')}
-                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
-              >
-                <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
-                </div>
-                <div className="text-left">
-                  <span className="block font-bold text-[var(--fg)]">TikTok</span>
-                  <span className="text-xs text-[var(--fg-muted)]">Auto-fill caption supported</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => handlePostNow('facebook')}
-                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
-              >
-                <div className="w-10 h-10 bg-[#1877F2] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </div>
-                <div className="text-left">
-                  <span className="block font-bold text-[var(--fg)]">Facebook</span>
-                  <span className="text-xs text-[var(--fg-muted)]">Opens Creator Studio</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => handlePostNow('instagram')}
-                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-alt)] transition-colors group"
-              >
-                <div className="w-10 h-10 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                </div>
-                <div className="text-left">
-                  <span className="block font-bold text-[var(--fg)]">Instagram</span>
-                  <span className="text-xs text-[var(--fg-muted)]">Opens Create Post</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─────────────  Calendar workspace (primary)  ───────────── */}
       <section className="w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm p-3 sm:p-5">
@@ -840,9 +772,13 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         onStrategyChange={setBatchStrategy}
         loadingPlan={loadingPlan}
         batchProgress={batchProgress}
+        creatingDay={creatingDay}
         ideas={ideas}
-        showBatchIdeas={showBatchIdeas}
-        onToggleIdeas={() => setShowBatchIdeas((v) => !v)}
+        postStatusByDay={postStatusByDay}
+        createCount={createCount}
+        scheduleRange={getScheduleDayRange(currentDate)}
+        paused={selectedDay !== null}
+        onOpenBilling={onOpenBilling}
         onGeneratePlan={handleGeneratePlan}
         onBatchGenerate={handleBatchGenerate}
         onUpdateIdea={handleUpdateIdea}
@@ -867,16 +803,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId }) => {
         onGeneratePost={handleGeneratePost}
         onAddOn={handleAddOn}
         onGenerateImage={handleGenerateImage}
-        onSavePost={handleSavePost}
         onPhotoUpload={handlePhotoUpload}
-        onPostNow={() => { if (generatedContent) setShowPostModal(true); }}
-        onSchedule={async () => {
-          if (generatedContent) {
-            const updated = { ...generatedContent, status: 'Scheduled' as const };
-            await handleSavePost(updated);
-            toast.success('Post scheduled 🚀');
-          }
-        }}
+        onRewriteCaption={handleRewriteCaption}
+        onAutosave={handleAutosave}
+        accounts={socialAccounts}
+        accountsError={socialError}
+        publishing={publishing}
+        onPublish={handlePublish}
+        onOpenSocial={onOpenSocial}
       />
 
     </div>

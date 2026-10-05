@@ -20,8 +20,8 @@ export const TERMS_SECTIONS = [
     body: `Kawayan AI operates as Software-as-a-Service (SaaS) with tiered usage: Free Trial (8 posts per calendar month) and Pro (16 posts per calendar month). Supplemental add-on posts may be purchased separately. Regeneration of AI captions and images is limited to two attempts per post to prevent resource abuse. We reserve the right to enforce tier limits and suspend accounts that circumvent usage caps.`,
   },
   {
-    title: '5. Payments & Wallet (Xendit)',
-    body: `Paid features are processed through our prepaid wallet and Xendit payment gateway (GCash, Maya, cards, and other supported channels). All amounts are in Philippine Peso (PHP). Wallet top-ups and subscription charges are non-refundable except where required by law. You agree that payment verification may require manual or automated confirmation before credits are applied.`,
+    title: '5. Payments & Wallet (PayMongo)',
+    body: `Paid features are processed through our prepaid wallet and the PayMongo payment gateway (GCash, Maya, cards, and other supported channels). All amounts are in Philippine Peso (PHP). Wallet top-ups and subscription charges are non-refundable except where required by law. You agree that payment verification may require manual or automated confirmation before credits are applied.`,
   },
   {
     title: '6. AI-Generated Content',
@@ -74,7 +74,7 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: '2. How We Use Your Data',
-    body: `Your data is used to verify your business, generate content plans and captions, provide analytics insights, process wallet top-ups and subscription billing through Xendit, and operate your account and support requests. We do not sell your personal data.`,
+    body: `Your data is used to verify your business, generate content plans and captions, provide analytics insights, process wallet top-ups and subscription billing through PayMongo, and operate your account and support requests. We do not sell your personal data.`,
   },
   {
     title: '3. AI Processing',
