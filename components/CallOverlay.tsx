@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PhoneOff, User, Loader2, Mic, MicOff, Video, VideoOff, Monitor, ScreenShare, ScreenShareOff, MessageSquare, Send, X } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import { useOrganicDialog } from './OrganicDialog';
+import { useToast } from './ui/Toast';
 
 interface Props {
   onEndCall: () => void;
@@ -12,7 +12,7 @@ interface Props {
 }
 
 const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reason, targetUserId }) => {
-  const dialog = useOrganicDialog();
+  const toast = useToast();
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   
   // Local Streams
@@ -143,7 +143,7 @@ const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reas
 
       } catch (err) {
         console.error("Call error:", err);
-        void dialog.alert("Microphone access is required.");
+        toast.error("Kawayan needs microphone access for calls.");
         onEndCall();
       }
     };
@@ -227,7 +227,7 @@ const CallOverlay: React.FC<Props> = ({ onEndCall, roomId, isAgent = false, reas
         pcRef.current.addTrack(track, localStream);
         setIsVideoOff(false);
         socketRef.current?.emit('cam-state', { roomId: actualRoomId.current, active: true });
-      } catch (e) { void dialog.alert("Camera access denied."); }
+      } catch (e) { toast.error("Camera access was blocked."); }
     } else {
       const track = localStream.getVideoTracks()[0];
       if (track) {

@@ -1,33 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Users, TrendingUp, DollarSign, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings, Power, Download, Filter, Lock, Calendar, CreditCard, Moon, Sun, XCircle, Wallet, FileText, ChevronRight, ChevronDown, RefreshCw, UserPlus, LogIn, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Users, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings, Power, Download, Filter, Lock, CreditCard, Moon, Sun, XCircle, Wallet, ChevronDown, RefreshCw, UserPlus, LogIn, Upload, Send, CalendarClock, AlertTriangle } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { supportService } from '../services/supportService';
 import { supportRealtime } from '../services/supportRealtime';
 import { Ticket, User } from '../types';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
+import AccountMenu from './AccountMenu';
+import AdminOverview, { HealthInfo } from './admin/AdminOverview';
+import AdminVerification, { VerifFilter } from './admin/AdminVerification';
+import { buildJobs, parseUtc, timeAgo } from '../utils/adminJobs';
 import './admin/adminConsole.css';
 
 interface Props {
   darkMode: boolean;
   toggleTheme: () => void;
+  user: User;
+  onSignOut: () => void;
+  onSwitchAccount?: () => void;
 }
 
 /* ── Shared building blocks for the console ──────────────────────── */
 const cx = (...c: Array<string | false | undefined | null>) => c.filter(Boolean).join(' ');
-
-const StatCard: React.FC<{ label: string; value: React.ReactNode; icon: React.ElementType; accent?: boolean }> = ({
-  label, value, icon: Icon, accent,
-}) => (
-  <div className={cx('adm-stat', accent && 'adm-stat--accent')}>
-    <div className="adm-stat__icon"><Icon className="w-4 h-4" /></div>
-    <div className="min-w-0">
-      <p className="adm-stat__value">{value}</p>
-      <p className="adm-stat__label">{label}</p>
-    </div>
-  </div>
-);
 
 const Panel: React.FC<{
   title?: string; desc?: string; actions?: React.ReactNode; children: React.ReactNode; flush?: boolean;
@@ -91,8 +85,93 @@ const ACTION_META: Record<string, { label: string; icon: React.ElementType; bg: 
   approve_verification: { label: 'Verification approved', icon: CheckCircle, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
   reject_verification: { label: 'Verification rejected', icon: XCircle, bg: 'bg-red-500/10', fg: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
   delete_user: { label: 'Account deleted', icon: Trash2, bg: 'bg-rose-600/10', fg: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-600' },
+  publish_post: { label: 'Post published', icon: Send, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  schedule_post: { label: 'Post scheduled', icon: CalendarClock, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
+  post_published: { label: 'Scheduled post went live', icon: CheckCircle, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  post_failed: { label: 'Scheduled post failed', icon: AlertTriangle, bg: 'bg-red-500/10', fg: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
 };
 const DEFAULT_ACTION_META = { label: 'System event', icon: Activity, bg: 'bg-[var(--bg-alt)]', fg: 'text-[var(--fg-muted)]', dot: 'bg-[var(--fg-subtle)]' };
+
+/** Audit entries loaded for the dispatch table and logs (newest first). */
+const AUDIT_WINDOW = 300;
+
+type SearchHit = { kind: 'account' | 'job' | 'verification'; id: string; label: string; sub: string };
+
+/** ⌘K search across accounts, dispatch jobs and verification submissions. */
+const AdminSearch: React.FC<{ hitsFor: (q: string) => SearchHit[]; onPick: (hit: SearchHit) => void }> = ({ hitsFor, onPick }) => {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hits = q.trim().length >= 2 ? hitsFor(q.trim().toLowerCase()) : [];
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const pick = (hit: SearchHit) => {
+    onPick(hit);
+    setQ('');
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  return (
+    <div className="relative w-full max-w-md" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
+      <label className="flex h-8 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 focus-within:border-[var(--primary)]">
+        <Search className="h-3.5 w-3.5 shrink-0 text-[var(--fg-subtle)]" aria-hidden />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, hits.length - 1)); }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+            if (e.key === 'Enter' && hits[active]) pick(hits[active]);
+            if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur(); }
+          }}
+          placeholder="Search accounts, job IDs, verifications…"
+          aria-label="Search the admin workspace"
+          className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--fg-subtle)]"
+        />
+        <kbd className="hidden rounded border border-[var(--border)] px-1 font-mono text-[10px] text-[var(--fg-subtle)] sm:inline">⌘K</kbd>
+      </label>
+      {open && q.trim().length >= 2 && (
+        <ul onMouseDown={(e) => e.preventDefault()} className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[var(--card)] py-1 shadow-lg" role="listbox">
+          {hits.length === 0 ? (
+            <li className="px-3 py-2 text-xs text-[var(--fg-muted)]">No matches for “{q.trim()}”.</li>
+          ) : (
+            hits.map((hit, i) => (
+              <li key={`${hit.kind}-${hit.id}`} role="option" aria-selected={i === active}>
+                <button
+                  type="button"
+                  onClick={() => pick(hit)}
+                  onMouseEnter={() => setActive(i)}
+                  className={cx('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs', i === active && 'bg-[var(--bg-alt)]')}
+                >
+                  <span className="w-[74px] shrink-0 font-mono text-[10px] uppercase tracking-wide text-[var(--fg-subtle)]">{hit.kind}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-[var(--fg)]">{hit.label}</span>
+                    <span className="block truncate font-mono text-[11px] text-[var(--fg-muted)]">{hit.sub}</span>
+                  </span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 const LOG_FILTERS: Array<{ key: string; label: string; actions?: string[] }> = [
   { key: 'all', label: 'All actions' },
@@ -101,24 +180,8 @@ const LOG_FILTERS: Array<{ key: string; label: string; actions?: string[] }> = [
   { key: 'approved', label: 'Verifications approved', actions: ['approve_verification'] },
   { key: 'rejected', label: 'Verifications rejected', actions: ['reject_verification'] },
   { key: 'deleted', label: 'Accounts deleted', actions: ['delete_user'] },
+  { key: 'publishing', label: 'Publishing — posts & outcomes', actions: ['publish_post', 'schedule_post', 'post_published', 'post_failed'] },
 ];
-
-// Supabase returns timestamptz values with no UTC marker (e.g. "2026-09-16T16:40:30.69"),
-// so `new Date(...)` misreads them as local time instead of UTC. Force UTC before parsing;
-// `toLocaleString`/`toLocaleDateString` then render in the viewer's own local time automatically.
-const parseUtc = (iso: string): Date => new Date(/[Zz]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
-
-const timeAgo = (iso: string): string => {
-  const s = Math.floor((Date.now() - parseUtc(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return parseUtc(iso).toLocaleDateString();
-};
 
 const dayLabel = (iso: string): string => {
   const d = parseUtc(iso);
@@ -130,42 +193,15 @@ const dayLabel = (iso: string): string => {
   return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
 };
 
-const chartTip = {
-  borderRadius: 10,
-  border: '1px solid var(--border-strong)',
-  background: 'var(--card)',
-  color: 'var(--fg)',
-  fontSize: 12,
-  boxShadow: 'var(--shadow-md)',
-} as const;
-
-const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
+const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOut, onSwitchAccount }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'billing' | 'helpdesk' | 'logs' | 'settings'>('overview');
   
-  // Stats State
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    totalPostsGenerated: 0,
-    revenue: 0,
-    cancelledTransactions: 0,
-    pendingTransactions: 0,
-    retentionRate: 0,
-    revenueData: [] as any[],
-    churnData: [] as any[]
-  });
-
   const [pendingTxns, setPendingTxns] = useState<any[]>([]);
   const [billingLoading, setBillingLoading] = useState(false);
   
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Tomorrow
-  });
-
   // Data State
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [users, setUsers] = useState<any[]>([]); // Using 'any' to include balance
@@ -194,12 +230,14 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   const [verifLoading, setVerifLoading] = useState(false);
   const [rejectModal, setRejectModal] = useState<{ id: string; businessName: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  const [verifStatusFilter, setVerifStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [verifStatusFilter, setVerifStatusFilter] = useState<VerifFilter>('pending');
   const [selectedVerifId, setSelectedVerifId] = useState<string | null>(null);
-  const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null);
-  const [docPreviewLoading, setDocPreviewLoading] = useState(false);
-  const [docPreviewError, setDocPreviewError] = useState<string | null>(null);
-  const [docPreviewRetryTick, setDocPreviewRetryTick] = useState(0);
+  const [deciding, setDeciding] = useState(false); // an approve confirm is open or in flight
+
+  // Workbench chrome
+  const [health, setHealth] = useState<HealthInfo>({ status: 'checking', passed: 0, total: 0 });
+  const [diagRunning, setDiagRunning] = useState(false);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
 
   // Settings State
   const [systemSettings, setSystemSettings] = useState({
@@ -215,7 +253,33 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
 
   useEffect(() => {
     loadData();
-  }, [dbService, dateRange]);
+  }, [dbService]);
+
+  // Live status: the API answers and its database check passes. Timed, and tallied for this session.
+  const checkHealth = useCallback(async () => {
+    const started = performance.now();
+    let status: HealthInfo['status'];
+    try {
+      const d = await (await fetch('/api/health')).json();
+      status = d.status === 'healthy' ? 'ok' : 'db-down';
+    } catch {
+      status = 'api-down';
+    }
+    const latencyMs = Math.round(performance.now() - started);
+    setHealth((h) => ({ status, latencyMs, checkedAt: Date.now(), passed: h.passed + (status === 'ok' ? 1 : 0), total: h.total + 1 }));
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+    const id = setInterval(checkHealth, 60_000);
+    return () => clearInterval(id);
+  }, [checkHealth]);
+
+  const runDiagnostics = async () => {
+    setDiagRunning(true);
+    await Promise.all([checkHealth(), loadData()]);
+    setDiagRunning(false);
+  };
 
   useEffect(() => {
     if (activeTab === 'verification') loadVerifications();
@@ -261,24 +325,24 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     if (!confirmed) return;
     try {
       await dbService.approveTransactionAdmin(transactionId);
-      await dialog.alert({ title: 'Approved', message: 'Payment verified and balance updated.' });
+      toast.success('Payment verified and balance updated');
       loadPendingTransactions();
       loadData();
     } catch (e) {
-      await dialog.alert('Failed to approve transaction.');
+      toast.error('Could not approve the payment.');
     }
   };
 
   const loadData = async () => {
     try {
-      const [adminStats, userList, ticketList, logs] = await Promise.all([
-        dbService.getAdminStats(dateRange.start, dateRange.end),
+      const [userList, ticketList, logs, verifList] = await Promise.all([
         dbService.getAllUsers(),
         dbService.getAllTicketsAdmin(),
-        dbService.getAuditLogs(100)
+        dbService.getAuditLogs(AUDIT_WINDOW),
+        dbService.getAllVerifications(),
       ]);
-      setStats(adminStats);
       setUsers(userList);
+      setVerifications(verifList);
       setTickets(ticketList);
       setAuditLogs(logs);
     } catch (error) {
@@ -290,7 +354,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
 
   const loadAuditLogs = async () => {
     try {
-      const logs = await dbService.getAuditLogs(100);
+      const logs = await dbService.getAuditLogs(AUDIT_WINDOW);
       setAuditLogs(logs);
     } catch (e) {
       console.error('Error loading audit logs:', e);
@@ -310,34 +374,6 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     }
   };
 
-  // Load the selected submission's document as an in-app preview instead of a new tab.
-  useEffect(() => {
-    if (!selectedVerifId) { setDocPreviewUrl(null); return; }
-    let cancelled = false;
-    setDocPreviewLoading(true);
-    setDocPreviewError(null);
-    (async () => {
-      try {
-        const token = localStorage.getItem('kawayan_jwt');
-        const res = await fetch(`/api/admin/verifications/${selectedVerifId}/document`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-        if (!res.ok) throw new Error('load failed');
-        const blob = await res.blob();
-        if (cancelled) return;
-        setDocPreviewUrl(URL.createObjectURL(blob));
-      } catch {
-        if (!cancelled) setDocPreviewError('Could not load this document.');
-      } finally {
-        if (!cancelled) setDocPreviewLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedVerifId, docPreviewRetryTick]);
-
-  // Release the previous blob URL whenever it's replaced or the tab unmounts.
-  useEffect(() => {
-    return () => { if (docPreviewUrl) URL.revokeObjectURL(docPreviewUrl); };
-  }, [docPreviewUrl]);
-
   // After a decision, jump straight to the next pending item so the queue can be cleared without re-scanning the list.
   const refreshVerificationsAndAdvance = async () => {
     const list = await dbService.getAllVerifications();
@@ -347,24 +383,28 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   };
 
   const handleApprove = async (id: string, businessName?: string) => {
-    const confirmed = await dialog.confirm({
-      title: 'Approve verification',
-      message: `Approve ${businessName ? `"${businessName}"` : 'this business'}? They will immediately gain full account access.`,
-      confirmLabel: 'Approve',
-    });
-    if (!confirmed) return;
+    if (deciding) return;
+    setDeciding(true);
     try {
+      const confirmed = await dialog.confirm({
+        title: 'Approve verification',
+        message: `Approve ${businessName ? `"${businessName}"` : 'this business'}? They will immediately gain full account access.`,
+        confirmLabel: 'Approve',
+      });
+      if (!confirmed) return;
       await dbService.approveVerification(id);
       toast.success(`${businessName ? `"${businessName}"` : 'Business'} approved`);
       await refreshVerificationsAndAdvance();
     } catch (e) {
-      await dialog.alert('Failed to approve. Please try again.');
+      toast.error('Could not approve. Please try again.');
+    } finally {
+      setDeciding(false);
     }
   };
 
   const handleReject = async () => {
     if (!rejectModal) return;
-    if (!rejectReason.trim()) { await dialog.alert('Please provide a rejection reason.'); return; }
+    if (!rejectReason.trim()) return; // the button stays disabled until a reason is typed
     try {
       await dbService.rejectVerification(rejectModal.id, rejectReason.trim());
       toast.info(`"${rejectModal.businessName}" rejected`);
@@ -372,35 +412,9 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
       setRejectReason('');
       await refreshVerificationsAndAdvance();
     } catch (e) {
-      await dialog.alert('Failed to reject. Please try again.');
+      toast.error('Could not reject. Please try again.');
     }
   };
-
-  // Verification queue keyboard nav: ↑/↓ to move selection, A/R to approve/reject the pending item in view.
-  useEffect(() => {
-    if (activeTab !== 'verification' || rejectModal) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      const list = verifStatusFilter === 'all' ? verifications : verifications.filter((v) => v.status === verifStatusFilter);
-      if (list.length === 0) return;
-      const idx = list.findIndex((v) => v.id === selectedVerifId);
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedVerifId(list[Math.min(idx + 1, list.length - 1)]?.id ?? list[0].id);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedVerifId(list[Math.max(idx - 1, 0)]?.id ?? list[0].id);
-      } else if ((e.key === 'a' || e.key === 'A') && idx >= 0 && list[idx].status === 'pending') {
-        handleApprove(list[idx].id, list[idx].businessName);
-      } else if ((e.key === 'r' || e.key === 'R') && idx >= 0 && list[idx].status === 'pending') {
-        setRejectModal({ id: list[idx].id, businessName: list[idx].businessName });
-        setRejectReason('');
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeTab, verifications, verifStatusFilter, selectedVerifId, rejectModal]);
 
   // --- Sorting & Filtering ---
   const handleSort = (key: string) => {
@@ -486,7 +500,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
       setEditForm({});
       loadData(); 
     } catch (error) {
-      await dialog.alert('Failed to update user');
+      toast.error('Could not update the user.');
     }
   };
 
@@ -497,7 +511,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
         await dbService.deleteUser(userId);
         loadData();
       } catch (error) {
-        await dialog.alert('Failed to delete user');
+        toast.error('Could not delete the user.');
       }
     }
   };
@@ -506,11 +520,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     if (!managingUser) return;
     try {
       await dbService.adminAdjustBalance(managingUser.id, balanceForm.amount, balanceForm.reason);
-      await dialog.alert('Balance adjusted');
+      toast.success('Balance adjusted');
       setManagingUser(null);
       loadData();
     } catch (error) {
-      await dialog.alert('Failed to adjust balance');
+      toast.error('Could not adjust the balance.');
     }
   };
 
@@ -518,11 +532,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     if (!managingUser) return;
     try {
       await dbService.adminUpdateSubscription(managingUser.id, subForm.plan, subForm.expiresAt);
-      await dialog.alert('Subscription updated');
+      toast.success('Subscription updated');
       setManagingUser(null);
       loadData();
     } catch (error) {
-      await dialog.alert('Failed to update subscription');
+      toast.error('Could not update the subscription.');
     }
   };
 
@@ -532,11 +546,8 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   };
 
   const handleAdminProfileUpdate = async () => {
-    if (adminProfile.password !== adminProfile.confirm) {
-      await dialog.alert("Passwords do not match");
-      return;
-    }
-    await dialog.alert("Admin profile updated (Simulation)");
+    if (adminProfile.password !== adminProfile.confirm) return; // shown under the field
+    toast.info('Admin profile updated (simulation only)');
   };
 
   const setDark = (wantDark: boolean) => {
@@ -554,7 +565,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   ];
 
   const HEADINGS: Record<typeof activeTab, { title: string; sub: string }> = {
-    overview: { title: 'Overview', sub: 'Revenue, growth and platform activity at a glance.' },
+    overview: { title: 'Operations', sub: 'Dispatch jobs, verification backlog and system status.' },
     users: { title: 'Users', sub: 'Search, edit roles, adjust wallets and manage subscriptions.' },
     verification: { title: 'Verification queue', sub: 'Review business documents and approve or reject MSME accounts.' },
     billing: { title: 'Billing', sub: 'Verify pending wallet top-ups and manage billing cycles.' },
@@ -562,6 +573,51 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
     logs: { title: 'Audit logs', sub: 'Every privileged action, timestamped.' },
     settings: { title: 'System settings', sub: 'Platform switches, appearance and admin credentials.' },
   };
+
+  const jobs = useMemo(() => buildJobs(auditLogs), [auditLogs]);
+
+  const searchHits = (q: string): SearchHit[] => [
+    ...users
+      .filter((u) => `${u.email} ${u.businessName || ''} ${u.id}`.toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((u): SearchHit => ({ kind: 'account', id: u.id, label: u.businessName || u.email, sub: `${u.email} · ${u.role} · ${u.id}` })),
+    ...jobs
+      .filter((j) => `${j.id} ${j.postId || ''}`.toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((j): SearchHit => ({ kind: 'job', id: j.id, label: `Job ${j.id}`, sub: `${j.tenant.name} · ${j.status} · ${j.topic}` })),
+    ...verifications
+      .filter((v) => `${v.businessName || ''} ${v.email} ${v.id}`.toLowerCase().includes(q))
+      .slice(0, 3)
+      .map((v): SearchHit => ({ kind: 'verification', id: v.id, label: v.businessName || 'Unnamed business', sub: `${v.email} · ${v.status}` })),
+  ];
+
+  const pickSearchHit = (hit: SearchHit) => {
+    if (hit.kind === 'account') {
+      setActiveTab('users');
+      setSearchTerm(users.find((u) => u.id === hit.id)?.email ?? '');
+    } else if (hit.kind === 'job') {
+      setActiveTab('overview');
+      setOpenJobId(hit.id);
+    } else {
+      setActiveTab('verification');
+      setVerifStatusFilter('all');
+      setSelectedVerifId(hit.id);
+    }
+  };
+
+  const reviewVerification = (id?: string) => {
+    setActiveTab('verification');
+    setVerifStatusFilter(id ? 'all' : 'pending');
+    if (id) setSelectedVerifId(id);
+    else setSelectedVerifId(verifications.find((v) => v.status === 'pending')?.id ?? null);
+  };
+
+  const STATUS_PILL = {
+    checking: { label: 'Checking status…', dot: 'bg-[var(--fg-subtle)]' },
+    ok: { label: 'System operational', dot: 'bg-[var(--success)]' },
+    'db-down': { label: 'Database unreachable', dot: 'bg-[var(--danger)]' },
+    'api-down': { label: 'API unreachable', dot: 'bg-[var(--danger)]' },
+  }[health.status];
 
   if (loading) {
     return (
@@ -579,137 +635,109 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
   );
 
   return (
-    <div className="adm-console animate-fade-in pb-16">
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--fg)]">
       {/* ── Sidebar ── */}
-      <aside className="adm-side">
-        <div className="adm-side__brand">
-          <div className="adm-side__brand-icon"><Shield className="w-4 h-4" /></div>
-          <div>
-            <p className="adm-side__brand-name">Admin Console</p>
-            <p className="adm-side__brand-tag">Kawayan AI</p>
-          </div>
+      <aside className="sticky top-0 hidden h-screen w-[200px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--card)] md:flex">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
+          <img src="/logo.png" alt="" className="h-6 w-6 rounded-md object-contain" />
+          <span className="text-[13px] font-semibold">Kawayan</span>
+          <span className="rounded border border-[var(--border-strong)] px-1 font-mono text-[10px] text-[var(--fg-muted)]">ADMIN</span>
         </div>
-        <nav className="adm-side__nav">
+        <nav aria-label="Admin" className="flex-1 space-y-px overflow-y-auto p-2">
           {NAV.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setActiveTab(item.id)}
-              className={cx('adm-side__item', activeTab === item.id && 'is-active')}
+              aria-current={activeTab === item.id ? 'page' : undefined}
+              className={cx(
+                'flex h-8 w-full items-center gap-2 rounded px-2 text-[13px] transition-colors',
+                activeTab === item.id
+                  ? 'bg-[var(--bg-alt)] font-semibold text-[var(--fg)] shadow-[inset_2px_0_0_var(--primary)]'
+                  : 'text-[var(--fg-muted)] hover:bg-[var(--bg-alt)] hover:text-[var(--fg)]',
+              )}
             >
-              <item.icon />
-              <span>{item.label}</span>
-              {item.count != null && <span className="adm-side__count">{item.count}</span>}
+              <item.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.count != null && <span className="font-mono text-[11px] tabular-nums text-[var(--fg-subtle)]">{item.count}</span>}
             </button>
           ))}
         </nav>
       </aside>
 
-      {/* ── Main ── */}
-      <div className="adm-main">
-        <header className="adm-head">
-          <div>
-            <h1 className="adm-head__title">{head.title}</h1>
-            <p className="adm-head__sub">{head.sub}</p>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* ── Top bar ── */}
+        <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4">
+          <nav aria-label="Breadcrumb" className="hidden shrink-0 items-center gap-1.5 text-xs text-[var(--fg-muted)] lg:flex">
+            <span>Kawayan</span>
+            <span className="text-[var(--fg-subtle)]">/</span>
+            <span>Admin Workspace</span>
+            <span className="text-[var(--fg-subtle)]">/</span>
+            <span className="font-semibold text-[var(--fg)]">{head.title}</span>
+          </nav>
+          <div className="flex min-w-0 flex-1 justify-center">
+            <AdminSearch hitsFor={searchHits} onPick={pickSearchHit} />
           </div>
-          <div className="adm-head__actions">
-            {activeTab === 'overview' && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--fg-muted)] flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5" /> Range
-                </span>
-                <input type="date" value={dateRange.start} onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} className="input !w-auto !py-1.5 !text-xs" />
-                <span className="text-[var(--fg-subtle)]">–</span>
-                <input type="date" value={dateRange.end} onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} className="input !w-auto !py-1.5 !text-xs" />
-              </div>
-            )}
-            {activeTab === 'users' && (
-              <button type="button" onClick={exportUsersToCSV} className="btn btn-glass btn-sm">
-                <Download className="w-3.5 h-3.5" /> Export CSV
-              </button>
-            )}
-            {activeTab === 'verification' && refreshBtn(loadVerifications)}
-          </div>
+          <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-medium sm:inline-flex" role="status">
+            <span className="relative flex h-2 w-2" aria-hidden>
+              {health.status === 'ok' && <span className={cx('absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:hidden', STATUS_PILL.dot)} />}
+              <span className={cx('relative inline-flex h-2 w-2 rounded-full', STATUS_PILL.dot)} />
+            </span>
+            {STATUS_PILL.label}
+          </span>
+          <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} />
         </header>
 
-        {/* ─────────────  OVERVIEW  ───────────── */}
+        {/* Phones: tabs instead of the sidebar */}
+        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:hidden">
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveTab(item.id)}
+              aria-current={activeTab === item.id ? 'page' : undefined}
+              className="shrink-0 rounded px-2 py-1 text-xs text-[var(--fg-muted)] aria-[current=page]:bg-[var(--bg-alt)] aria-[current=page]:font-semibold aria-[current=page]:text-[var(--fg)]"
+            >
+              {item.label}{item.count != null ? ` ${item.count}` : ''}
+            </button>
+          ))}
+        </nav>
+
+        {/* App's <main> already wraps the console, so this is a plain region. */}
+        <div className="min-w-0 flex-1 p-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h1 className="text-[15px] font-semibold">{head.title}</h1>
+              <p className="text-xs text-[var(--fg-muted)]">{head.sub}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeTab === 'overview' && refreshBtn(loadData)}
+              {activeTab === 'users' && (
+                <button type="button" onClick={exportUsersToCSV} className="btn btn-glass btn-sm">
+                  <Download className="w-3.5 h-3.5" /> Export CSV
+                </button>
+              )}
+              {activeTab === 'verification' && refreshBtn(loadVerifications)}
+            </div>
+          </div>
+
+        {/* ─────────────  OVERVIEW — operations workbench  ───────────── */}
         {activeTab === 'overview' && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 mb-5">
-              <StatCard label="Total revenue" value={`₱${stats.revenue.toLocaleString()}`} icon={DollarSign} accent />
-              <StatCard label="Total users" value={stats.totalUsers} icon={Users} />
-              <StatCard label="Active sessions" value={stats.activeUsers} icon={Activity} />
-              <StatCard label="Posts created" value={stats.totalPostsGenerated} icon={TrendingUp} />
-              <StatCard label="Cancelled txns" value={stats.cancelledTransactions} icon={XCircle} />
-              <StatCard label="Pending txns" value={stats.pendingTransactions} icon={Wallet} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="adm-panel lg:col-span-2 p-5">
-                <h3 className="adm-panel__title mb-3">User growth</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats.revenueData}>
-                      <defs>
-                        <linearGradient id="admArea" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2B5748" stopOpacity={0.18} />
-                          <stop offset="100%" stopColor="#2B5748" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} width={34} />
-                      <Tooltip contentStyle={chartTip} />
-                      <Area type="monotone" dataKey="value" stroke="#2B5748" strokeWidth={2.5} fill="url(#admArea)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="adm-panel p-5">
-                <h3 className="adm-panel__title mb-3">Retention rate</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.churnData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} unit="%" width={34} />
-                      <Tooltip contentStyle={chartTip} formatter={(v: number) => [`${v}%`, 'Retention']} />
-                      <Bar dataKey="value" fill="#5E7F63" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="adm-panel lg:col-span-3">
-                <header className="adm-panel__head">
-                  <h3 className="adm-panel__title">Latest activity</h3>
-                  <button onClick={() => setActiveTab('logs')} className="text-xs font-bold text-[var(--primary)] hover:underline flex items-center gap-1">
-                    View all <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </header>
-                <div className="divide-y divide-[var(--border)]">
-                  {auditLogs.slice(0, 6).map((log) => {
-                    const meta = ACTION_META[log.action] || DEFAULT_ACTION_META;
-                    const Icon = meta.icon;
-                    return (
-                      <div key={log.id} className="flex items-center gap-3 px-5 py-3">
-                        <div className={cx('w-8 h-8 rounded-lg grid place-items-center shrink-0', meta.bg)}>
-                          <Icon className={cx('w-3.5 h-3.5', meta.fg)} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-[var(--fg)] truncate">{meta.label}</p>
-                          <p className="text-xs text-[var(--fg-subtle)] truncate adm-table__mono">{log.user_id}</p>
-                        </div>
-                        <span className="text-xs text-[var(--fg-subtle)] whitespace-nowrap">{timeAgo(log.timestamp)}</span>
-                      </div>
-                    );
-                  })}
-                  {auditLogs.length === 0 && <div className="adm-empty">No activity recorded yet.</div>}
-                </div>
-              </div>
-            </div>
-          </>
+          <AdminOverview
+            users={users}
+            verifications={verifications}
+            auditLogs={auditLogs}
+            openJobId={openJobId}
+            onOpenJob={setOpenJobId}
+            health={health}
+            diagRunning={diagRunning}
+            onRunDiagnostics={runDiagnostics}
+            onReviewVerification={reviewVerification}
+            onOpenTenant={(email) => {
+              setActiveTab('users');
+              setSearchTerm(email);
+            }}
+          />
         )}
 
         {/* ─────────────  USERS  ───────────── */}
@@ -820,131 +848,22 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
         )}
 
         {/* ─────────────  VERIFICATION — review queue  ───────────── */}
-        {activeTab === 'verification' && (() => {
-          const filteredVerifs = verifStatusFilter === 'all' ? verifications : verifications.filter((v) => v.status === verifStatusFilter);
-          const selectedVerif = verifications.find((v) => v.id === selectedVerifId) || null;
-          const isPdf = /\.pdf$/i.test(selectedVerif?.documentName || '');
-          return (
-            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 items-start">
-              {/* Queue list */}
-              <div className="adm-panel overflow-hidden">
-                <div className="p-3 border-b border-[var(--border)] flex items-center gap-1.5 flex-wrap">
-                  {(['all', 'pending', 'verified', 'rejected'] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setVerifStatusFilter(s)}
-                      className={cx(
-                        'px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border transition-colors',
-                        verifStatusFilter === s
-                          ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
-                          : 'border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)] hover:border-[var(--border-strong)]'
-                      )}
-                    >
-                      {s === 'all' ? `All · ${verifications.length}` : `${s} · ${verifications.filter((v) => v.status === s).length}`}
-                    </button>
-                  ))}
-                </div>
-                <p className="px-3 py-1.5 text-[10px] text-[var(--fg-subtle)] border-b border-[var(--border)]">
-                  <kbd className="adm-table__mono">↑↓</kbd> move · <kbd className="adm-table__mono">A</kbd> approve · <kbd className="adm-table__mono">R</kbd> reject
-                </p>
-                <div className="max-h-[600px] overflow-y-auto divide-y divide-[var(--border)]">
-                  {verifLoading ? (
-                    <div className="adm-spinner m-6" />
-                  ) : filteredVerifs.length === 0 ? (
-                    <div className="adm-empty">No submissions.</div>
-                  ) : filteredVerifs.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSelectedVerifId(v.id)}
-                      className={cx('w-full text-left pl-16 pr-4 py-3 lg:px-4 transition-colors', selectedVerifId === v.id ? 'bg-[var(--bg-alt)]' : 'hover:bg-[var(--bg-alt)]')}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-[var(--fg)] truncate">{v.businessName || 'Unnamed business'}</p>
-                        <VStatusBadge status={v.status} />
-                      </div>
-                      <p className="text-xs text-[var(--fg-subtle)] truncate mt-0.5">{v.email}</p>
-                      <p className="text-[11px] text-[var(--fg-subtle)] mt-1">{v.createdAt ? parseUtc(v.createdAt).toLocaleDateString() : '—'}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Detail + inline document preview */}
-              <div className="adm-panel p-5 min-h-[520px]">
-                {!selectedVerif ? (
-                  <div className="adm-empty h-full flex items-center justify-center min-h-[460px]">Select a submission to review.</div>
-                ) : (
-                  <>
-                    <header className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-[var(--border)]">
-                      <div className="min-w-0">
-                        <h3 className="font-display text-lg font-bold text-[var(--fg)] truncate">{selectedVerif.businessName || 'Unnamed business'}</h3>
-                        <p className="text-sm text-[var(--fg-muted)] truncate">{selectedVerif.email}</p>
-                      </div>
-                      <VStatusBadge status={selectedVerif.status} />
-                    </header>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-5">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Phone</p>
-                        <p className="text-[var(--fg)]">{selectedVerif.businessPhone || '—'}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Address</p>
-                        <p className="text-[var(--fg)] truncate">{selectedVerif.businessAddress || '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] mb-1">Submitted</p>
-                        <p className="text-[var(--fg)]">{selectedVerif.createdAt ? parseUtc(selectedVerif.createdAt).toLocaleDateString() : '—'}</p>
-                      </div>
-                    </div>
-
-                    {selectedVerif.status === 'rejected' && selectedVerif.rejectionReason && (
-                      <div className="mb-5 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-3.5 py-2.5 text-xs text-[var(--danger)]">
-                        <strong>Rejection reason:</strong> {selectedVerif.rejectionReason}
-                      </div>
-                    )}
-                    {selectedVerif.status !== 'pending' && selectedVerif.reviewedAt && (
-                      <p className="text-xs text-[var(--fg-subtle)] italic mb-5">Reviewed {parseUtc(selectedVerif.reviewedAt).toLocaleString()}</p>
-                    )}
-
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--fg-subtle)] flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" /> Submitted document
-                      </p>
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--fg-subtle)]">{isPdf ? 'PDF' : 'Image'}</span>
-                    </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-alt)] overflow-hidden flex items-center justify-center" style={{ minHeight: 380 }}>
-                      {docPreviewLoading ? (
-                        <div className="adm-spinner" />
-                      ) : docPreviewError ? (
-                        <div className="text-center p-6">
-                          <p className="text-xs text-[var(--fg-subtle)] mb-3">{docPreviewError}</p>
-                          <button type="button" onClick={() => setDocPreviewRetryTick((n) => n + 1)} className="btn btn-outline btn-sm">
-                            <RefreshCw className="w-3.5 h-3.5" /> Retry
-                          </button>
-                        </div>
-                      ) : docPreviewUrl && isPdf ? (
-                        <iframe src={docPreviewUrl} className="w-full" style={{ height: 480, border: 0 }} title="Submitted document" />
-                      ) : docPreviewUrl ? (
-                        <img src={docPreviewUrl} alt="Submitted document" className="max-w-full max-h-[480px] object-contain" />
-                      ) : null}
-                    </div>
-                    <p className="text-[11px] text-[var(--fg-subtle)] mt-1.5 mb-5 truncate" title={selectedVerif.documentName}>{selectedVerif.documentName || ' '}</p>
-
-                    {selectedVerif.status === 'pending' && (
-                      <div className="flex items-center gap-5">
-                        <button onClick={() => handleApprove(selectedVerif.id, selectedVerif.businessName)} className="btn btn-primary"><CheckCircle className="w-4 h-4" /> Approve</button>
-                        <button onClick={() => { setRejectModal({ id: selectedVerif.id, businessName: selectedVerif.businessName }); setRejectReason(''); }} className="btn btn-danger"><XCircle className="w-4 h-4" /> Reject</button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })()}
+        {activeTab === 'verification' && (
+          <AdminVerification
+            verifications={verifications}
+            loading={verifLoading}
+            filter={verifStatusFilter}
+            onFilter={setVerifStatusFilter}
+            selectedId={selectedVerifId}
+            onSelect={setSelectedVerifId}
+            onApprove={(v) => handleApprove(v.id, v.businessName)}
+            onReject={(v) => {
+              setRejectModal({ id: v.id, businessName: v.businessName });
+              setRejectReason('');
+            }}
+            paused={!!rejectModal || deciding}
+          />
+        )}
 
         {/* ─────────────  BILLING  ───────────── */}
         {activeTab === 'billing' && (
@@ -1191,11 +1110,21 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1.5">Confirm password</label>
-                    <input type="password" value={adminProfile.confirm} onChange={(e) => setAdminProfile({ ...adminProfile, confirm: e.target.value as any })} className="input" />
+                    <input
+                      type="password"
+                      value={adminProfile.confirm}
+                      onChange={(e) => setAdminProfile({ ...adminProfile, confirm: e.target.value as any })}
+                      className="input"
+                      aria-invalid={!!adminProfile.confirm && adminProfile.password !== adminProfile.confirm}
+                      aria-describedby="admin-pw-match"
+                    />
+                    {adminProfile.confirm && adminProfile.password !== adminProfile.confirm && (
+                      <p id="admin-pw-match" className="text-xs mt-1.5" style={{ color: 'var(--danger)' }}>Passwords don’t match.</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <button onClick={handleAdminProfileUpdate} className="btn btn-primary">
+                  <button onClick={handleAdminProfileUpdate} className="btn btn-primary" disabled={adminProfile.password !== adminProfile.confirm}>
                     <Lock className="w-4 h-4" /> Update credentials
                   </button>
                 </div>
@@ -1203,6 +1132,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
             </Panel>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Manage-user modal ── */}
@@ -1271,11 +1201,13 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme }) => {
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="e.g. Document appears unreadable, business name does not match…"
                 className="input resize-none"
+                aria-describedby="reject-hint"
               />
+              <p id="reject-hint" className="text-xs mt-1.5" style={{ color: 'var(--fg-subtle)' }}>The owner sees this reason, so say what they need to fix.</p>
             </div>
             <div className="flex gap-2.5">
               <button onClick={() => setRejectModal(null)} className="btn btn-outline flex-1">Cancel</button>
-              <button onClick={handleReject} className="btn btn-primary flex-1" style={{ background: 'var(--danger)' }}>Confirm rejection</button>
+              <button onClick={handleReject} disabled={!rejectReason.trim()} className="btn btn-primary flex-1 disabled:opacity-50" style={{ background: 'var(--danger)' }}>Confirm rejection</button>
             </div>
           </div>
         </AdminModal>

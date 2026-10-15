@@ -1,4 +1,4 @@
-import { Sparkles, CalendarDays, Layers, BarChart3, Share2, CreditCard, Settings as SettingsIcon, MessageSquare, Rocket } from 'lucide-react';
+import { Sparkles, ChartGantt, Layers, BarChart3, Share2, CreditCard, Settings as SettingsIcon, MessageSquare, Rocket } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface TourStep {
@@ -27,16 +27,16 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'calendar-grid',
-    name: 'Calendar',
-    title: 'This is your content calendar',
-    body: 'Every day of the month can hold a post. Click any day to write, edit, or schedule what goes out.',
-    icon: CalendarDays,
+    name: 'Timeline',
+    title: 'This is your channel timeline',
+    body: 'Each row is a channel and each column a day of the month. Click a post to see its details, or an empty slot to write one.',
+    icon: ChartGantt,
   },
   {
     anchor: 'plan-month',
     name: 'Plan',
     title: 'Start with "Plan month"',
-    body: 'Kawayan drafts a full month of Taglish captions and image prompts in your brand voice. Do this first — the calendar stays empty until you do.',
+    body: 'Kawayan drafts a full month of Taglish captions and image prompts in your brand voice. Do this first — the timeline stays empty until you do.',
     icon: Layers,
   },
   {
@@ -50,7 +50,7 @@ export const TOUR_STEPS: TourStep[] = [
     anchor: 'nav-social',
     name: 'Social',
     title: 'Connect your pages',
-    body: 'Link your Facebook Page and Instagram once. After that, Post now and Schedule in the calendar publish to them for you.',
+    body: 'Link your Facebook Page and Instagram once. After that, Post now and Schedule in the post studio publish to them for you.',
     icon: Share2,
   },
   {
@@ -68,10 +68,10 @@ export const TOUR_STEPS: TourStep[] = [
     icon: SettingsIcon,
   },
   {
-    anchor: 'support-bubble',
+    anchor: 'help-button',
     name: 'Help',
     title: 'Help is one click away',
-    body: 'Raise a ticket, ask the AI assistant, or request a call with a real support agent.',
+    body: 'Ask the AI assistant, raise a ticket, or request a call with a real support agent. Press ⌘K (Ctrl+K) from anywhere.',
     icon: MessageSquare,
   },
   {

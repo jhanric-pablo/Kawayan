@@ -1,24 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
-import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, getTrendingTopicsPH, rewriteCaption } from '../services/aiService';
+import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, rewriteCaption } from '../services/aiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
-import { socialService, SocialAccount } from '../services/socialService';
+import { socialService, SocialAccount, SocialPlatform } from '../services/socialService';
 import {
-  LayoutList, LayoutGrid, ChevronLeft, ChevronRight, Layers
+  LayoutList, ChartGantt, ChevronLeft, ChevronRight, Layers, ArrowRight
 } from 'lucide-react';
-import KawayanCalendar from './calendar/KawayanCalendar';
+import ChannelTimelineTrack from './calendar/ChannelTimelineTrack';
+import AgendaView from './calendar/AgendaView';
+import PostDetailSheet from './calendar/PostDetailSheet';
+import { StatusBadge } from './calendar/TimelinePostCard';
+import { buildCalendarItems } from './calendar/mapCalendarEvents';
 import PostComposer from './calendar/PostComposer';
 import PlanningModal from './calendar/PlanningModal';
+import UpNext from './calendar/UpNext';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
+import { normalizeFormat } from '../services/validationService';
+import { FEED_EVENT, PostChannels, failedPostsKey, platformsFor, postChannelsKey, readStored } from '../utils/workspaceFeed';
 import {
   countPostsInMonth,
   getBatchLimitForSubscription,
   isAtTierLimit,
   normalizeIdeasToBatchCount,
   getScheduleDayRange,
-  TIER_LIMIT_MESSAGE,
   TIER_LIMIT_TITLE,
   ADDON_POST_PRICE_PHP,
 } from '../utils/tierLimits';
@@ -29,17 +35,22 @@ interface Props {
   /** Opens the Social page, where Facebook and Instagram get connected. */
   onOpenSocial: () => void;
   onOpenBilling: () => void;
+  /** A request from the app shell (Create post, a search hit, a notification), run once data is loaded. */
+  intent?: CalendarIntent | null;
+  onIntentDone?: () => void;
 }
 
-// Layout: full-screen calendar + sliding right preview panel
+export type CalendarIntent = { type: 'compose' } | { type: 'open'; postId: string };
 
-const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling }) => {
+const announceFeedChange = () => window.dispatchEvent(new Event(FEED_EVENT));
+
+const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   const [batchStrategy, setBatchStrategy] = useState('');
   const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
-  const [currentDate, setCurrentDate] = useState(new Date()); 
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [dateInputValue, setDateInputValue] = useState("");
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
@@ -55,7 +66,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const parseSmartDate = (input: string) => {
     // Clean input: replace commas/slashes with spaces, remove extra spaces
     let clean = input.replace(/[,/]/g, ' ').replace(/\s+/g, ' ').trim();
-    
+
     // Handle 4-digit year only "2026"
     if (/^\d{4}$/.test(clean)) {
       return { date: new Date(parseInt(clean), 0, 1), isSpecific: false };
@@ -64,20 +75,20 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     // Heuristic: Check for Month Name + Day + Optional Year (e.g. "Jan 12 26", "feb 2")
     const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
     const monthMatch = months.findIndex(m => clean.toLowerCase().startsWith(m));
-    
+
     if (monthMatch !== -1) {
        // Found a month name start
        const parts = clean.split(' ');
        const yearPart = parts.find(p => /^\d{4}$/.test(p) || /^\d{2}$/.test(p) && parseInt(p) > 31);
        const dayPart = parts.find(p => /^\d{1,2}$/.test(p) && p !== yearPart);
-       
+
        let year = yearPart ? (yearPart.length === 2 ? 2000 + parseInt(yearPart) : parseInt(yearPart)) : currentDate.getFullYear();
        let day = dayPart ? parseInt(dayPart) : 1;
-       
+
        // Clamp day
        const maxDay = new Date(year, monthMatch + 1, 0).getDate();
        day = Math.min(day, maxDay);
-       
+
        return { date: new Date(year, monthMatch, day), isSpecific: !!dayPart };
     }
 
@@ -85,7 +96,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     const parsed = new Date(clean);
     if (!isNaN(parsed.getTime())) {
       // Determine if specific day was likely intended
-      const hasDay = /\d{1,2}/.test(clean.replace(/\d{4}/, '')); 
+      const hasDay = /\d{1,2}/.test(clean.replace(/\d{4}/, ''));
       return { date: parsed, isSpecific: hasDay };
     }
     return null;
@@ -116,11 +127,18 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const contentRef = useRef<GeneratedPost | null>(null);
   contentRef.current = generatedContent;
   const [loadingImage, setLoadingImage] = useState(false);
-  const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
   const [posts, setPosts] = useState<GeneratedPost[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false); // first load done; the timeline shows a skeleton until then
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // Scheduled posts that failed to publish come back as Drafts; remember which, so "Up next" can flag them.
+  const failedKey = failedPostsKey(userId);
+  const [failedIds, setFailedIds] = useState<string[]>(() => readStored<string[]>(failedKey, []));
+  // Which channels each post went to, for the timeline lanes.
+  const [postChannels, setPostChannels] = useState<PostChannels>(() => readStored<PostChannels>(postChannelsKey(userId), {}));
+  // The post shown in the details sheet.
+  const [sheetPostId, setSheetPostId] = useState<string | null>(null);
   const [calendarDataVersion, setCalendarDataVersion] = useState(0);
   const [subscription, setSubscription] = useState<'FREE' | 'PRO' | 'ENTERPRISE'>('FREE');
-  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const batchPostCount = getBatchLimitForSubscription(subscription);
   const monthlyPostCount = countPostsInMonth(posts, currentDate);
@@ -147,10 +165,12 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const createCount = Math.min(pendingIdeas().length, Math.max(0, batchPostCount - monthlyPostCount));
 
   const showTierLimitDialog = async () => {
-    await dialog.alert({
+    const upgrade = await dialog.confirm({
       title: TIER_LIMIT_TITLE,
-      message: `${TIER_LIMIT_MESSAGE}\n\nVisit Billing to upgrade your plan.`,
+      message: `You've used all ${batchPostCount} posts for this month. Pro gives you 16 a month, or add single posts for ₱${ADDON_POST_PRICE_PHP} each from the post studio.`,
+      confirmLabel: 'See Pro plan',
     });
+    if (upgrade) onOpenBilling();
   };
 
   const guardNewPostCreation = async (): Promise<boolean> => {
@@ -232,7 +252,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
   useEffect(() => {
     paymentService.getWalletData()
-      .then((w) => setSubscription(w.subscription))
+      .then((w) => {
+        setSubscription(w.subscription);
+        setWalletBalance(w.balance);
+      })
       .catch(() => setSubscription('FREE'));
   }, []);
 
@@ -243,12 +266,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
   const loadData = async () => {
     const monthName = currentDate.toLocaleString('default', { month: 'long' });
-
-    // Trending topics come from the (sometimes slow / offline) AI proxy — never
-    // let it block the calendar. Fire it separately, apply whenever it lands.
-    getTrendingTopicsPH(profile.industry)
-      .then(setTrendingTopics)
-      .catch(() => undefined);
 
     // Posts + saved plan are what the calendar actually renders — load them
     // independently so one failing does not blank the other.
@@ -267,7 +284,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     if (planRes.status === 'fulfilled' && planRes.value) {
       const range = getScheduleDayRange(currentDate);
       const normalized = normalizeIdeasToBatchCount(
-        planRes.value,
+        planRes.value.map((i) => ({ ...i, format: normalizeFormat(i.format) })),
         Math.max(planRes.value.length, 1),
         range
       );
@@ -277,6 +294,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
 
     setCalendarDataVersion((v) => v + 1);
+    setDataLoaded(true);
   };
 
   const handleGeneratePlan = async () => {
@@ -300,9 +318,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       await dbService.savePlan(userId, monthName, newIdeas);
     } catch (e: any) {
       if (e.message.includes('quota')) {
-        await dialog.alert("Kawayan's AI has used up today's free allowance. Please try again later.");
+        toast.error("Kawayan's AI has used up today's free allowance. Please try again later.");
       } else {
-        await dialog.alert(`Failed to generate content plan. Please try again.\n\nError: ${e.message}`);
+        toast.error('Could not plan the month. Please try again.');
       }
     } finally {
       setLoadingPlan(false);
@@ -326,16 +344,23 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     });
   };
 
+  const handleDeleteIdea = (index: number) => {
+    clearTimeout(ideaSaveTimer.current); // a pending edit save would bring the idea back
+    const next = ideas.filter((_, i) => i !== index);
+    setIdeas(next);
+    persistIdeas(next).catch(() => toast.error('Could not save the plan. Please try again.'));
+  };
+
   const handleClosePanel = () => {
     setSelectedDay(null);
   };
 
   const handleDayClick = (day: number) => {
     setSelectedDay(day);
-    
+
     const existingPost = posts.find(p => {
        const d = new Date(p.date);
-       return d.getDate() === day && 
+       return d.getDate() === day &&
               d.getMonth() === currentDate.getMonth() &&
               d.getFullYear() === currentDate.getFullYear();
     });
@@ -360,7 +385,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
       if (sameDayAsEditor && generatedContent.id) {
         if (generatedContent.regenCount >= 2) {
-          await dialog.alert('Regeneration Limit Reached (Max 2). Please use the current version.');
+          toast.info('This post has used both of its rewrites. You can still edit it by hand.');
           return;
         }
 
@@ -400,9 +425,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     } catch (e: any) {
       if (e.message?.includes('TIER_LIMIT')) return;
       if (e.message.includes('quota')) {
-        await dialog.alert("Kawayan's AI has used up today's free allowance. Please try again later.");
+        toast.error("Kawayan's AI has used up today's free allowance. Please try again later.");
       } else {
-        await dialog.alert(`Failed to generate content. Please try again.\n\nError: ${e.message}`);
+        toast.error('Could not write the post. Please try again.');
       }
     } finally {
       setGeneratingPost(false);
@@ -413,7 +438,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     const pending = pendingIdeas();
 
     if (!ideas.length) {
-      await dialog.alert({ message: 'Plan the month first to get content ideas.', title: 'No Ideas' });
+      toast.info('Plan the month first to get content ideas.');
       return;
     }
 
@@ -424,7 +449,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
 
     if (!pending.length) {
-      await dialog.alert({ message: 'Every batch slot already has a saved post for this month.', title: 'Nothing to Generate' });
+      toast.info('Every idea already has a post this month.');
       return;
     }
 
@@ -460,9 +485,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       await refreshPostsFromDb();
     } catch (e: any) {
       if (e.message?.includes('quota')) {
-        await dialog.alert(`Kawayan's AI has used up today's free allowance. ${created} post${created === 1 ? '' : 's'} were saved before it stopped.`);
+        toast.error(`Kawayan's AI has used up today's free allowance. ${created} post${created === 1 ? '' : 's'} were saved before it stopped.`);
       } else {
-        await dialog.alert(`Batch generation stopped. ${created} post${created === 1 ? '' : 's'} were saved.\n\nError: ${e.message}`);
+        toast.error(`Batch create stopped. ${created} post${created === 1 ? '' : 's'} were saved.`);
       }
     } finally {
       setLoadingPlan(false);
@@ -471,46 +496,40 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
-  const handleAddOn = async (day: number) => {
-    if (postExistsForDay(day)) {
-      handleDayClick(day);
-      return;
-    }
-
+  // An extra post beyond the plan: paid from the wallet, then written like any other post.
+  // Returns an error message for the studio to show next to the form, or null on success.
+  const handleAddOn = async (day: number, topic: string): Promise<string | null> => {
     const cost = ADDON_POST_PRICE_PHP;
-    const topic = await dialog.prompt({
-      title: `Single Post Add-on · ₱${cost}`,
-      message: `Add a standalone post to this date (₱${cost}). Describe your topic:`,
-      placeholder: 'e.g. Weekend promo, new menu item…',
-    });
-    if (!topic) return;
-
-    const confirmed = await dialog.confirm({
-      title: `Confirm ₱${cost} Add-on`,
-      message: `Purchase this single post add-on for ₱${cost.toLocaleString()}? The amount will be deducted from your wallet balance.`,
-    });
-    if (confirmed) {
-       try {
-         await paymentService.makePayment(cost, `Add-on Post: ${topic}`);
-         
-         const newIdea: ContentIdea = { day, title: "Add-on Post", topic, format: 'Image' };
-         const updatedIdeas = [...ideas, newIdea];
-         setIdeas(updatedIdeas);
-         
-         const monthName = currentDate.toLocaleString('default', { month: 'long' });
-         await dbService.savePlan(userId, monthName, updatedIdeas);
-         
-         setSelectedDay(day);
-         const post = await createPostFromIdea(newIdea, `addon-${Date.now()}`);
-         setGeneratedContent(post);
-         await persistPost(post);
-         await dialog.alert({ message: `Purchase successful! Your ₱${cost} add-on post is ready in the preview panel.`, title: 'Add-on Purchased' });
-         
-       } catch (e: any) {
-         if (e.message?.includes('TIER_LIMIT')) return;
-         await dialog.alert(e.message || "Payment failed. Please ensure you have enough balance in your wallet.");
-       }
+    try {
+      await paymentService.makePayment(cost, `Extra post: ${topic}`);
+    } catch (e: any) {
+      return e.message || 'Payment failed.';
     }
+    setWalletBalance((b) => (b == null ? b : b - cost));
+    const newIdea: ContentIdea = { day, title: 'Extra post', topic, format: 'Image' };
+    const updatedIdeas = [...ideas, newIdea];
+    setIdeas(updatedIdeas);
+    dbService.savePlan(userId, currentDate.toLocaleString('default', { month: 'long' }), updatedIdeas).catch(() => undefined);
+    toast.success(`Paid ₱${cost} from your wallet. Writing your extra post…`);
+    setGeneratingPost(true);
+    try {
+      const post = await createPostFromIdea(newIdea, `addon-${Date.now()}`);
+      setGeneratedContent(post);
+      await persistPost(post);
+    } catch {
+      toast.error('Paid, but the post could not be written. Press “Write it with AI” to try again.');
+    } finally {
+      setGeneratingPost(false);
+    }
+    return null;
+  };
+
+  // Opens any post in the studio, switching the calendar to its month first.
+  const openPost = (post: GeneratedPost) => {
+    const [y, m, d] = post.date.split('-').map(Number);
+    if (y !== currentDate.getFullYear() || m - 1 !== currentDate.getMonth()) setCurrentDate(new Date(y, m - 1, 1));
+    setGeneratedContent(post);
+    setSelectedDay(d);
   };
 
   const handleGenerateImage = async () => {
@@ -519,7 +538,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     try {
       const base = await generateImageFromPrompt(generatedContent.imagePrompt + IMAGE_PROMPT_SUFFIX);
       if (!base) {
-        await dialog.alert('Failed to generate image. Please try again.');
+        toast.error('Could not create the image. Please try again.');
         return;
       }
       // Cache-busting query param only makes sense for real URLs (Pollinations fallback);
@@ -533,7 +552,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         await persistPost(updated);
       }
     } catch (e: any) {
-      await dialog.alert(`Failed to regenerate image.\n\nError: ${e.message || 'Unknown error'}`);
+      toast.error('Could not create the image. Please try again.');
     } finally {
       setLoadingImage(false);
     }
@@ -560,10 +579,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
-  // Connected pages, fetched each time the composer opens.
+  // Connected pages: for the timeline lanes, and fetched again each time the composer opens.
   const composerOpen = selectedDay !== null;
   useEffect(() => {
-    if (!composerOpen) return;
     let cancelled = false;
     setSocialError('');
     socialService
@@ -579,17 +597,30 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     };
   }, [composerOpen]);
 
-  const handlePublish = async (accountIds: string[], scheduledFor?: string) => {
-    if (!generatedContent) return;
+  const publishPost = async (post: GeneratedPost, accountIds: string[], scheduledFor?: string, saveFirst = false) => {
     setPublishing(true);
     try {
-      await persistPost(generatedContent); // publish the latest edits, not the last saved copy
-      const updated = await socialService.publish(generatedContent.id, accountIds, scheduledFor);
+      if (saveFirst) await persistPost(post); // publish the latest edits, not the last saved copy
+      const updated = await socialService.publish(post.id, accountIds, scheduledFor);
       mergePostIntoState(updated);
+      const platforms = [...new Set((socialAccounts || []).filter((a) => accountIds.includes(a.id)).map((a) => a.platform))];
+      const channels = { ...postChannels, [post.id]: { platforms, at: scheduledFor, queuedAt: new Date().toISOString() } };
+      setPostChannels(channels);
+      try {
+        localStorage.setItem(postChannelsKey(userId), JSON.stringify(channels));
+      } catch {
+        /* private mode */
+      }
+      announceFeedChange();
       const when = scheduledFor
         ? new Date(scheduledFor).toLocaleString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
         : '';
-      toast.success(updated.status === 'Published' ? 'Posted. It’s live now.' : `Scheduled for ${when}`);
+      const link = updated.externalLink;
+      if (updated.status === 'Published') {
+        toast.toast('Posted. It’s live now.', { variant: 'success', action: link ? { label: 'View post', onClick: () => window.open(link, '_blank', 'noopener') } : undefined });
+      } else {
+        toast.success(`Scheduled for ${when}`);
+      }
     } catch (e: any) {
       toast.error(e.message || 'Could not publish the post.');
     } finally {
@@ -597,26 +628,115 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
+  const handlePublish = async (accountIds: string[], scheduledFor?: string) => {
+    if (generatedContent) await publishPost(generatedContent, accountIds, scheduledFor, true);
+  };
+
+  // A post that failed to go out: publish it now to the same channels.
+  const retryPost = async (post: GeneratedPost) => {
+    const platforms = platformsFor(post, postChannels, socialAccounts || []);
+    const accountIds = (socialAccounts || []).filter((a) => a.isActive && platforms.includes(a.platform)).map((a) => a.id);
+    if (!accountIds.length) {
+      toast.error('None of this post’s pages are connected. Reconnect them first.');
+      onOpenSocial();
+      return;
+    }
+    await publishPost(post, accountIds);
+  };
+
+  // Reconnecting re-runs the platform login, which refreshes the account's access token.
+  const handleConnect = (platform: SocialPlatform) => {
+    socialService.connect(platform).catch((e: any) => toast.error(e.message));
+  };
+
+  const handleDisconnect = async (account: SocialAccount) => {
+    const ok = await dialog.confirm(
+      `Disconnect @${account.username}? Posts scheduled to this ${account.platform} account will no longer be published.`
+    );
+    if (!ok) return;
+    try {
+      await socialService.disconnect(account.id);
+      toast.success(`@${account.username} disconnected`);
+      setSocialAccounts(await socialService.listAccounts());
+      announceFeedChange();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  // Details sheet → studio.
+  const editPost = (post: GeneratedPost) => {
+    setSheetPostId(null);
+    openPost(post);
+  };
+
   // Scheduled posts publish on Zernio's side; pull their results back when the calendar opens.
   useEffect(() => {
     socialService.sync()
-      .then(({ published, failed }) => {
+      .then(({ published, failed, failedIds: newlyFailed = [] }) => {
+        if (newlyFailed.length) setFailedIds((ids) => [...new Set([...ids, ...newlyFailed])]);
         if (!published && !failed) return;
         refreshPostsFromDb();
         if (published) toast.success(`${published} scheduled post${published > 1 ? 's' : ''} went live`);
-        if (failed) toast.error(`${failed} scheduled post${failed > 1 ? 's' : ''} failed to publish and went back to Draft`);
+        if (failed) {
+          toast.toast(`${failed} scheduled post${failed > 1 ? 's' : ''} failed to publish and went back to Draft`, {
+            variant: 'error',
+            action: { label: 'Review', onClick: () => setSheetPostId(newlyFailed[0]) },
+          });
+        }
       })
       .catch(() => undefined); // social posting not set up yet: nothing to sync
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleMonthChange = (date: Date) => {
-    setCurrentDate(date);
-  };
+  // Forget failures once the post is rescheduled, published or deleted.
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const still = failedIds.filter((id) => posts.some((p) => p.id === id && p.status === 'Draft'));
+    if (still.length !== failedIds.length) setFailedIds(still);
+    try {
+      const json = JSON.stringify(still);
+      if (localStorage.getItem(failedKey) !== json) {
+        localStorage.setItem(failedKey, json);
+        announceFeedChange();
+      }
+    } catch {
+      /* private mode */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, failedIds, dataLoaded]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // The sidebar's quota and the shell's search follow posts being created or deleted.
+  useEffect(() => {
+    if (dataLoaded) announceFeedChange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts.length]);
+
+  // Shell requests: "Create post" opens the next free day from today; search and notifications open a post.
+  useEffect(() => {
+    if (!intent || !dataLoaded) return;
+    if (intent.type === 'compose') {
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const taken = new Set(posts.filter((p) => p.date.startsWith(`${y}-${String(m + 1).padStart(2, '0')}-`)).map((p) => Number(p.date.slice(8, 10))));
+      let day = today.getDate();
+      while (taken.has(day) && day < new Date(y, m + 1, 0).getDate()) day++;
+      if (taken.has(day)) day = today.getDate();
+      if (y !== currentDate.getFullYear() || m !== currentDate.getMonth()) setCurrentDate(new Date(y, m, 1));
+      setGeneratedContent(posts.find((p) => p.date === `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ?? null);
+      setSelectedDay(day);
+    } else {
+      setSheetPostId(intent.postId);
+    }
+    onIntentDone?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent, dataLoaded]);
+
+  const agendaItems = useMemo(() => buildCalendarItems(posts, ideas, currentDate), [posts, ideas, currentDate, calendarDataVersion]);
+  const sheetPost = posts.find((p) => p.id === sheetPostId) ?? null;
+
+  const handlePhotoFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== 'string') return;
@@ -628,25 +748,24 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       });
     };
     reader.readAsDataURL(file);
-    if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
   const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-  const STATUS_LEGEND: { key: string; label: string }[] = [
-    { key: 'idea', label: 'Idea' },
-    { key: 'draft', label: 'Draft' },
-    { key: 'scheduled', label: 'Scheduled' },
-    { key: 'published', label: 'Published' },
-  ];
+  const now = new Date();
+  const isPastMonth = currentDate.getFullYear() * 12 + currentDate.getMonth() < now.getFullYear() * 12 + now.getMonth();
+  // A month with nothing in it gets the planner pitch right on the timeline.
+  const showEmptyCta = dataLoaded && viewMode === 'timeline' && !isPastMonth && monthlyPostCount === 0 && ideas.length === 0 && !loadingPlan;
 
   return (
     <div className="relative w-full flex flex-col gap-4 pb-16 font-sans text-[var(--fg)]">
 
-      {/* ─────────────  Calendar workspace (primary)  ───────────── */}
-      <section className="w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm p-3 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => setPlanningOpen(true)} />}
+
+      {/* ─────────────  Channel timeline (primary)  ───────────── */}
+      <section className="w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-3 sm:px-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-display text-xl sm:text-2xl font-bold text-[var(--fg)] tracking-tight mr-1">
+            <h1 className="font-display text-xl font-bold text-[var(--fg)] tracking-tight mr-1">
               {monthLabel}
             </h1>
             <div className="flex items-center rounded-lg border border-[var(--border-strong)] overflow-hidden">
@@ -683,25 +802,31 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 placeholder="Jump to date…"
                 aria-label="Jump to date"
-                className="text-sm text-[var(--fg-muted)] bg-[var(--bg-alt)] border border-[var(--border-strong)] rounded-lg px-3 py-1.5 w-36 outline-none focus:ring-2 focus:ring-[rgba(43,87,72,0.18)] focus:border-[var(--primary)] placeholder:text-[var(--fg-subtle)]"
+                className="text-sm text-[var(--fg-muted)] bg-[var(--bg-alt)] border border-[var(--border-strong)] rounded-lg px-3 py-1.5 w-36 outline-none focus:ring-2 focus:ring-[var(--ring)] focus:border-[var(--primary)] placeholder:text-[var(--fg-subtle)]"
               />
               <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[var(--kw-forest)] text-white text-[10px] px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)] bg-[rgba(43,87,72,0.08)] dark:bg-[rgba(156,176,128,0.12)] px-2.5 py-1 rounded-full">
-              {monthlyPostCount}/{batchPostCount} this month
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="kw-usage w-full sm:w-auto">
+              <span className="kw-usage__bar" aria-hidden>
+                <b style={{ width: `${Math.min(100, (monthlyPostCount / Math.max(batchPostCount, 1)) * 100)}%` }} />
+              </span>
+              {monthlyPostCount} of {batchPostCount} posts used
+              {subscription === 'FREE' && (
+                <button type="button" onClick={onOpenBilling}>· Pro gives 16</button>
+              )}
             </span>
             <div className="flex gap-0.5 p-0.5 bg-[var(--bg-alt)] rounded-lg border border-[var(--border-strong)]">
               <button
-                onClick={() => setViewMode('grid')}
-                aria-pressed={viewMode === 'grid'}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-[var(--card)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]'}`}
-                title="Month grid"
+                onClick={() => setViewMode('timeline')}
+                aria-pressed={viewMode === 'timeline'}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'timeline' ? 'bg-[var(--card)] shadow-sm text-[var(--primary)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]'}`}
+                title="Channel timeline"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <ChartGantt className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -716,10 +841,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               type="button"
               data-tour="plan-month"
               onClick={() => setPlanningOpen(true)}
-              className="btn btn-primary btn-lg"
-              title="AI content planning"
+              className="btn btn-primary"
+              aria-label="Plan month"
             >
-              <Layers className="w-[1.15rem] h-[1.15rem]" />
+              <Layers className="w-4 h-4" />
               <span className="hidden sm:inline">Plan month</span>
               {ideas.length > 0 && (
                 <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.35rem] h-[1.35rem] px-1 rounded-full bg-white/25 text-[11px] font-black">
@@ -730,31 +855,47 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           </div>
         </div>
 
-        <div data-tour="calendar-grid">
-          <KawayanCalendar
-            currentDate={currentDate}
-            posts={posts}
-            ideas={ideas}
-            selectedDay={selectedDay}
-            viewMode={viewMode}
-            calendarDataVersion={calendarDataVersion}
-            onDayClick={handleDayClick}
-            onMonthChange={handleMonthChange}
-            onAddOn={handleAddOn}
-          />
+        <div data-tour="calendar-grid" className="relative">
+          {viewMode === 'timeline' || !dataLoaded ? (
+            <ChannelTimelineTrack
+              currentDate={currentDate}
+              posts={posts}
+              ideas={ideas}
+              accounts={socialAccounts}
+              channels={postChannels}
+              failedIds={failedIds}
+              loading={!dataLoaded}
+              onOpenPost={(post) => setSheetPostId(post.id)}
+              onEditPost={openPost}
+              onRetryPost={retryPost}
+              onOpenDay={handleDayClick}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onManageAccounts={onOpenSocial}
+            />
+          ) : (
+            <div className="p-3 sm:p-5">
+              <AgendaView items={agendaItems} currentDate={currentDate} selectedDay={selectedDay} onDayClick={handleDayClick} />
+            </div>
+          )}
+          {showEmptyCta && (
+            <div className="kw-empty-cta">
+              <div className="kw-empty-cta__card">
+                <b>Your {currentDate.toLocaleDateString('en-PH', { month: 'long' })} is empty.</b>
+                <button type="button" onClick={() => setPlanningOpen(true)} className="btn btn-primary">
+                  Plan {batchPostCount} posts in 15 seconds <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-[var(--border)]">
-          <div className="kw-cal-legend">
-            {STATUS_LEGEND.map((s) => (
-              <span key={s.key} className="kw-cal-legend__item">
-                <span className={`kw-cal-legend__dot kw-cal-legend__dot--${s.key}`} />
-                {s.label}
-              </span>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-3 py-2.5 sm:px-5">
+          <div className="flex flex-wrap items-center gap-1.5" aria-label="Status key">
+            {(['idea', 'draft', 'scheduled', 'published', 'failed'] as const).map((s) => <StatusBadge key={s} status={s} />)}
           </div>
           <p className="text-xs text-[var(--fg-muted)] hidden md:block">
-            Click a day to preview, draft, or add a ₱{ADDON_POST_PRICE_PHP} single post
+            Click a post for details, or an empty slot to write one. Extra posts are ₱{ADDON_POST_PRICE_PHP} each.
           </p>
         </div>
       </section>
@@ -782,7 +923,12 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         onGeneratePlan={handleGeneratePlan}
         onBatchGenerate={handleBatchGenerate}
         onUpdateIdea={handleUpdateIdea}
+        onDeleteIdea={handleDeleteIdea}
         onOpenDay={handleDayClick}
+        posts={posts}
+        accounts={socialAccounts}
+        channels={postChannels}
+        failedIds={failedIds}
       />
 
       {/* ── Post creation studio ── */}
@@ -798,12 +944,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         generatingPost={generatingPost}
         loadingImage={loadingImage}
         addOnPrice={ADDON_POST_PRICE_PHP}
-        photoInputRef={photoInputRef}
+        limitReached={trialLimitReached}
+        planPostCount={batchPostCount}
+        walletBalance={walletBalance}
+        onOpenBilling={onOpenBilling}
         onClose={handleClosePanel}
         onGeneratePost={handleGeneratePost}
         onAddOn={handleAddOn}
         onGenerateImage={handleGenerateImage}
-        onPhotoUpload={handlePhotoUpload}
+        onPhotoFile={handlePhotoFile}
         onRewriteCaption={handleRewriteCaption}
         onAutosave={handleAutosave}
         accounts={socialAccounts}
@@ -813,6 +962,19 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         onOpenSocial={onOpenSocial}
       />
 
+      {/* ── Post details (from a timeline card, search or a notification) ── */}
+      <PostDetailSheet
+        post={sheetPost}
+        profile={profile}
+        platforms={sheetPost ? platformsFor(sheetPost, postChannels, socialAccounts || []) : []}
+        scheduledAt={sheetPost ? postChannels[sheetPost.id]?.at : undefined}
+        queuedAt={sheetPost ? postChannels[sheetPost.id]?.queuedAt : undefined}
+        failed={!!sheetPost && sheetPost.status === 'Draft' && failedIds.includes(sheetPost.id)}
+        publishing={publishing}
+        onClose={() => setSheetPostId(null)}
+        onEdit={editPost}
+        onRetry={retryPost}
+      />
     </div>
   );
 };

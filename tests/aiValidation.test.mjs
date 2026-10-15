@@ -7,7 +7,7 @@ import { normalizeFormat, ValidationService } from '../services/validationServic
 
 assert.equal(normalizeFormat('Reel'), 'Video');
 assert.equal(normalizeFormat('IGTV'), 'Video');
-assert.equal(normalizeFormat('Carousel Image'), 'Carousel');
+assert.equal(normalizeFormat('Carousel Image'), 'Image');
 assert.equal(normalizeFormat('Text post'), 'Text');
 assert.equal(normalizeFormat('Story Highlights'), 'Image');
 assert.equal(normalizeFormat(undefined), 'Image');
@@ -17,6 +17,6 @@ const ideas = ValidationService.validateContentIdeas([
   { day: 8, title: 'Tita Lola’s Secret', topic: 'Behind the scenes', format: 'Reel' },
   { day: 40, title: 'Bad day', topic: 'x', format: 'Image' }, // out of range: still dropped
 ]);
-assert.deepEqual(ideas.map((i) => [i.day, i.format]), [[5, 'Carousel'], [8, 'Video']]);
+assert.deepEqual(ideas.map((i) => [i.day, i.format]), [[5, 'Image'], [8, 'Video']]);
 
 console.log('aiValidation: all checks passed');

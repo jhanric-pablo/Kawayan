@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ViewState } from '../types';
 import {
   ArrowRight, Sparkles, Calendar, Zap, CheckCircle2,
-  Wand2, Share2, Store, Heart, MessageCircle, Send, Bookmark, Loader2,
+  Wand2, Share2, Store, Play,
   ShieldCheck, Lock, UserCheck,
 } from 'lucide-react';
 import HeroBackground from './landing/HeroBackground';
 import WhyKawayan from './landing/WhyKawayan';
+import DemoModal from './landing/DemoModal';
 import './landing/landing.css';
 
 interface Props {
@@ -63,64 +64,6 @@ const PLANS = [
   },
 ];
 
-/* ── Hero product console: a self-playing "social automation" demo ── */
-type ChipStatus = 'idea' | 'draft' | 'scheduled' | 'published';
-const CAL_LABEL: Record<ChipStatus, string> = { idea: 'Idea', draft: 'Draft', scheduled: 'Sched', published: 'Live' };
-const CAL_START_DOW = 3;
-const CAL_DAYS = 30;
-const CAL_TODAY = 8;
-const AMBIENT_CHIPS: Record<number, ChipStatus> = { 3: 'published', 8: 'scheduled', 22: 'draft' };
-const DEMO_DAYS = [5, 12, 19, 26];
-const FOCUS_DAY = 12;
-const DEMO_CAPTION =
-  'Tag-ulan na naman, bes! ☔ Best time for hot choco — yakap in a cup. Come thru! ☕ #BedWeather';
-const DEMO_PLATFORMS = ['Instagram', 'Facebook', 'TikTok'] as const;
-const LOOP_MS = 17000;
-const PUB_START = 10300;
-const PREFERS_REDUCED =
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-
-/* Stylised "generated photo" scenes — inline SVG so there are no external
-   requests; the demo cycles through them, one per loop. */
-const photoSVG = (
-  bg: [string, string, string], liquid: string, glass: string, w: number, h: number, rim: number,
-) => {
-  const cx = 220;
-  const top = 178 - h / 2;
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 330'>
-<defs>
-<radialGradient id='bg' cx='30%' cy='24%' r='105%'>
-<stop offset='0' stop-color='${bg[0]}'/><stop offset='.52' stop-color='${bg[1]}'/><stop offset='1' stop-color='${bg[2]}'/>
-</radialGradient>
-<linearGradient id='gl' x1='0' y1='0' x2='.35' y2='1'>
-<stop offset='0' stop-color='#fff' stop-opacity='.92'/><stop offset='.5' stop-color='${glass}' stop-opacity='.5'/><stop offset='1' stop-color='${glass}' stop-opacity='.82'/>
-</linearGradient>
-<filter id='sf' x='-40%' y='-40%' width='180%' height='180%'><feGaussianBlur stdDeviation='10'/></filter>
-<filter id='gr'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .09 0'/></filter>
-</defs>
-<rect width='440' height='330' fill='url(#bg)'/>
-<circle cx='374' cy='54' r='54' fill='#fff' opacity='.15' filter='url(#sf)'/>
-<circle cx='52' cy='264' r='70' fill='${liquid}' opacity='.24' filter='url(#sf)'/>
-<ellipse cx='${cx}' cy='280' rx='130' ry='23' fill='#000' opacity='.32' filter='url(#sf)'/>
-<rect x='${cx - w / 2}' y='${top}' width='${w}' height='${h}' rx='${rim}' fill='url(#gl)'/>
-<ellipse cx='${cx}' cy='${top}' rx='${w / 2}' ry='${w / 6.5}' fill='${liquid}'/>
-<ellipse cx='${cx}' cy='${top}' rx='${w / 2.6}' ry='${w / 8.5}' fill='#000' opacity='.2'/>
-<rect x='${cx - w / 2 + 9}' y='${top + 13}' width='${w * 0.2}' height='${h * 0.7}' rx='${rim / 1.6}' fill='#fff' opacity='.42'/>
-<rect width='440' height='330' filter='url(#gr)'/>
-</svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-};
-
-const DEMO_PHOTOS = [
-  photoSVG(['#f1ddc0', '#cfa06a', '#7c5330'], '#3b2512', '#efe6d6', 140, 150, 20), // hot coffee
-  photoSVG(['#e3eded', '#b3cbc4', '#5a7b72'], '#2a4b40', '#e9f1ee', 116, 182, 16), // iced latte
-  photoSVG(['#f7e6bd', '#e6bd77', '#a87c34'], '#5c3e14', '#f6ecd6', 150, 128, 30), // milk tea
-  photoSVG(['#f2d9dd', '#d79aa6', '#8f5563'], '#5a2c38', '#f5e6ea', 128, 156, 22), // pink drink
-];
-
 /* Number that counts up when it scrolls into view */
 const CountUp: React.FC<{ to: number; dur?: number; prefix?: string; suffix?: string; sep?: boolean }> = ({
   to, dur = 1500, prefix = '', suffix = '', sep = false,
@@ -150,200 +93,6 @@ const CountUp: React.FC<{ to: number; dur?: number; prefix?: string; suffix?: st
   return <span ref={ref}>{prefix}{sep ? val.toLocaleString() : val}{suffix}</span>;
 };
 
-const HeroConsole: React.FC = () => {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [t, setT] = useState(PREFERS_REDUCED ? 16000 : 0);
-  const [photoIdx, setPhotoIdx] = useState(0);
-  const prevT = useRef(0);
-
-  useEffect(() => {
-    if (PREFERS_REDUCED) return;
-    let onScreen = true;
-    const io =
-      'IntersectionObserver' in window
-        ? new IntersectionObserver((e) => { onScreen = e[0].isIntersecting; }, { threshold: 0.04 })
-        : null;
-    if (io && rootRef.current) io.observe(rootRef.current);
-    const id = window.setInterval(() => {
-      if (document.hidden || !onScreen) return;
-      setT((x) => (x + 40) % LOOP_MS);
-    }, 40);
-    return () => { window.clearInterval(id); io?.disconnect(); };
-  }, []);
-
-  // Rotate to a fresh "generated photo" whenever the loop restarts.
-  useEffect(() => {
-    if (prevT.current > LOOP_MS - 600 && t < 600) {
-      setPhotoIdx((i) => (i + 1) % DEMO_PHOTOS.length);
-    }
-    prevT.current = t;
-  }, [t]);
-  const photo = DEMO_PHOTOS[photoIdx];
-
-  // ── phase + derived state, all a pure function of the loop clock ──
-  const phase: 'plan' | 'write' | 'visual' | 'publish' | 'done' =
-    t < 3400 ? 'plan' : t < 7500 ? 'write' : t < PUB_START ? 'visual' : t < 15600 ? 'publish' : 'done';
-
-  const planP = clamp01((t - 200) / 2900);
-  const chipsIn = t < 250 ? 0 : Math.min(DEMO_DAYS.length, Math.ceil(planP * DEMO_DAYS.length));
-
-  const writeP = clamp01((t - 3500) / 3600);
-  const typed = Math.round(writeP * DEMO_CAPTION.length);
-
-  const imgP = clamp01((t - 7400) / 1800);
-  const showShimmer = phase === 'write' || (phase === 'visual' && imgP < 1);
-
-  const slot = t < PUB_START ? -1 : Math.floor((t - PUB_START) / 1500);
-  const inSlot = t < PUB_START ? 0 : (t - PUB_START) % 1500;
-  const activeP = t < PUB_START ? 0 : Math.min(2, Math.max(0, slot));
-  const posted = new Set<number>();
-  if (t >= PUB_START) {
-    for (let i = 0; i < Math.min(3, slot); i++) posted.add(i);
-    if (slot >= 0 && slot < 3 && inSlot > 620) posted.add(slot);
-    if (slot >= 3) { posted.add(0); posted.add(1); posted.add(2); }
-  }
-
-  const focusStatus: ChipStatus = t < PUB_START ? 'idea' : t < 12400 ? 'scheduled' : 'published';
-
-  const engP = clamp01((t - PUB_START) / 4800);
-  const likes = t < PUB_START ? 0 : Math.round(engP * 236) + 7;
-  const comments = t < PUB_START ? 0 : Math.round(engP * 24);
-
-  const status =
-    phase === 'plan' ? 'Planning September…'
-      : phase === 'write' ? 'Writing your caption…'
-        : phase === 'visual' ? 'Generating the visual…'
-          : phase === 'publish' ? `Publishing to ${DEMO_PLATFORMS[activeP]}…`
-            : '4 posts scheduled · 3 platforms';
-  const busy = phase !== 'done';
-
-  const cardFade = t > LOOP_MS - 480 ? clamp01((LOOP_MS - t) / 380) : t < 340 ? clamp01(t / 300) : 1;
-
-  const cells = Array.from({ length: 35 }, (_, i) => {
-    const day = i - CAL_START_DOW + 1;
-    const inMonth = day >= 1 && day <= CAL_DAYS;
-    const label = inMonth ? day : day < 1 ? 30 + day : day - CAL_DAYS;
-    return { key: i, day, label, inMonth, today: inMonth && day === CAL_TODAY };
-  });
-
-  return (
-    <div ref={rootRef}>
-      <div className="lp-console__badge lp-console__badge--tl" data-on={chipsIn >= DEMO_DAYS.length}>
-        <Sparkles className="w-3.5 h-3.5" /> AI drafted 4 posts
-      </div>
-      <div className="lp-console__badge lp-console__badge--br" data-on={posted.size >= 3}>
-        <CheckCircle2 className="w-3.5 h-3.5" /> Scheduled to 3 platforms
-      </div>
-
-      <div className="lp-console__bar">
-        <span className="lp-console__dot" /><span className="lp-console__dot" /><span className="lp-console__dot" />
-        <span className="lp-console__title">Kawayan · Content Studio</span>
-        <span className={`lp-console__status${busy ? ' is-busy' : ''}`}>
-          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-          <span>{status}</span>
-        </span>
-      </div>
-
-      <div className="lp-console__body" style={{ opacity: cardFade }}>
-        <div className="lp-cal">
-          <div className="lp-cal__head">
-            <span className="lp-cal__month">September 2026</span>
-            <span className="lp-cal__nav"><span>‹</span><span>›</span></span>
-          </div>
-          <div className="lp-cal__dows">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i} className="lp-cal__dow">{d}</span>)}
-          </div>
-          <div className="lp-cal__grid">
-            <div
-              className="lp-cal__scan"
-              style={{ top: `${planP * 100}%`, opacity: phase === 'plan' && t > 160 ? 1 : 0 }}
-            />
-            {cells.map((c) => {
-              const demoIdx = DEMO_DAYS.indexOf(c.day);
-              const showDemo = demoIdx > -1 && demoIdx < chipsIn;
-              const ambient = !showDemo && c.inMonth ? AMBIENT_CHIPS[c.day] : undefined;
-              const st = showDemo ? (c.day === FOCUS_DAY ? focusStatus : 'idea') : ambient;
-              return (
-                <div
-                  key={c.key}
-                  className={
-                    'lp-cal__cell'
-                    + (c.inMonth ? '' : ' lp-cal__cell--out')
-                    + (c.today ? ' lp-cal__cell--today' : '')
-                    + (c.day === FOCUS_DAY && phase !== 'plan' ? ' lp-cal__cell--focus' : '')
-                  }
-                >
-                  {c.label}
-                  {st && <span key={st} className={`lp-cal__chip lp-cal__chip--${st}`}>{CAL_LABEL[st]}</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="lp-pv">
-          <div className="lp-pv__tabs">
-            {DEMO_PLATFORMS.map((p, i) => (
-              <span
-                key={p}
-                className={`lp-pv__tab lp-pv__tab--${p.toLowerCase()}${(t >= PUB_START ? activeP === i : i === 0) ? ' is-active' : ''}`}
-              >
-                {p}
-              </span>
-            ))}
-          </div>
-          <div className="lp-pv__card">
-            <div className="lp-pv__head">
-              <span className="lp-pv__avatar" />
-              <div className="lp-pv__meta">
-                <span className="lp-pv__name">Kapehan sa Kanto</span>
-                <span className="lp-pv__sub">Sponsored · Kawayan AI</span>
-              </div>
-            </div>
-
-            <div className="lp-pv__media">
-              {phase === 'plan' ? (
-                <Sparkles className="w-5 h-5" />
-              ) : (
-                <>
-                  <div
-                    className="lp-pv__photo"
-                    style={{
-                      backgroundImage: `url("${photo}")`,
-                      opacity: Math.min(1, imgP * 1.3),
-                      transform: `scale(${1.08 - imgP * 0.08})`,
-                    }}
-                  />
-                  {showShimmer && <div className="lp-pv__shimmer" style={{ opacity: 1 - imgP }} />}
-                </>
-              )}
-              <span className="lp-pv__stamp" data-shown={posted.has(activeP)}>Posted</span>
-            </div>
-
-            <div className="lp-pv__acts">
-              <Heart className="w-4 h-4" /><span className="lp-pv__count">{likes || ''}</span>
-              <MessageCircle className="w-4 h-4" /><span className="lp-pv__count">{comments || ''}</span>
-              <Send className="w-4 h-4" />
-              <Bookmark className="w-4 h-4 ml-auto" />
-            </div>
-
-            <div className="lp-pv__body">
-              {phase === 'plan' ? (
-                <span className="lp-pv__caption lp-pv__caption--ph">Your Taglish caption will appear here…</span>
-              ) : (
-                <span className="lp-pv__caption">
-                  {DEMO_CAPTION.slice(0, typed)}
-                  {writeP < 1 && <span className="lp-pv__caret" />}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const targetScrollY = useRef(0);
@@ -353,7 +102,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   const bgRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
-  const consoleRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
 
   // --- Smooth scroll scrub + layered parallax ---
@@ -406,16 +154,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       if (indicatorRef.current) indicatorRef.current.style.opacity = (1 - progress * 4).toString();
 
       if (!reduce) {
-        if (consoleRef.current) {
-          const r = consoleRef.current.getBoundingClientRect();
-          const off = (r.top + r.height / 2) - window.innerHeight / 2;
-          // Only ever nudge the console DOWN while it is still below the fold,
-          // easing to its resting spot as you scroll to it — never lift it up
-          // into the hero text/buttons.
-          const rise = Math.max(0, Math.min(56, off * 0.05));
-          consoleRef.current.style.transform =
-            `perspective(1600px) translate3d(0, ${rise.toFixed(1)}px, 0) rotateX(${(my * 1.4).toFixed(2)}deg) rotateY(${(mx * -1.8).toFixed(2)}deg)`;
-        }
         const sy = window.scrollY;
         const mid = window.innerHeight / 2;
         parallaxNodes.forEach((n, i) => {
@@ -464,22 +202,9 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   // FAQ answers expand/collapse independently (not an exclusive accordion).
   const [openFaqs, setOpenFaqs] = useState<Set<string>>(new Set());
 
-  // Click the product console → dim + blur the rest of the page and lift/zoom it.
-  // Click again, click the backdrop, or press Escape to exit.
-  const [consoleFocus, setConsoleFocus] = useState(false);
-  const consoleFocusEnabled = !PREFERS_REDUCED;
-  const toggleConsoleFocus = () => {
-    if (consoleFocusEnabled) setConsoleFocus((v) => !v);
-  };
+  // The product demo plays on request (hero button, How it works), never inline.
+  const [demoOpen, setDemoOpen] = useState(false);
 
-  useEffect(() => {
-    if (!consoleFocus) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setConsoleFocus(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [consoleFocus]);
 
   return (
     <div
@@ -565,12 +290,14 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                     Start Free Trial <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
                   </span>
                 </button>
-                <a
-                  href="#how"
-                  className="px-6 py-4 rounded-full font-semibold text-[0.95rem] text-white/85 border border-white/20 bg-white/[0.06] backdrop-blur-md hover:bg-white/[0.12] hover:text-white transition-all w-full sm:w-auto text-center"
+                <button
+                  type="button"
+                  onClick={() => setDemoOpen(true)}
+                  className="px-6 py-4 rounded-full font-semibold text-[0.95rem] text-white/85 border border-white/20 bg-white/[0.06] backdrop-blur-md hover:bg-white/[0.12] hover:text-white transition-all w-full sm:w-auto text-center inline-flex items-center justify-center gap-2.5"
                 >
+                  <span className="lp-play" aria-hidden><Play className="w-3 h-3" /></span>
                   See how it works
-                </a>
+                </button>
               </div>
               <p className="mt-4 text-sm font-medium text-white/65">
                 Create your first 7-day content calendar in minutes. No credit card required.
@@ -578,43 +305,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
         </section>
-      </div>
-
-      {/* ══ Hero product console (parallax rise, overlaps hero) ══ */}
-      {consoleFocus && (
-        <div
-          className="lp-console-backdrop"
-          onClick={() => setConsoleFocus(false)}
-        />
-      )}
-      <div
-        className={`lp-console-wrap${consoleFocus ? ' is-focused' : ''}${consoleFocusEnabled ? ' is-interactive' : ''}`}
-        onClick={consoleFocusEnabled ? toggleConsoleFocus : undefined}
-        onKeyDown={
-          consoleFocusEnabled
-            ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  toggleConsoleFocus();
-                }
-              }
-            : undefined
-        }
-        role={consoleFocusEnabled ? 'button' : undefined}
-        tabIndex={consoleFocusEnabled ? 0 : undefined}
-        aria-pressed={consoleFocusEnabled ? consoleFocus : undefined}
-        aria-label={
-          consoleFocusEnabled
-            ? consoleFocus
-              ? 'Exit product preview zoom'
-              : 'Zoom in on the product preview'
-            : undefined
-        }
-      >
-        <div className="lp-console-glow" data-parallax="0.06" />
-        <div ref={consoleRef} className="lp-console reveal reveal--scale" style={{ willChange: 'transform' }}>
-          <HeroConsole />
-        </div>
       </div>
 
       {/* ══ Stats band ══ */}
@@ -687,6 +377,13 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                 <p className="lp-step__desc">{s.desc}</p>
               </div>
             ))}
+          </div>
+
+          <div className="text-center mt-14 reveal">
+            <button type="button" className="lp-watch" onClick={() => setDemoOpen(true)}>
+              <span className="lp-play" aria-hidden><Play className="w-3 h-3" /></span>
+              Watch it happen in 40 seconds
+            </button>
           </div>
         </div>
       </section>
@@ -936,6 +633,15 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           </div>
         </div>
       </section>
+
+      <DemoModal
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        onStart={() => {
+          setDemoOpen(false);
+          onNavigate(ViewState.SIGNUP);
+        }}
+      />
     </div>
   );
 };

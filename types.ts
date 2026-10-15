@@ -43,7 +43,7 @@ export interface ContentIdea {
   day: number;
   title: string;
   topic: string;
-  format: 'Image' | 'Carousel' | 'Text' | 'Video';
+  format: 'Image' | 'Text' | 'Video';
 }
 
 export interface PostVersion {
@@ -136,7 +136,7 @@ export const AIResponseSchema = {
     return typeof idea.day === 'number' &&
            typeof idea.title === 'string' &&
            typeof idea.topic === 'string' &&
-           ['Image', 'Carousel', 'Text', 'Video'].includes(idea.format);
+           ['Image', 'Text', 'Video'].includes(idea.format);
   },
   postResponse: (response: any): response is {
     caption: string;

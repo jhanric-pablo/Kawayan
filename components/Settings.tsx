@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, CheckCircle2, KeyRound, MessageCircle, Palette, PlayCircle, ShieldCheck, Store, X } from 'lucide-react';
+import { ArrowLeft, Check, KeyRound, MessageCircle, Palette, PlayCircle, ShieldCheck, Store, X } from 'lucide-react';
 import { BrandProfile, User } from '../types';
 import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import { BRAND_VOICES, isCustomVoice } from '../constants/brandVoices';
@@ -8,6 +8,8 @@ import { ValidationService } from '../services/validationService';
 import PasswordMeter from './auth/PasswordMeter';
 import { useToast } from './ui/Toast';
 import './settings.css';
+import { AccessibilityOptions } from './AccessibilityWidget';
+import SettingsAppearance from './SettingsAppearance';
 
 interface Props {
   profile?: BrandProfile | null;
@@ -389,41 +391,12 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
             <div key="appearance" className="st-panel">
               {panelHead('Appearance', 'How Kawayan looks on this device.')}
               <div className="st-stack">
+                <SettingsAppearance darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+
                 <div>
-                  <span className="st-label" id="st-theme-label">Theme</span>
-                  <div className="st-themes" role="radiogroup" aria-labelledby="st-theme-label">
-                    {[{ dark: false, label: 'Light' }, { dark: true, label: 'Dark' }].map(({ dark, label }) => {
-                      const active = darkMode === dark;
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          className="st-theme"
-                          onClick={() => !active && toggleDarkMode()}
-                        >
-                          <div className={`st-theme__art st-theme__art--${dark ? 'dark' : 'light'}`} aria-hidden>
-                            <div className="st-theme__side">
-                              <i className="is-accent" style={{ height: 6, width: '70%' }} />
-                              <i style={{ height: 5 }} />
-                              <i style={{ height: 5, width: '80%' }} />
-                              <i style={{ height: 5, width: '60%' }} />
-                            </div>
-                            <div className="st-theme__body">
-                              <i style={{ height: 7, width: '45%' }} />
-                              <i style={{ height: 5 }} />
-                              <i style={{ height: 5, width: '85%' }} />
-                              <i className="is-accent" style={{ height: 12, width: '35%', marginTop: 'auto', borderRadius: 4 }} />
-                            </div>
-                          </div>
-                          <div className="st-theme__foot">
-                            {label}
-                            {active && <CheckCircle2 />}
-                          </div>
-                        </button>
-                      );
-                    })}
+                  <span className="st-label">Accessibility</span>
+                  <div className="st-a11y">
+                    <AccessibilityOptions />
                   </div>
                 </div>
 

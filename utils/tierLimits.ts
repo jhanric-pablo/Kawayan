@@ -55,7 +55,7 @@ export function getScheduleDayRange(calendarMonth: Date, now: Date = new Date())
   return { minDay, maxDay };
 }
 
-const FORMATS: ContentIdea['format'][] = ['Image', 'Carousel', 'Video', 'Text'];
+const FORMATS: ContentIdea['format'][] = ['Image', 'Video', 'Text'];
 
 /**
  * Pad or trim ideas so batch generation always targets exactly `targetCount` slots.

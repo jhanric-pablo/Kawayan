@@ -1,166 +1,31 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BrandProfile, ContentIdea, GeneratedPost, PostVersion } from '../../types';
 import type { SocialAccount } from '../../services/socialService';
 import type { CaptionRewrite } from '../../services/aiService';
 import {
-  X, Wand2, RefreshCcw, Loader2, Upload, Image as ImageIcon, Sparkles, Heart, MessageCircle, Send, MoreHorizontal,
-  Plus, ThumbsUp, Globe, Bookmark, Music2, Facebook, Instagram, Share2, Scissors, Smile, Briefcase, Megaphone,
-  Languages, Hash, ArrowUp, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine, CircleAlert,
-  History, Clock,
+  X, RefreshCcw, Loader2, Upload, Image as ImageIcon, Send, Facebook, Instagram, Scissors, Smile, Briefcase, Megaphone,
+  Languages, Hash, ArrowUp, ArrowUpRight, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine,
+  CircleAlert, History, Clock, Globe, AudioLines, Sparkles,
 } from 'lucide-react';
-import './postComposer.css';
-import './kawayanCalendar.css';
-import './studio.css';
+import TextareaAutosize from 'react-textarea-autosize';
+import clsx from 'clsx';
+import FormatPicker, { PostFormat } from './FormatPicker';
+import PhonePreview from './PhonePreview';
+import { StatusBadge } from './TimelinePostCard';
+import { normalizeFormat } from '../../services/validationService';
 
-type PreviewPlatform = 'instagram' | 'facebook' | 'tiktok';
+/* ── Shared looks ── */
 
-const TikTokGlyph: React.FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-  </svg>
-);
-
-const PREVIEW_PLATFORMS: { id: PreviewPlatform; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'instagram', label: 'Instagram', Icon: Instagram },
-  { id: 'facebook', label: 'Facebook', Icon: Facebook },
-  { id: 'tiktok', label: 'TikTok', Icon: TikTokGlyph },
-];
-
-const PreviewTabs: React.FC<{ value: PreviewPlatform; onChange: (p: PreviewPlatform) => void }> = ({ value, onChange }) => (
-  <div className="kw-pv-tabs" role="tablist" aria-label="Preview platform">
-    {PREVIEW_PLATFORMS.map((p) => (
-      <button
-        key={p.id}
-        type="button"
-        role="tab"
-        aria-selected={value === p.id}
-        className={`kw-pv-tabs__btn kw-pv-tabs__btn--${p.id}${value === p.id ? ' is-active' : ''}`}
-        onClick={() => onChange(p.id)}
-      >
-        <p.Icon className="w-3.5 h-3.5" />
-        <span>{p.label}</span>
-      </button>
-    ))}
-  </div>
-);
-
-/** Read-only, platform-accurate mock of the post as it would appear on the network. */
-const PostPreview: React.FC<{
-  platform: PreviewPlatform;
-  businessName: string;
-  initials: string;
-  caption?: string;
-  imageUrl?: string;
-  likes: number;
-  loadingImage: boolean;
-}> = ({ platform, businessName, initials, caption, imageUrl, likes, loadingImage }) => {
-  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K` : `${n}`);
-  const comments = Math.max(1, Math.round(likes / 12));
-  const shares = Math.max(1, Math.round(likes / 30));
-  const handle = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'yourbusiness';
-
-  const media = (
-    <div className="kw-pv__media">
-      {imageUrl ? (
-        <>
-          <img key={imageUrl} src={imageUrl} alt="Post visual" />
-          {loadingImage && (
-            <div className="kw-pv__media-load">
-              <Loader2 className="w-7 h-7 animate-spin text-white" />
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="kw-pv__media-empty">
-          <ImageIcon className="w-7 h-7" />
-          <span>Visual appears here</span>
-        </div>
-      )}
-    </div>
-  );
-
-  const captionNode = caption ? <>{caption}</> : <span className="kw-pv__ph">Your caption will show here…</span>;
-
-  if (platform === 'facebook') {
-    return (
-      <div className="kw-pv kw-pv--fb">
-        <div className="kw-pv-fb__head">
-          <span className="kw-pv-fb__avatar">{initials}</span>
-          <div className="kw-pv-fb__meta">
-            <span className="kw-pv-fb__name">{businessName}</span>
-            <span className="kw-pv-fb__sub">Just now · <Globe className="w-3 h-3" /></span>
-          </div>
-          <MoreHorizontal className="w-4 h-4" />
-        </div>
-        <p className="kw-pv-fb__caption">{captionNode}</p>
-        {media}
-        <div className="kw-pv-fb__stats">
-          <span className="kw-pv-fb__reacts">
-            <span className="kw-pv-fb__r kw-pv-fb__r--like"><ThumbsUp className="w-2.5 h-2.5" /></span>
-            <span className="kw-pv-fb__r kw-pv-fb__r--love"><Heart className="w-2.5 h-2.5" /></span>
-            <span className="kw-pv-fb__rc">{fmt(likes)}</span>
-          </span>
-          <span>{fmt(comments)} comments · {fmt(shares)} shares</span>
-        </div>
-        <div className="kw-pv-fb__bar">
-          <button type="button"><ThumbsUp className="w-4 h-4" /> Like</button>
-          <button type="button"><MessageCircle className="w-4 h-4" /> Comment</button>
-          <button type="button"><Share2 className="w-4 h-4" /> Share</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (platform === 'tiktok') {
-    return (
-      <div className="kw-pv kw-pv--tt">
-        {media}
-        <div className="kw-pv-tt__scrim" />
-        <div className="kw-pv-tt__rail">
-          <span className="kw-pv-tt__avatar">{initials}<span className="kw-pv-tt__plus">+</span></span>
-          <span className="kw-pv-tt__act"><Heart className="w-7 h-7" /><b>{fmt(likes)}</b></span>
-          <span className="kw-pv-tt__act"><MessageCircle className="w-7 h-7" /><b>{fmt(comments)}</b></span>
-          <span className="kw-pv-tt__act"><Bookmark className="w-7 h-7" /><b>{fmt(Math.round(likes / 6))}</b></span>
-          <span className="kw-pv-tt__act"><Share2 className="w-7 h-7" /><b>{fmt(shares)}</b></span>
-          <span className="kw-pv-tt__disc">{initials}</span>
-        </div>
-        <div className="kw-pv-tt__info">
-          <p className="kw-pv-tt__name">@{handle}</p>
-          <p className="kw-pv-tt__caption">{captionNode}</p>
-          <p className="kw-pv-tt__music"><Music2 className="w-3.5 h-3.5" /> original sound — {businessName}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Instagram
-  return (
-    <div className="kw-pv kw-pv--ig">
-      <div className="kw-pv-ig__head">
-        <span className="kw-pv-ig__ring"><span className="kw-pv-ig__avatar">{initials}</span></span>
-        <div className="kw-pv-ig__meta">
-          <span className="kw-pv-ig__name">{handle}</span>
-        </div>
-        <MoreHorizontal className="w-4 h-4" />
-      </div>
-      {media}
-      <div className="kw-pv-ig__actions">
-        <Heart className="w-6 h-6" />
-        <MessageCircle className="w-6 h-6" />
-        <Send className="w-6 h-6" />
-        <Bookmark className="w-6 h-6 kw-pv-ig__save" />
-      </div>
-      <div className="kw-pv-ig__body">
-        <p className="kw-pv-ig__likes">{fmt(likes)} likes</p>
-        <p className="kw-pv-ig__caption">
-          <span className="kw-pv-ig__name">{handle}</span> {captionNode}
-        </p>
-        <p className="kw-pv-ig__more">View all {fmt(comments)} comments</p>
-        <p className="kw-pv-ig__time">Just now</p>
-      </div>
-    </div>
-  );
-};
+const CARD = 'rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4';
+const CARD_HEAD = 'mb-3 flex items-center justify-between gap-2 text-[13px] font-semibold text-[var(--fg)]';
+/** The frameless writing surface: one hairline, emerald when focused. */
+const FIELD =
+  'rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] transition-colors focus-within:border-brand focus-within:ring-2 focus-within:ring-[var(--ring)]';
+const CHIP =
+  'inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-alt)] px-3 py-1.5 text-xs font-semibold text-[var(--fg-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+export const PRIMARY_BTN =
+  'inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-accent-fg)] transition-colors hover:bg-[var(--primary-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4';
+const LABEL = 'text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--fg-subtle)]';
 
 /* ── AI helpers ── */
 
@@ -181,13 +46,18 @@ const scoreWord = (s: number) => (s >= 75 ? 'Strong' : s >= 50 ? 'Promising' : '
 const ScoreRing: React.FC<{ score: number }> = ({ score }) => {
   const r = 26;
   const c = 2 * Math.PI * r;
+  const color = score >= 75 ? 'var(--primary)' : score >= 50 ? 'var(--warning)' : 'var(--danger)';
   return (
-    <div className={`ps-ring ps-ring--${score >= 75 ? 'high' : score >= 50 ? 'mid' : 'low'}`}>
-      <svg viewBox="0 0 64 64" aria-hidden>
-        <circle cx="32" cy="32" r={r} className="ps-ring__track" />
-        <circle cx="32" cy="32" r={r} className="ps-ring__fill" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
+    <div className="relative h-16 w-16 shrink-0">
+      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--border-strong)" strokeWidth="6" />
+        <circle
+          cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)}
+          className="transition-[stroke-dashoffset] duration-500"
+        />
       </svg>
-      <span className="ps-ring__num">{score}</span>
+      <span className="absolute inset-0 grid place-items-center font-display text-lg font-bold">{score}</span>
     </div>
   );
 };
@@ -205,10 +75,23 @@ const GeneratingSteps: React.FC = () => {
   }, []);
   const steps = ['Reading your brand profile', 'Writing a Taglish caption', 'Creating a matching visual'];
   return (
-    <ol className="ps-steps" aria-live="polite">
+    <ol className="mt-5 space-y-2.5" aria-live="polite">
       {steps.map((s, i) => (
-        <li key={s} className={i < step ? 'is-done' : i === step ? 'is-active' : ''}>
-          <span className="ps-steps__dot">{i < step ? <Check /> : i === step ? <Loader2 className="animate-spin" /> : null}</span>
+        <li
+          key={s}
+          className={clsx(
+            'flex items-center gap-2.5 text-[13.5px] transition-colors',
+            i < step ? 'text-[var(--fg-muted)]' : i === step ? 'font-semibold text-[var(--fg)]' : 'text-[var(--fg-subtle)]',
+          )}
+        >
+          <span
+            className={clsx(
+              'grid h-5 w-5 place-items-center rounded-full border',
+              i < step ? 'border-transparent bg-brand text-on-brand' : i === step ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-[var(--border-strong)]',
+            )}
+          >
+            {i < step ? <Check className="h-3 w-3" strokeWidth={3} /> : i === step ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          </span>
           {s}
         </li>
       ))}
@@ -231,6 +114,7 @@ const to12h = (hhmm: string) => {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
 const pad = (n: number) => String(n).padStart(2, '0');
+const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 const isoToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -249,10 +133,10 @@ const snapOf = (p: GeneratedPost) => JSON.stringify([p.caption, p.imagePrompt, p
 /**
  * PostComposer: the post studio.
  *
- * Left: the caption with an AI co-writer (one-tap edits, free-text asks, undo, re-scoring),
- * the visual, the score and earlier versions. Right: a live platform preview. Bottom: the
- * publish bar, where a "where and when" popover picks pages and a suggested time.
- * Drafts save themselves; every network/AI call is delegated to ContentCalendar.
+ * Left: the brief (or, once drafted, the caption with an AI co-writer, the visual, the score
+ * and earlier versions). Right: the post in a phone, per platform. Bottom: where and when,
+ * paired with the publish button. Drafts save themselves; every network/AI call is delegated
+ * to ContentCalendar.
  */
 interface Props {
   open: boolean;
@@ -266,27 +150,26 @@ interface Props {
   generatingPost: boolean;
   loadingImage: boolean;
   addOnPrice: number;
-  photoInputRef: React.RefObject<HTMLInputElement | null>;
+  /** The plan's posts for this month are used up: new posts are paid extras. */
+  limitReached: boolean;
+  planPostCount: number;
+  walletBalance: number | null;
   accounts: SocialAccount[] | null;
   accountsError: string;
   publishing: boolean;
   onClose: () => void;
   onGeneratePost: (idea: ContentIdea) => void;
-  onAddOn: (day: number) => void;
+  /** Pays for an extra post from the wallet and writes it; resolves to an error message or null. */
+  onAddOn: (day: number, topic: string) => Promise<string | null>;
+  onOpenBilling: () => void;
   onGenerateImage: () => void;
   onRewriteCaption: (caption: string, instruction: string) => Promise<CaptionRewrite | null>;
   onAutosave: (post: GeneratedPost) => Promise<void>;
-  onPhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** A photo picked with "Upload photo" or dropped on the preview. */
+  onPhotoFile: (file: File) => void;
   onPublish: (accountIds: string[], scheduledFor?: string) => Promise<void>;
   onOpenSocial: () => void;
 }
-
-const STATUS_STYLE: Record<string, string> = {
-  Draft: 'kw-chip-status kw-chip-status--draft',
-  Scheduled: 'kw-chip-status kw-chip-status--scheduled',
-  Published: 'kw-chip-status kw-chip-status--published',
-  New: 'kw-chip-status kw-chip-status--idea',
-};
 
 const PostComposer: React.FC<Props> = ({
   open,
@@ -300,7 +183,9 @@ const PostComposer: React.FC<Props> = ({
   generatingPost,
   loadingImage,
   addOnPrice,
-  photoInputRef,
+  limitReached,
+  planPostCount,
+  walletBalance,
   accounts,
   accountsError,
   publishing,
@@ -310,11 +195,11 @@ const PostComposer: React.FC<Props> = ({
   onGenerateImage,
   onRewriteCaption,
   onAutosave,
-  onPhotoUpload,
+  onPhotoFile,
   onPublish,
   onOpenSocial,
+  onOpenBilling,
 }) => {
-  const [previewPlatform, setPreviewPlatform] = useState<PreviewPlatform>('instagram');
   const [aiBusy, setAiBusy] = useState<string | null>(null);
   const [ask, setAsk] = useState('');
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
@@ -326,10 +211,13 @@ const PostComposer: React.FC<Props> = ({
   const [mode, setMode] = useState<'schedule' | 'now'>('schedule');
   const [time, setTime] = useState('20:00');
   const [chosen, setChosen] = useState<string[]>([]);
+  const [brief, setBrief] = useState(''); // what the post is about; also the paid extra post's topic
+  const [format, setFormat] = useState<PostFormat>('Image');
+  const [extraBusy, setExtraBusy] = useState(false);
+  const [extraError, setExtraError] = useState('');
   const dialogRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLDivElement>(null);
-
-  const fakeLikes = useMemo(() => Math.floor(Math.random() * 500) + 10, [post?.id]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Latest values for listeners and timers that outlive a render.
   const latest = useRef({ post, onClose, onAutosave, planOpen });
@@ -421,9 +309,18 @@ const PostComposer: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id]);
 
+  // Pre-pick every page that can actually publish; one that lost access would fail the post.
   useEffect(() => {
-    if (accounts) setChosen(accounts.map((a) => a.id));
+    if (accounts) setChosen(accounts.filter((a) => a.isActive).map((a) => a.id));
   }, [accounts]);
+
+  useEffect(() => {
+    const idea = ideas.find((i) => i.day === selectedDay);
+    setBrief(idea?.topic || '');
+    setFormat(idea?.format || 'Image');
+    setExtraError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay]);
 
   useEffect(() => {
     if (!generatingPost) setRedoing(false);
@@ -431,7 +328,8 @@ const PostComposer: React.FC<Props> = ({
 
   if (!open || selectedDay == null) return null;
 
-  const currentPost = posts.find((p) => new Date(p.date).getDate() === selectedDay);
+  const ymd = `${currentDate.getFullYear()}-${pad(currentDate.getMonth() + 1)}-${pad(selectedDay)}`;
+  const currentPost = posts.find((p) => p.date === ymd);
   const currentIdea = ideas.find((i) => i.day === selectedDay);
   const heading = post?.topic || currentPost?.topic || currentIdea?.title || 'New post';
   const dateLabel = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toLocaleDateString('en-PH', {
@@ -439,14 +337,29 @@ const PostComposer: React.FC<Props> = ({
     month: 'short',
     day: 'numeric',
   });
-  const statusLabel = post?.status || 'New';
+  const monthName = currentDate.toLocaleDateString('en-PH', { month: 'long' });
   const isPublished = post?.status === 'Published';
   const isScheduled = post?.status === 'Scheduled';
-  const initials = profile.businessName.substring(0, 2).toUpperCase();
   const rewritesLeft = Math.max(0, MAX_REWRITES - (post?.regenCount || 0));
 
   const runGenerate = () => {
-    onGeneratePost(currentIdea || { day: selectedDay, title: 'Custom Post', topic: 'General Update', format: 'Image' });
+    onGeneratePost({
+      day: selectedDay,
+      title: currentIdea?.title || 'Custom post',
+      topic: brief.trim() || currentIdea?.topic || post?.topic || 'General update',
+      format,
+    });
+  };
+
+  const submitBrief = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (brief.trim().length < 3 || generatingPost || extraBusy) return;
+    if (!limitReached) return runGenerate();
+    setExtraBusy(true);
+    setExtraError('');
+    const error = await onAddOn(selectedDay, brief.trim());
+    setExtraBusy(false);
+    if (error) setExtraError(error);
   };
 
   /* ── AI co-writer ── */
@@ -517,8 +430,8 @@ const PostComposer: React.FC<Props> = ({
   const chosenAccounts = (accounts || []).filter((a) => chosen.includes(a.id));
   const timeOk = mode === 'now' || (!!post && !isPast(post.date, time));
   const whereLabel =
-    accounts === null ? 'Loading pages…' : accounts.length === 0 ? 'No pages connected' : chosenAccounts.length === 0 ? 'No page picked' : chosenAccounts.map((a) => (a.platform === 'facebook' ? 'Facebook' : 'Instagram')).join(' + ');
-  const whenLabel = mode === 'now' ? 'Right away' : post ? `${longDate(post.date)} · ${to12h(time)}` : '';
+    accounts === null ? 'Loading pages…' : accounts.length === 0 ? 'No pages connected' : chosenAccounts.length === 0 ? 'No page picked' : chosenAccounts.map((a) => (a.platform === 'facebook' ? 'Facebook Page' : 'Instagram')).join(' + ');
+  const whenLabel = mode === 'now' ? 'Right away' : post ? `${longDate(post.date)} · ${to12h(time)}` : 'Draft the post first';
 
   const publish = () => {
     if (!post) return;
@@ -529,45 +442,42 @@ const PostComposer: React.FC<Props> = ({
 
   const ctaDisabled = !post || publishing || accounts === null || (accounts.length > 0 && (chosen.length === 0 || !timeOk));
   const ctaLabel =
-    accounts && accounts.length === 0 ? 'Connect a page' : mode === 'now' ? 'Post now' : `Schedule · ${to12h(time)}`;
+    accounts && accounts.length === 0 ? 'Connect a page' : mode === 'now' ? 'Post now' : `Schedule • ${to12h(time)}`;
 
   const busyLabel = aiBusy ? `Rewriting: ${aiBusy}` : redoing && generatingPost ? 'Writing a new version…' : null;
   const counts = post ? { chars: [...post.caption].length, tags: (post.caption.match(/#[\p{L}\p{N}_]+/gu) || []).length } : null;
   const score = post?.viralityScore ?? 0;
+  const canEditVisual = !!post && !isPublished;
 
   /* ── Pieces ── */
-  const previewBlock = (
-    <>
-      <PreviewTabs value={previewPlatform} onChange={setPreviewPlatform} />
-      <PostPreview
-        platform={previewPlatform}
-        businessName={profile.businessName}
-        initials={initials}
-        caption={post?.caption}
-        imageUrl={post?.imageUrl}
-        likes={fakeLikes}
-        loadingImage={loadingImage}
-      />
-    </>
+  const preview = (
+    <PhonePreview
+      key={post?.id ?? 'new'}
+      businessName={profile.businessName}
+      caption={post?.caption}
+      imageUrl={post?.imageUrl}
+      loadingImage={loadingImage}
+      onDropImage={canEditVisual ? onPhotoFile : undefined}
+    />
   );
 
   const saveIndicator = post && (
-    <span className={`ps-save ps-save--${saveState}`} aria-live="polite">
+    <span className="inline-flex items-center gap-1 [&_svg]:h-3 [&_svg]:w-3" aria-live="polite">
       {saveState === 'saved' && <><Check /> Saved</>}
       {saveState === 'saving' && <><Loader2 className="animate-spin" /> Saving…</>}
-      {saveState === 'dirty' && <><i /> Unsaved changes</>}
+      {saveState === 'dirty' && <><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes</>}
       {saveState === 'error' && (
-        <>
+        <span className="inline-flex items-center gap-1 text-[var(--danger)]">
           <CircleAlert /> Couldn’t save
-          <button type="button" onClick={save}>Retry</button>
-        </>
+          <button type="button" onClick={save} className="font-bold underline">Retry</button>
+        </span>
       )}
     </span>
   );
 
   return (
-    <div className="kw-composer-overlay" role="presentation">
-      <div className="kw-composer-backdrop" onClick={close} aria-hidden="true" />
+    <div className="fixed inset-0 z-[90] flex items-center justify-center sm:p-6" role="presentation">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
 
       <div
         ref={dialogRef}
@@ -575,87 +485,144 @@ const PostComposer: React.FC<Props> = ({
         aria-modal="true"
         aria-label={`Compose post for ${dateLabel}`}
         tabIndex={-1}
-        className="kw-composer ps"
+        className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-[var(--bg)] text-[var(--fg)] outline-none animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:border sm:border-[var(--border-strong)] sm:shadow-2xl"
       >
         {/* ── Header ── */}
-        <header className="ps-head">
-          <span className="ps-head__date">{dateLabel}</span>
-          <div className="ps-head__title">
-            <h2 title={heading}>{heading}</h2>
-            <div className="ps-head__meta">
-              <span className={STATUS_STYLE[statusLabel] || STATUS_STYLE.New}>{statusLabel}</span>
-              {post?.format && <span className="ps-head__format">{post.format} post</span>}
+        <header className="flex items-start gap-3 border-b border-[var(--border)] bg-[var(--card)] px-5 py-4 sm:px-6">
+          <span className="mt-0.5 shrink-0 rounded-full border border-badge-border bg-badge px-2.5 py-1 text-xs font-bold text-badge-text">
+            {dateLabel}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-bold leading-snug" title={heading}>{heading}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--fg-muted)]">
+              {post ? (
+                <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
+              ) : (
+                <span className="rounded-full border border-dashed border-[var(--border-strong)] px-1.5 text-[10.5px] font-semibold leading-4">New</span>
+              )}
+              {post?.format && <span>{normalizeFormat(post.format)} post</span>}
+              {profile.brandVoice && (
+                <span className="inline-flex items-center gap-1" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
+                  <AudioLines className="h-3.5 w-3.5 text-[var(--primary)]" aria-hidden />
+                  Tuned to: <b className="font-semibold text-[var(--fg)]">{profile.brandVoice}</b>
+                </span>
+              )}
               {saveIndicator}
             </div>
           </div>
-          <button type="button" onClick={close} aria-label="Close composer" className="kw-composer__close">
-            <X className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Close composer"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-[var(--bg-alt)] hover:text-[var(--fg)]"
+          >
+            <X className="h-5 w-5" />
           </button>
         </header>
 
-        {/* ── Body ── */}
-        <div className="ps-body">
-          <div className="ps-main">
+        {/* ── Body: studio | phone ── */}
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-h-0 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
             {!post ? (
-              <div className="ps-start">
-                {generatingPost ? (
-                  <>
-                    <span className="ps-start__icon is-busy"><Sparkles /></span>
-                    <h3>Kawayan is drafting your post</h3>
-                    <p>This takes about 20 seconds.</p>
-                    <GeneratingSteps />
-                  </>
-                ) : (
-                  <>
-                    <span className="ps-start__icon"><Sparkles /></span>
-                    <h3>{currentIdea ? 'Ready when you are' : 'Nothing planned for this day yet'}</h3>
-                    {currentIdea ? (
-                      <div className="ps-brief">
-                        <span className="ps-brief__k">From your monthly plan</span>
-                        <b>{currentIdea.title}</b>
-                        <p>{currentIdea.topic}</p>
-                        <span className="ps-brief__tag">{currentIdea.format} post</span>
-                      </div>
-                    ) : (
-                      <p>Kawayan can write a Taglish caption and make a matching visual for this day.</p>
-                    )}
-                    <button type="button" onClick={runGenerate} className="ps-start__cta">
-                      <Wand2 className="w-4 h-4" /> Write it with AI
-                    </button>
-                    <span className="ps-start__note">Caption, virality score and visual in one go.</span>
-                    <button type="button" onClick={() => onAddOn(selectedDay)} className="ps-start__addon">
-                      <Plus className="w-3.5 h-3.5" /> Or buy a single extra post · ₱{addOnPrice}
-                    </button>
-                  </>
+              <form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy}>
+                <p className="text-xs font-semibold text-[var(--fg-muted)]">{currentIdea ? `From your ${monthName} plan` : `${dateLabel} · nothing planned yet`}</p>
+                <h3 className="mb-4 mt-1 font-display text-2xl font-bold tracking-tight">
+                  {limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'}
+                </h3>
+                {limitReached && <p className="-mt-2 mb-4 text-sm text-[var(--fg-muted)]">Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>}
+
+                <div className={clsx(FIELD, 'p-4')}>
+                  <TextareaAutosize
+                    className="block w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none placeholder:text-[var(--fg-subtle)]"
+                    minRows={4}
+                    maxRows={12}
+                    maxLength={400}
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitBrief();
+                    }}
+                    readOnly={generatingPost || extraBusy}
+                    placeholder="e.g. Behind the scenes of our 5 AM bake, and 10% off pandesal this weekend"
+                    aria-label="What the post is about"
+                    aria-invalid={!!extraError}
+                    aria-describedby="ps-brief-msg"
+                  />
+                </div>
+
+                {!limitReached && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <span className={LABEL}>Format</span>
+                    <FormatPicker value={format} onChange={setFormat} disabled={generatingPost} />
+                  </div>
                 )}
-              </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={brief.trim().length < 3 || generatingPost || extraBusy}
+                    className="inline-flex items-center gap-2 rounded-full border border-brand/50 bg-brand/10 px-4 py-2 text-sm font-semibold text-[var(--primary)] transition-colors hover:bg-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {generatingPost || extraBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
+                    <span className="ml-1 inline-flex gap-0.5 opacity-70" aria-hidden>
+                      <kbd className="rounded border border-brand/40 px-1 font-sans text-[10.5px]">{MOD_KEY}</kbd>
+                      <kbd className="rounded border border-brand/40 px-1 font-sans text-[10.5px]">↵</kbd>
+                    </span>
+                  </button>
+                </div>
+
+                {generatingPost ? (
+                  <GeneratingSteps />
+                ) : limitReached ? (
+                  <p
+                    id="ps-brief-msg"
+                    className={clsx('mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] [&_button]:font-semibold [&_button]:text-[var(--primary)] [&_button:hover]:underline', extraError ? 'text-[var(--danger)]' : 'text-[var(--fg-muted)]')}
+                    role={extraError ? 'alert' : undefined}
+                  >
+                    {extraError || (walletBalance != null ? `Wallet balance: ₱${walletBalance.toLocaleString('en-PH')}.` : 'Paid from your Kawayan wallet.')}
+                    {(extraError || (walletBalance != null && walletBalance < addOnPrice)) && (
+                      <button type="button" onClick={onOpenBilling}>Top up</button>
+                    )}
+                    {planPostCount < 16 && (
+                      <button type="button" onClick={onOpenBilling}>Or upgrade to Pro for 16 posts a month</button>
+                    )}
+                  </p>
+                ) : (
+                  <p id="ps-brief-msg" className="mt-4 text-[13px] text-[var(--fg-muted)]">
+                    Kawayan writes the caption, scores it and makes a matching image. About 20 seconds.
+                  </p>
+                )}
+              </form>
             ) : (
               <>
                 {isPublished && (
-                  <p className="ps-note ps-note--live">
-                    <Check /> This post is live, so editing is turned off.
+                  <p className="flex flex-wrap items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-[13px] text-[var(--fg)]">
+                    <Check className="h-4 w-4 text-[var(--primary)]" /> This post is live, so editing is turned off.
                     {post.externalLink && (
-                      <a href={post.externalLink} target="_blank" rel="noreferrer">View post <ExternalLink /></a>
+                      <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-[var(--primary)] hover:underline">
+                        View post <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
                     )}
                   </p>
                 )}
                 {isScheduled && (
-                  <p className="ps-note">
-                    <Clock /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
+                  <p className="flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                    <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
                   </p>
                 )}
 
                 {/* Caption + AI co-writer */}
-                <section className={`ps-card ps-caption${busyLabel ? ' is-busy' : ''}`}>
-                  <div className="ps-card__head">
+                <section className={CARD}>
+                  <div className={CARD_HEAD}>
                     <label htmlFor="ps-caption-text">Caption</label>
                     {counts && (
-                      <span className={`ps-count${counts.chars > IG_CAPTION_LIMIT ? ' is-over' : ''}`}>
+                      <span className={clsx('text-xs font-normal tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-[var(--danger)]' : 'text-[var(--fg-subtle)]')}>
                         {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
                       </span>
                     )}
                   </div>
-                  <div className="ps-caption__field">
+                  <div className={clsx(FIELD, 'relative')}>
                     <textarea
                       id="ps-caption-text"
                       rows={7}
@@ -663,42 +630,43 @@ const PostComposer: React.FC<Props> = ({
                       readOnly={isPublished || !!busyLabel}
                       onChange={(e) => setGeneratedContent({ ...post, caption: e.target.value })}
                       placeholder="Write your Taglish caption…"
+                      className="block min-h-[168px] w-full resize-y bg-transparent p-4 text-[14.5px] leading-relaxed outline-none placeholder:text-[var(--fg-subtle)]"
                     />
                     {busyLabel && (
-                      <div className="ps-caption__busy" aria-live="polite">
-                        <Sparkles /> {busyLabel}
+                      <div className="absolute inset-0 grid place-items-center rounded-xl bg-[color-mix(in_srgb,var(--card)_78%,transparent)] text-sm font-semibold" aria-live="polite">
+                        <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin text-[var(--primary)]" /> {busyLabel}</span>
                       </div>
                     )}
                   </div>
 
                   {lastEdit && !busyLabel && (
-                    <div className="ps-change">
-                      <Check className="ps-change__ok" />
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-[var(--fg-muted)]">
+                      <Check className="h-3.5 w-3.5 text-[var(--primary)]" />
                       <span>{lastEdit.label}</span>
                       {lastEdit.delta != null && lastEdit.delta !== 0 && (
-                        <span className={`ps-change__delta ${lastEdit.delta > 0 ? 'is-up' : 'is-down'}`}>
+                        <span className={clsx('rounded-full px-1.5 font-semibold', lastEdit.delta > 0 ? 'bg-brand/15 text-[var(--primary)]' : 'bg-red-500/10 text-[var(--danger)]')}>
                           Score {lastEdit.delta > 0 ? '+' : '−'}{Math.abs(lastEdit.delta)}
                         </span>
                       )}
                       {undoStack.length > 0 && (
-                        <button type="button" onClick={undo} className="ps-change__undo">
-                          <Undo2 /> Undo
+                        <button type="button" onClick={undo} className="ml-auto inline-flex items-center gap-1 font-semibold text-[var(--fg)] hover:underline">
+                          <Undo2 className="h-3.5 w-3.5" /> Undo
                         </button>
                       )}
                     </div>
                   )}
 
                   {!isPublished && (
-                    <div className="ps-ai">
-                      <div className="ps-ai__chips" role="group" aria-label="Quick AI edits">
+                    <div className="mt-3 space-y-2.5">
+                      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick AI edits">
                         {QUICK_EDITS.map(({ label, Icon, instruction }) => (
-                          <button key={label} type="button" disabled={!!aiBusy} onClick={() => runEdit(label, instruction)}>
+                          <button key={label} type="button" className={CHIP} disabled={!!aiBusy} onClick={() => runEdit(label, instruction)}>
                             {aiBusy === label ? <Loader2 className="animate-spin" /> : <Icon />} {label}
                           </button>
                         ))}
                       </div>
-                      <form className="ps-ai__ask" onSubmit={submitAsk}>
-                        <Sparkles aria-hidden />
+                      <form onSubmit={submitAsk} className={clsx(FIELD, 'flex items-center gap-2 py-1 pl-3 pr-1')}>
+                        <PencilLine className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden />
                         <input
                           value={ask}
                           onChange={(e) => setAsk(e.target.value)}
@@ -706,8 +674,9 @@ const PostComposer: React.FC<Props> = ({
                           disabled={!!aiBusy}
                           placeholder="Tell Kawayan what to change, e.g. “mention our 20% weekend promo”"
                           aria-label="Tell Kawayan what to change"
+                          className="min-w-0 flex-1 bg-transparent py-1.5 text-[13.5px] outline-none placeholder:text-[var(--fg-subtle)]"
                         />
-                        <button type="submit" disabled={!ask.trim() || !!aiBusy} aria-label="Rewrite with this instruction">
+                        <button type="submit" disabled={!ask.trim() || !!aiBusy} aria-label="Rewrite with this instruction" className={clsx(PRIMARY_BTN, 'h-8 w-8 p-0')}>
                           <ArrowUp />
                         </button>
                       </form>
@@ -715,64 +684,84 @@ const PostComposer: React.FC<Props> = ({
                   )}
                 </section>
 
-                <div className="ps-row">
+                <div className="grid gap-4 md:grid-cols-2">
                   {/* Visual */}
-                  <section className="ps-card ps-visual">
-                    <div className="ps-card__head">
-                      <span>Visual</span>
-                    </div>
-                    <div className={`ps-visual__frame${loadingImage ? ' is-busy' : ''}`}>
-                      {post.imageUrl ? <img src={post.imageUrl} alt="Post visual" /> : <ImageIcon className="ps-visual__empty" />}
-                      {loadingImage && <span className="ps-visual__busy"><Loader2 className="animate-spin" /> Creating a new visual…</span>}
+                  <section className={CARD}>
+                    <div className={CARD_HEAD}><span>Visual</span></div>
+                    <div className="relative aspect-square overflow-hidden rounded-xl bg-[var(--bg-alt)]">
+                      {post.imageUrl ? (
+                        <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-[var(--fg-subtle)]" aria-hidden />
+                      )}
+                      {loadingImage && (
+                        <span className="absolute inset-0 grid place-items-center bg-black/45 text-sm font-semibold text-white">
+                          <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Creating a new visual…</span>
+                        </span>
+                      )}
                     </div>
                     {!isPublished && (
-                      <div className="ps-visual__actions">
-                        <button type="button" onClick={onGenerateImage} disabled={loadingImage}>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <button type="button" className={CHIP} onClick={onGenerateImage} disabled={loadingImage}>
                           <RefreshCcw /> {post.imageUrl ? 'New image' : 'Create image'}
                         </button>
-                        <button type="button" onClick={() => photoInputRef.current?.click()}>
+                        <button type="button" className={CHIP} onClick={() => photoInputRef.current?.click()}>
                           <Upload /> Upload photo
                         </button>
-                        <button type="button" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
-                          <PencilLine /> Prompt <ChevronDown className={showPrompt ? 'is-flipped' : ''} />
+                        <button type="button" className={CHIP} onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
+                          <PencilLine /> Prompt <ChevronDown className={clsx('transition-transform', showPrompt && 'rotate-180')} />
                         </button>
                       </div>
                     )}
                     {showPrompt && (
-                      <div className="ps-visual__prompt">
-                        <textarea
-                          rows={3}
-                          value={post.imagePrompt}
-                          onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })}
-                          aria-label="Image prompt"
-                        />
-                        <span>Describe the picture in English. “New image” uses this.</span>
+                      <div className="mt-3">
+                        <div className={FIELD}>
+                          <textarea
+                            rows={3}
+                            value={post.imagePrompt}
+                            onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })}
+                            aria-label="Image prompt"
+                            className="block w-full resize-y bg-transparent p-3 text-[13px] outline-none"
+                          />
+                        </div>
+                        <span className="mt-1.5 block text-xs text-[var(--fg-muted)]">Describe the picture in English. “New image” uses this.</span>
                       </div>
                     )}
-                    <input ref={photoInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={onPhotoUpload} />
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onPhotoFile(file);
+                        e.target.value = '';
+                      }}
+                    />
                   </section>
 
-                  {/* Score + versions */}
-                  <div className="ps-side">
-                    <section className="ps-card ps-score">
-                      <div className="ps-card__head">
+                  {/* Score, start over, versions */}
+                  <div className="space-y-4">
+                    <section className={CARD}>
+                      <div className={CARD_HEAD}>
                         <span>Virality score</span>
-                        <span className="ps-score__word">{scoreWord(score)}</span>
+                        <span className="text-xs font-semibold text-[var(--primary)]">{scoreWord(score)}</span>
                       </div>
-                      <div className="ps-score__body">
+                      <div className="flex items-center gap-4">
                         <ScoreRing score={score} />
-                        <p>{post.viralityReason || 'Kawayan’s AI rates how likely the caption is to get shared.'}</p>
+                        <p className="text-[13px] leading-relaxed text-[var(--fg-muted)]">{post.viralityReason || 'Kawayan’s AI rates how likely the caption is to get shared.'}</p>
                       </div>
                     </section>
 
                     {!isPublished && (
-                      <section className="ps-card ps-redo">
-                        <div>
-                          <b>Start over</b>
-                          <span>New caption, score and visual from the same idea.</span>
+                      <section className={clsx(CARD, 'flex flex-wrap items-center justify-between gap-3')}>
+                        <div className="text-[13px]">
+                          <b className="block font-semibold">Start over</b>
+                          <span className="text-[var(--fg-muted)]">New caption, score and visual from the same idea.</span>
                         </div>
                         <button
                           type="button"
+                          className={CHIP}
                           onClick={() => {
                             setRedoing(true);
                             runGenerate();
@@ -786,104 +775,131 @@ const PostComposer: React.FC<Props> = ({
                     )}
 
                     {post.history?.length > 0 && (
-                      <section className="ps-card ps-versions">
-                        <div className="ps-card__head">
-                          <span><History /> Earlier versions</span>
+                      <section className={CARD}>
+                        <div className={CARD_HEAD}>
+                          <span className="inline-flex items-center gap-1.5"><History className="h-4 w-4 text-[var(--fg-muted)]" /> Earlier versions</span>
                         </div>
-                        {post.history.map((v, i) => (
-                          <div key={`${v.createdAt}-${i}`} className="ps-version">
-                            <p>{v.caption}</p>
-                            <div>
-                              {v.viralityScore != null && <span className="ps-version__score">{v.viralityScore}</span>}
-                              {!isPublished && (
-                                <button type="button" onClick={() => restoreVersion(i)}>Use this</button>
-                              )}
+                        <div className="space-y-2">
+                          {post.history.map((v, i) => (
+                            <div key={`${v.createdAt}-${i}`} className="rounded-xl bg-[var(--bg-alt)] p-3 text-[13px]">
+                              <p className="line-clamp-3 text-[var(--fg-muted)]">{v.caption}</p>
+                              <div className="mt-2 flex items-center justify-between">
+                                {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
+                                {!isPublished && (
+                                  <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-semibold text-[var(--primary)] hover:underline">Use this</button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </section>
                     )}
                   </div>
                 </div>
-
-                <details className="ps-mpreview">
-                  <summary>Preview on Instagram, Facebook and TikTok</summary>
-                  {previewBlock}
-                </details>
               </>
             )}
+
+            <details className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 lg:hidden">
+              <summary className="cursor-pointer text-[13px] font-semibold">Preview on Instagram, Facebook and TikTok</summary>
+              <div className="mt-4">{preview}</div>
+            </details>
           </div>
 
-          <aside className="ps-rail">
-            <span className="ps-rail__label">Live preview</span>
-            {previewBlock}
+          <aside className="hidden min-h-0 flex-col items-center gap-3 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg-alt)] px-6 py-5 lg:flex">
+            <span className={clsx(LABEL, 'self-start')}>Live preview</span>
+            {preview}
           </aside>
         </div>
 
-        {/* ── Publish bar ── */}
-        <footer className="ps-foot">
+        {/* ── Where + when, paired with publish ── */}
+        <footer className="flex flex-wrap items-center gap-3 border-t border-[var(--border)] bg-[var(--card)] px-5 py-3 sm:px-6">
+          <p className="hidden text-xs text-[var(--fg-muted)] md:block">
+            {post ? 'Drafts save as you type.' : 'Draft the post, then pick where and when it goes out.'}
+          </p>
           {isPublished ? (
-            <div className="ps-foot__state">
-              <span className="ps-foot__live"><Check /> Published</span>
+            <div className="ml-auto flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--primary)]"><Check className="h-4 w-4" /> Published</span>
               {post?.externalLink && (
                 <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
-                  View post <ExternalLink className="w-3.5 h-3.5" />
+                  View post <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               )}
             </div>
           ) : isScheduled ? (
-            <div className="ps-foot__state">
-              <span className="ps-foot__queued"><CalendarClock /> Scheduled for {longDate(post!.date)}</span>
-            </div>
+            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300">
+              <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
+            </span>
           ) : (
-            <div className="ps-foot__publish" ref={planRef}>
+            <div className="relative ml-auto flex items-stretch" ref={planRef}>
               <button
                 type="button"
-                className="ps-plan"
                 onClick={() => setPlanOpen((v) => !v)}
                 disabled={!post}
                 aria-expanded={planOpen}
                 aria-haspopup="dialog"
+                className="flex items-center gap-2.5 rounded-l-full border border-r-0 border-[var(--border-strong)] bg-[var(--bg-alt)] py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-[var(--card-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span className="ps-plan__avatars" aria-hidden>
+                <span className="flex -space-x-1" aria-hidden>
                   {chosenAccounts.length > 0
-                    ? chosenAccounts.map((a) => <span key={a.id}><PlatformIcon platform={a.platform} /></span>)
-                    : <span><Globe className="w-3.5 h-3.5" /></span>}
+                    ? chosenAccounts.map((a) => (
+                        <span key={a.id} className="grid h-6 w-6 place-items-center rounded-full bg-[var(--card)] ring-2 ring-[var(--bg-alt)]">
+                          <PlatformIcon platform={a.platform} />
+                        </span>
+                      ))
+                    : <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--card)]"><Globe className="h-3.5 w-3.5 text-[var(--fg-muted)]" /></span>}
                 </span>
-                <span className="ps-plan__text">
-                  <b>{whereLabel}</b>
-                  <small>{whenLabel}</small>
+                <span className="min-w-0">
+                  <b className="block max-w-[180px] truncate text-[13px] font-semibold">{whereLabel}</b>
+                  <small className="block text-[11px] text-[var(--fg-muted)]">{whenLabel}</small>
                 </span>
-                <ChevronDown className={`ps-plan__chev${planOpen ? ' is-flipped' : ''}`} />
+                <ChevronDown className={clsx('h-4 w-4 text-[var(--fg-muted)] transition-transform', planOpen && 'rotate-180')} />
               </button>
 
-              <button type="button" className="ps-cta" onClick={publish} disabled={ctaDisabled}>
-                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'now' ? <Send className="w-4 h-4" /> : <CalendarClock className="w-4 h-4" />}
+              <button type="button" className={clsx(PRIMARY_BTN, 'rounded-l-none')} onClick={publish} disabled={ctaDisabled}>
+                {publishing ? <Loader2 className="animate-spin" /> : mode === 'now' ? <Send /> : <CalendarClock />}
                 {publishing ? 'Sending…' : ctaLabel}
+                {!publishing && mode === 'schedule' && accounts?.length !== 0 && <ArrowUpRight />}
               </button>
 
               {planOpen && post && (
-                <div className="ps-pop" role="dialog" aria-label="Where and when to post">
-                  <div className="ps-seg" role="radiogroup" aria-label="When">
-                    <button type="button" role="radio" aria-checked={mode === 'schedule'} disabled={!canSchedule} onClick={() => setMode('schedule')}>
-                      <CalendarClock /> Schedule
-                    </button>
-                    <button type="button" role="radio" aria-checked={mode === 'now'} onClick={() => setMode('now')}>
-                      <Send /> Post now
-                    </button>
+                <div
+                  role="dialog"
+                  aria-label="Where and when to post"
+                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-2xl border border-[var(--border-strong)] bg-[var(--card)] p-4 shadow-xl"
+                >
+                  <div className="grid grid-cols-2 gap-1 rounded-full bg-[var(--bg-alt)] p-1" role="radiogroup" aria-label="When">
+                    {([
+                      ['schedule', CalendarClock, 'Schedule', !canSchedule],
+                      ['now', Send, 'Post now', false],
+                    ] as const).map(([value, Icon, label, disabled]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={mode === value}
+                        disabled={disabled}
+                        onClick={() => setMode(value)}
+                        className={clsx(
+                          'inline-flex items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors disabled:opacity-40',
+                          mode === value ? 'bg-[var(--card)] text-[var(--fg)] shadow-sm ring-1 ring-[var(--border-strong)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]',
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" /> {label}
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="ps-pop__sec">
-                    <span className="ps-pop__label">Post to</span>
+                  <div className="space-y-2">
+                    <span className={LABEL}>Post to</span>
                     {accounts === null ? (
-                      <span className="ps-pop__muted"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading your pages…</span>
+                      <span className="flex items-center gap-1.5 text-xs text-[var(--fg-muted)]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading your pages…</span>
                     ) : accounts.length === 0 ? (
-                      <div className="ps-pop__empty">
-                        <span>{accountsError || 'Connect your Facebook Page or Instagram account first.'}</span>
+                      <div className="space-y-2 text-[13px] text-[var(--fg-muted)]">
+                        <p>{accountsError || 'Connect your Facebook Page or Instagram account first.'}</p>
                         <button type="button" className="btn btn-outline btn-sm" onClick={onOpenSocial}>Connect a page</button>
                       </div>
                     ) : (
-                      <div className="ps-pop__accounts">
+                      <div className="space-y-1.5">
                         {accounts.map((a) => {
                           const on = chosen.includes(a.id);
                           return (
@@ -892,12 +908,18 @@ const PostComposer: React.FC<Props> = ({
                               type="button"
                               role="checkbox"
                               aria-checked={on}
-                              className={on ? 'is-on' : ''}
                               onClick={() => setChosen((ids) => (on ? ids.filter((id) => id !== a.id) : [...ids, a.id]))}
+                              className={clsx(
+                                'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors',
+                                on ? 'border-brand/50 bg-brand/10' : 'border-[var(--border)] hover:border-[var(--border-strong)]',
+                              )}
                             >
-                              <PlatformIcon platform={a.platform} className="w-4 h-4" />
-                              <span>@{a.username}</span>
-                              <i>{on && <Check />}</i>
+                              <PlatformIcon platform={a.platform} className="h-4 w-4" />
+                              <span className="flex-1 font-medium">@{a.username}</span>
+                              {!a.isActive && <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-300">Needs reconnecting</span>}
+                              <span className={clsx('grid h-4 w-4 place-items-center rounded border', on ? 'border-transparent bg-brand text-on-brand' : 'border-[var(--border-strong)]')}>
+                                {on && <Check className="h-3 w-3" strokeWidth={3} />}
+                              </span>
                             </button>
                           );
                         })}
@@ -906,31 +928,48 @@ const PostComposer: React.FC<Props> = ({
                   </div>
 
                   {mode === 'schedule' ? (
-                    <div className="ps-pop__sec">
-                      <span className="ps-pop__label">Time on {longDate(post.date)}</span>
-                      <div className="ps-slots">
+                    <div className="space-y-2">
+                      <span className={LABEL}>Time on {longDate(post.date)}</span>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {SUGGESTED_TIMES.map((s) => {
                           const past = isPast(post.date, s.time);
                           return (
-                            <button key={s.time} type="button" aria-pressed={time === s.time} disabled={past} onClick={() => setTime(s.time)}>
-                              <b>{to12h(s.time)}</b>
-                              <small>{past ? 'Passed' : s.label}</small>
-                              {s.best && !past && <em>Best</em>}
+                            <button
+                              key={s.time}
+                              type="button"
+                              aria-pressed={time === s.time}
+                              disabled={past}
+                              onClick={() => setTime(s.time)}
+                              className={clsx(
+                                'relative rounded-xl border p-2 text-left transition-colors disabled:opacity-40',
+                                time === s.time ? 'border-brand/60 bg-brand/10' : 'border-[var(--border)] hover:border-[var(--border-strong)]',
+                              )}
+                            >
+                              <b className="block text-[13px] font-semibold">{to12h(s.time)}</b>
+                              <small className="block text-[11px] text-[var(--fg-muted)]">{past ? 'Passed' : s.label}</small>
+                              {s.best && !past && (
+                                <em className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 text-[9.5px] font-bold not-italic text-on-brand">Best</em>
+                              )}
                             </button>
                           );
                         })}
                       </div>
-                      <label className="ps-custom">
-                        <Clock /> Other time
-                        <input type="time" value={time} onChange={(e) => e.target.value && setTime(e.target.value)} />
+                      <label className="flex items-center gap-2 text-[13px] text-[var(--fg-muted)]">
+                        <Clock className="h-4 w-4" /> Other time
+                        <input
+                          type="time"
+                          value={time}
+                          onChange={(e) => e.target.value && setTime(e.target.value)}
+                          className="ml-auto rounded-lg border border-[var(--border)] bg-[var(--bg-alt)] px-2 py-1 text-[var(--fg)] outline-none focus:border-brand"
+                        />
                       </label>
-                      {!timeOk && <span className="ps-pop__warn">That time has passed. Pick a later one.</span>}
-                      <span className="ps-pop__muted">Suggested times are when Filipino audiences are usually online. All times are in your local time zone.</span>
+                      {!timeOk && <p className="text-xs font-semibold text-[var(--danger)]">That time has passed. Pick a later one.</p>}
+                      <p className="text-xs text-[var(--fg-subtle)]">Suggested times are when Filipino audiences are usually online. All times are in your local time zone.</p>
                     </div>
                   ) : (
-                    <p className="ps-pop__muted ps-pop__sec">Goes out as soon as you press Post now.</p>
+                    <p className="text-xs text-[var(--fg-muted)]">Goes out as soon as you press Post now.</p>
                   )}
-                  {!canSchedule && <span className="ps-pop__muted">This day has passed, so the post can only go out now.</span>}
+                  {!canSchedule && <p className="text-xs text-[var(--fg-muted)]">This day has passed, so the post can only go out now.</p>}
                 </div>
               )}
             </div>

@@ -619,7 +619,8 @@ export class SupabaseService {
     if (error) throw error;
   }
 
-  async approveTransaction(transactionId: string): Promise<void> {
+  /** applyToBalance=false completes a payment made straight to PayMongo (e.g. Pro), leaving the wallet alone. */
+  async approveTransaction(transactionId: string, applyToBalance = true): Promise<void> {
     // Flip PENDING -> COMPLETED in one conditional update so two concurrent approvals
     // (e.g. a double "verify" on page load) can't both credit the wallet.
     const { data: txn, error: updateError } = await this.supabase
@@ -631,6 +632,7 @@ export class SupabaseService {
       .maybeSingle();
     if (updateError) throw updateError;
     if (!txn) throw new Error('Pending transaction not found');
+    if (!applyToBalance) return;
 
     const balanceChange = txn.type === 'CREDIT' ? txn.amount : -txn.amount;
     const { error: walletError } = await this.supabase.rpc('update_wallet_balance', {

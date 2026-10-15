@@ -2,14 +2,18 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ViewState, BrandProfile, User, VerificationStatus } from './types';
 import BrandSurvey from './components/BrandSurvey';
-import ContentCalendar from './components/ContentCalendar';
+import ContentCalendar, { CalendarIntent } from './components/ContentCalendar';
+import DashboardLayout from './components/layout/DashboardLayout';
+import { useToast } from './components/ui/Toast';
 import AdminDashboard from './components/AdminDashboard';
 import Login from './components/Login';
 import ResetPassword from './components/auth/ResetPassword';
 import LandingPage from './components/LandingPage';
 import LandingNav from './components/landing/LandingNav';
 import Settings from './components/Settings';
-import SupportWidget from './components/SupportWidget';
+import AccessibilityWidget from './components/AccessibilityWidget';
+import AccountMenu from './components/AccountMenu';
+import { usePhone } from './utils/usePhone';
 import InsightsDashboard from './components/InsightsDashboard';
 import SocialAccounts from './components/SocialAccounts';
 import Billing from './components/Billing';
@@ -32,10 +36,11 @@ import {
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
-import { CalendarDays, LogOut, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
+import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
+  const toast = useToast();
   const [isHydrating, setIsHydrating] = useState(false);
   const [view, setView] = useState<ViewState>(() => {
     if (hasPersistedSession()) {
@@ -56,6 +61,8 @@ const App: React.FC = () => {
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  // Shell → calendar requests (Create post, search hits, notifications).
+  const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
   const loginInProgressRef = useRef(false);
   const sessionRestoredRef = useRef(false);
   const handleLoginRef = useRef<(user: User, initialView?: ViewState) => Promise<void>>(async () => {});
@@ -147,6 +154,13 @@ const App: React.FC = () => {
   }, [continueAsUser, dbService]);
 
   handleLoginRef.current = handleLogin;
+
+  // A login from the sign-in form (not a restored session) gets the island greeting.
+  const handleFreshLogin = async (loggedInUser: User, initialView?: ViewState) => {
+    await handleLogin(loggedInUser, initialView);
+    const who = loggedInUser.role === 'admin' ? 'administrator' : loggedInUser.role === 'support' ? 'support staff' : loggedInUser.businessName || loggedInUser.email;
+    toast.success(`Signed in as ${who}`);
+  };
 
   useEffect(() => {
     console.log('Initializing Kawayan AI App...');
@@ -423,6 +437,16 @@ const App: React.FC = () => {
 
   // Safe navigation guard for logged in users
   const isLoggedIn = user !== null;
+  const phone = usePhone();
+  const showNav = isLoggedIn && user?.role !== 'admin' && !(user?.role === 'user' && verifStatus !== 'verified');
+  const navItems = [
+    { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
+    { id: ViewState.CALENDAR, label: 'Timeline', icon: ChartGantt, roles: ['user'] },
+    { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
+    { id: ViewState.SOCIAL, label: 'Social', icon: Share2, roles: ['user'] },
+    { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
+    { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
+  ].filter((item) => item.roles.includes(user?.role || ''));
 
   // A 'user' account that isn't verified yet must stay on the verification
   // screen — used by every user-clickable nav trigger (pills, brand mark).
@@ -449,12 +473,141 @@ const App: React.FC = () => {
     if (user) markTourDone(user.id);
   };
 
+  const requestCalendar = (intent: CalendarIntent) => {
+    setCalendarIntent(intent);
+    goTo(ViewState.CALENDAR);
+  };
+
   const authViews = [ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN, ViewState.RESET_PASSWORD];
   const isAuthView = authViews.includes(view);
   const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
 
+  const accountActions = {
+    onSignOut: handleLogout,
+    onSwitchAccount: async () => {
+      await handleLogout();
+      navigateView(ViewState.LOGIN);
+    },
+    onSettings: showNav && (user?.role === 'user' || user?.role === 'support') ? () => goTo(ViewState.SETTINGS) : undefined,
+    onBilling: showNav && user?.role === 'user' ? () => goTo(ViewState.BILLING) : undefined,
+  };
+  // The admin console brings its own top bar and sidebar, edge to edge.
+  const adminConsole = user?.role === 'admin' && view === ViewState.ADMIN_DASHBOARD && !blockForHydration;
+  const pageClass = `w-full ${
+    isAuthView ? 'min-h-[calc(100vh-0px)]' :
+    view === ViewState.LANDING ? '' :
+    view === ViewState.CALENDAR ? 'max-w-full mx-auto py-4 px-2 sm:px-4 lg:px-6' :
+    adminConsole ? '' :
+    (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
+    'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
+  }`;
+
+  const page = blockForHydration ? (
+    <AppHydrationLoader />
+  ) : (
+    <Routes>
+      <Route path="*" element={
+        (() => {
+          switch (view) {
+            case ViewState.LANDING:
+              return <LandingPage onNavigate={navigateView} />;
+            case ViewState.LOGIN:
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+            case ViewState.SIGNUP:
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+            case ViewState.ADMIN_LOGIN:
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+            case ViewState.RESET_PASSWORD:
+              return <ResetPassword token={resetToken} onNavigate={navigateView} />;
+            case ViewState.VERIFICATION:
+              return (
+                <VerificationStatusScreen
+                  userId={user?.id}
+                  status={verifStatus}
+                  rejectionReason={verifRejectionReason}
+                  businessName={user?.businessName}
+                  onLogout={handleLogout}
+                  onResubmit={handleVerifResubmit}
+                  onSessionExpired={handleSessionExpired}
+                  onVerified={handleVerified}
+                />
+              );
+            case ViewState.SURVEY:
+              return <BrandSurvey onComplete={handleSurveyComplete} businessName={user?.businessName} />;
+            case ViewState.CALENDAR:
+              if (user?.role === 'support') {
+                return (
+                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-10 animate-fade-in">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2" style={{ background: 'rgba(43,87,72,0.1)' }}>
+                      <MessageSquare className="w-7 h-7 text-[#2B5748]" />
+                    </div>
+                    <h2 className="text-xl font-bold" style={{ color: 'var(--fg)' }}>Support Dashboard</h2>
+                    <p className="text-sm max-w-sm" style={{ color: 'var(--fg-muted)' }}>
+                      The content calendar is for SME accounts. Open your Support Dashboard to manage tickets and calls.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigateView(ViewState.SUPPORT_DASHBOARD)}
+                      className="btn btn-primary mt-2"
+                    >
+                      Open Support Dashboard
+                    </button>
+                  </div>
+                );
+              }
+              return (user && brandProfile) ? (
+                <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} intent={calendarIntent} onIntentDone={() => setCalendarIntent(null)} />
+              ) : user ? (
+                <AppHydrationLoader />
+              ) : (
+                <AppHydrationLoader />
+              );
+            case ViewState.SETTINGS:
+              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
+            case ViewState.INSIGHTS:
+              return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
+            case ViewState.SOCIAL:
+              return <SocialAccounts />;
+            case ViewState.BILLING:
+              return <Billing />;
+            case ViewState.SUPPORT_DASHBOARD:
+              return <SupportDashboard />;
+            case ViewState.ADMIN_DASHBOARD:
+              return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} user={user} {...accountActions} /> : (
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  <div className="text-center p-10">
+                    <p className="font-semibold" style={{ color: 'var(--fg)' }}>Access Denied</p>
+                  </div>
+                </div>
+              );
+            default:
+              return <LandingPage onNavigate={navigateView} />;
+          }
+        })()
+      } />
+    </Routes>
+  );
+
+  const accountMenu = user && <AccountMenu user={user} {...accountActions} />;
+
   return (
     <div className="min-h-screen flex flex-col transition-colors font-sans" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
+      {showNav && user ? (
+        <DashboardLayout
+          user={user}
+          view={view}
+          navItems={navItems}
+          phone={phone}
+          account={accountActions}
+          onNavigate={goTo}
+          onHome={() => goTo(getHomeViewForRole(user.role))}
+          onCreatePost={() => requestCalendar({ type: 'compose' })}
+          onOpenPost={(postId) => requestCalendar({ type: 'open', postId })}
+        >
+          <div className={pageClass}>{page}</div>
+        </DashboardLayout>
+      ) : (
+      <>
       {/* ── Navigation ────────────────────────────────────────────── */}
       {!isAuthView && view === ViewState.LANDING && !isLoggedIn && (
         <LandingNav
@@ -463,7 +616,7 @@ const App: React.FC = () => {
           toggleTheme={() => updateTheme(!darkMode)}
         />
       )}
-      {!isAuthView && !(view === ViewState.LANDING && !isLoggedIn) && (
+      {!isAuthView && !adminConsole && !(view === ViewState.LANDING && !isLoggedIn) && (
       <nav className="glass-panel sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-15" style={{ height: '3.75rem' }}>
@@ -490,49 +643,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2">
               {isLoggedIn ? (
                 <>
-                  {/* Role-based nav pills — hidden entirely (not just blocked)
-                      for a 'user' account that isn't verified yet. */}
-                  {user?.role !== 'admin' && !(user?.role === 'user' && verifStatus !== 'verified') && (
-                    <div className="flex items-center p-1 rounded-xl gap-0.5 border"
-                      style={{ background: 'var(--bg-alt)', borderColor: 'var(--border)' }}>
-                      {[
-                        { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
-                        { id: ViewState.CALENDAR, label: 'Calendar', icon: CalendarDays, roles: ['user'] },
-                        { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
-                        { id: ViewState.SOCIAL, label: 'Social', icon: Share2, roles: ['user'] },
-                        { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
-                        { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
-                      ].filter(item => item.roles.includes(user?.role || '')).map((item) => (
-                        <button
-                          key={item.id}
-                          data-tour={`nav-${item.label.toLowerCase()}`}
-                          onClick={() => goTo(item.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            view === item.id ? 'nav-item-active' : 'hover:text-[var(--fg)]'
-                          }`}
-                          style={view !== item.id ? { color: 'var(--fg-muted)' } : {}}
-                        >
-                          <item.icon className="w-3.5 h-3.5" />
-                          {/* Active pill shows its label from sm up; below that every
-                              pill is icon-only, or the row overflows on a phone. */}
-                          <span className={`${view === item.id ? 'hidden sm:inline' : 'hidden'} lg:inline`}>{item.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="w-px h-5 mx-1" style={{ background: 'var(--border)' }} />
-
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                    style={{ color: 'var(--fg-muted)' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 8%, transparent)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = ''; }}
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Sign Out</span>
-                  </button>
+                  {accountMenu}
                 </>
               ) : (
                 view === ViewState.LANDING && (
@@ -583,102 +694,13 @@ const App: React.FC = () => {
 
       {/* ── Main Content ──────────────────────────────────────────── */}
       <main className="flex-grow">
-        <div className={`w-full ${
-          isAuthView ? 'min-h-[calc(100vh-0px)]' :
-          view === ViewState.LANDING ? '' :
-          view === ViewState.CALENDAR ? 'max-w-full mx-auto py-4 px-2 sm:px-4 lg:px-6' :
-          (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
-          'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
-        }`}>
-          {blockForHydration ? (
-            <AppHydrationLoader />
-          ) : (
-          <Routes>
-            <Route path="*" element={
-              (() => {
-                switch (view) {
-                  case ViewState.LANDING:
-                    return <LandingPage onNavigate={navigateView} />;
-                  case ViewState.LOGIN:
-                    return <Login onLogin={handleLogin} onNavigate={navigateView} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
-                  case ViewState.SIGNUP:
-                    return <Login onLogin={handleLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
-                  case ViewState.ADMIN_LOGIN:
-                    return <Login onLogin={handleLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
-                  case ViewState.RESET_PASSWORD:
-                    return <ResetPassword token={resetToken} onNavigate={navigateView} />;
-                  case ViewState.VERIFICATION:
-                    return (
-                      <VerificationStatusScreen
-                        userId={user?.id}
-                        status={verifStatus}
-                        rejectionReason={verifRejectionReason}
-                        businessName={user?.businessName}
-                        onLogout={handleLogout}
-                        onResubmit={handleVerifResubmit}
-                        onSessionExpired={handleSessionExpired}
-                        onVerified={handleVerified}
-                      />
-                    );
-                  case ViewState.SURVEY:
-                    return <BrandSurvey onComplete={handleSurveyComplete} businessName={user?.businessName} />;
-                  case ViewState.CALENDAR:
-                    if (user?.role === 'support') {
-                      return (
-                        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-10 animate-fade-in">
-                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2" style={{ background: 'rgba(43,87,72,0.1)' }}>
-                            <MessageSquare className="w-7 h-7 text-[#2B5748]" />
-                          </div>
-                          <h2 className="text-xl font-bold" style={{ color: 'var(--fg)' }}>Support Dashboard</h2>
-                          <p className="text-sm max-w-sm" style={{ color: 'var(--fg-muted)' }}>
-                            The content calendar is for SME accounts. Open your Support Dashboard to manage tickets and calls.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => navigateView(ViewState.SUPPORT_DASHBOARD)}
-                            className="btn btn-primary mt-2"
-                          >
-                            Open Support Dashboard
-                          </button>
-                        </div>
-                      );
-                    }
-                    return (user && brandProfile) ? (
-                      <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} />
-                    ) : user ? (
-                      <AppHydrationLoader />
-                    ) : (
-                      <AppHydrationLoader />
-                    );
-                  case ViewState.SETTINGS:
-                    return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
-                  case ViewState.INSIGHTS:
-                    return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
-                  case ViewState.SOCIAL:
-                    return <SocialAccounts />;
-                  case ViewState.BILLING:
-                    return <Billing />;
-                  case ViewState.SUPPORT_DASHBOARD:
-                    return <SupportDashboard />;
-                  case ViewState.ADMIN_DASHBOARD:
-                    return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} /> : (
-                      <div className="flex items-center justify-center min-h-[60vh]">
-                        <div className="text-center p-10">
-                          <p className="font-semibold" style={{ color: 'var(--fg)' }}>Access Denied</p>
-                        </div>
-                      </div>
-                    );
-                  default:
-                    return <LandingPage onNavigate={navigateView} />;
-                }
-              })()
-            } />
-          </Routes>
-          )}
-        </div>
+        <div className={pageClass}>{page}</div>
       </main>
+      </>
+      )}
 
-      {isLoggedIn && user?.role === 'user' && <SupportWidget />}
+      {/* Public pages keep the floating accessibility button; signed in, it's in Settings → Appearance. */}
+      {!isLoggedIn && <AccessibilityWidget />}
 
       {/* Onboarding walkthrough — only on the calendar, where its anchors are. */}
       {isLoggedIn && user?.role === 'user' && verifStatus === 'verified' && view === ViewState.CALENDAR && (

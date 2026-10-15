@@ -5,175 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kawayan AI - Philippine SME Marketing</title>
     <link rel="icon" type="image/png" href="/logo.png" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      console.warn = (function(orig) {
-        return function() {
-          if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].includes('cdn.tailwindcss.com should not be used in production')) return;
-          orig.apply(this, arguments);
-        };
-      })(console.warn);
-
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              background: '#F6F7F7',
-              foreground: '#0F1A16',
-              primary: '#2B5748',
-              'primary-light': '#37715A',
-              'primary-foreground': '#FFFFFF',
-              secondary: '#5E7F63',
-              accent: '#9CB080',
-              'accent-foreground': '#0F1A16',
-              glass: {
-                light: 'rgba(255,255,255,0.85)',
-                medium: 'rgba(255,255,255,0.65)',
-                dark: 'rgba(18,24,22,0.85)',
-              },
-              canvas: {
-                light: '#F6F7F7',
-                dark: '#0C110F',
-              },
-              slate: {
-                50: '#F7F8F8',
-                100: '#EFF1F1',
-                200: '#E1E4E4',
-                300: '#C7CDCC',
-                400: '#98A2A0',
-                500: '#6B7773',
-                600: '#4E5A56',
-                700: '#3A4441',
-                800: '#252D2A',
-                850: '#1B211F',
-                900: '#121716',
-              },
-              emerald: {
-                50: '#EDF4F0',
-                100: '#D8E9E0',
-                200: '#AFD3C1',
-                300: '#7FB79C',
-                400: '#4F9878',
-                500: '#2B5748',
-                600: '#224739',
-                700: '#1A362D',
-                800: '#122420',
-                900: '#0B1512',
-                450: '#367158',
-              }
-            },
-            fontFamily: {
-              display: ['"Space Grotesk"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-              ui: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-            },
-            fontSize: {
-              '2xs': ['0.65rem', { lineHeight: '1rem' }],
-              xs: ['0.75rem', { lineHeight: '1.125rem' }],
-              sm: ['0.875rem', { lineHeight: '1.375rem' }],
-              base: ['1rem', { lineHeight: '1.625rem' }],
-              lg: ['1.125rem', { lineHeight: '1.75rem' }],
-              xl: ['1.25rem', { lineHeight: '1.875rem' }],
-              '2xl': ['1.5rem', { lineHeight: '2rem' }],
-              '3xl': ['1.875rem', { lineHeight: '2.375rem' }],
-              '4xl': ['2.25rem', { lineHeight: '2.75rem' }],
-              '5xl': ['3rem', { lineHeight: '3.5rem' }],
-            },
-            spacing: {
-              '4.5': '1.125rem',
-              '13': '3.25rem',
-              '18': '4.5rem',
-              '22': '5.5rem',
-            },
-            borderRadius: {
-              'sm': '6px',
-              DEFAULT: '9px',
-              'md': '12px',
-              'lg': '14px',
-              'xl': '18px',
-              '2xl': '24px',
-              '3xl': '30px',
-              '4xl': '38px',
-            },
-            animation: {
-              'float': 'float 6s ease-in-out infinite',
-              'scroll': 'scroll 20s linear infinite',
-              'scroll-y': 'scroll-y 24s linear infinite',
-              'float-gentle': 'float-gentle 5s ease-in-out infinite',
-              'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
-              'slide-up': 'slide-up 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
-              'fade-in': 'fade-in 0.35s ease forwards',
-              'scale-in': 'scale-in 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
-              'shimmer': 'shimmer 2.5s ease-in-out infinite',
-            },
-            keyframes: {
-              float: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-20px)' },
-              },
-              scroll: {
-                '0%': { transform: 'translateX(0)' },
-                '100%': { transform: 'translateX(-100%)' },
-              },
-              'scroll-y': {
-                '0%': { transform: 'translateY(0)' },
-                '100%': { transform: 'translateY(-50%)' },
-              },
-              'float-gentle': {
-                '0%, 100%': { transform: 'translateY(0px)' },
-                '50%': { transform: 'translateY(-10px)' },
-              },
-              'pulse-dot': {
-                '0%, 100%': { opacity: '1', transform: 'scale(1)' },
-                '50%': { opacity: '0.4', transform: 'scale(0.75)' },
-              },
-              'slide-up': {
-                '0%': { opacity: '0', transform: 'translateY(16px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-              'fade-in': {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              'scale-in': {
-                '0%': { opacity: '0', transform: 'scale(0.92)' },
-                '100%': { opacity: '1', transform: 'scale(1)' },
-              },
-              shimmer: {
-                '0%': { backgroundPosition: '-200% center' },
-                '100%': { backgroundPosition: '200% center' },
-              },
-            },
-            boxShadow: {
-              'xs': '0 1px 2px rgba(16,32,26,0.06)',
-              'sm': '0 1px 2px rgba(16,32,26,0.05), 0 2px 6px -1px rgba(16,32,26,0.07)',
-              DEFAULT: '0 2px 4px -1px rgba(16,32,26,0.06), 0 6px 16px -4px rgba(16,32,26,0.10)',
-              'md': '0 4px 8px -2px rgba(16,32,26,0.08), 0 12px 28px -8px rgba(16,32,26,0.14)',
-              'lg': '0 8px 16px -4px rgba(16,32,26,0.10), 0 24px 48px -12px rgba(16,32,26,0.18)',
-              'xl': '0 16px 32px -8px rgba(16,32,26,0.14), 0 40px 72px -16px rgba(16,32,26,0.24)',
-              '2xl': '0 24px 48px -12px rgba(16,32,26,0.18), 0 56px 100px -24px rgba(16,32,26,0.30)',
-              'accent': '0 8px 24px -8px rgba(43,87,72,0.34)',
-              'accent-sm': '0 4px 14px -4px rgba(43,87,72,0.26)',
-              'accent-lg': '0 16px 40px -12px rgba(43,87,72,0.38)',
-              'glass': '0 8px 24px rgba(16,32,26,0.10)',
-              'glass-dark': '0 8px 24px rgba(0,0,0,0.40)',
-              'float': '0 8px 16px -4px rgba(16,32,26,0.10), 0 24px 48px -12px rgba(16,32,26,0.18)',
-              'inset-top': 'inset 0 1px 0 rgba(255,255,255,0.5)',
-              'none': 'none',
-            },
-            backdropBlur: {
-              xs: '4px',
-              sm: '8px',
-              DEFAULT: '16px',
-              md: '20px',
-              lg: '28px',
-              xl: '40px',
-            }
-          }
-        }
-      }
-    </script>
+    <script>try{var t=localStorage.getItem('kawayan_theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 
     <!-- Fonts: Plus Jakarta Sans (UI/body) + Space Grotesk (Display/Brand) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -200,12 +32,12 @@
         --kw-sage-light:   #C2D6B6;
         --kw-forest:       #15352A;
 
-        /* Surface — bright, cool, app-like */
-        --bg:              #F6F7F7;
-        --bg-alt:          #EEF1F0;
-        --fg:              #0F1A16;
-        --fg-muted:        rgba(15,26,22,0.60);
-        --fg-subtle:       rgba(15,26,22,0.42);
+        /* Surface — Rice Paper & Forest (default): warm canvas, white cards, stone hairlines */
+        --bg:              #F7F6F2;
+        --bg-alt:          #EFEDE7;
+        --fg:              #151D19;
+        --fg-muted:        #606964;
+        --fg-subtle:       #8B918D;
 
         /* Glass (overlays / a11y widget) */
         --glass-bg:        rgba(255,255,255,0.85);
@@ -215,22 +47,35 @@
 
         /* Cards */
         --card:            #FFFFFF;
-        --card-hover:      #F7F8F8;
-        --border:          rgba(15,26,22,0.10);
-        --border-strong:   rgba(15,26,22,0.16);
+        --card-hover:      #FAF9F6;
+        --border:          #E6E4DD;
+        --border-strong:   #D8D5CC;
 
-        /* Semantic */
-        --primary:         #2B5748;
-        --primary-hover:   #21463A;
+        /* Semantic. --primary is the accent for links, lines and selections;
+           --accent-rgb is the same colour as channels, for Tailwind's brand/<alpha>. */
+        --primary:         #1A6B4F;
+        --primary-hover:   #155A42;
+        --accent-rgb:      26 107 79;
+        --on-accent:       #FFFFFF;
+        /* Main buttons ("Create post", "Plan month") */
+        --primary-accent:       #153E31;
+        --primary-accent-hover: #103227;
+        --primary-accent-fg:    #FFFFFF;
+        /* Brand badges and status pills */
+        --badge-bg:        #E8F3EE;
+        --badge-text:      #1B4D3E;
+        --badge-border:    #CDE5D8;
+        /* Today's column on the timeline */
+        --today-highlight: rgba(16,185,129,0.08);
         --secondary:       #5E7F63;
         --accent:          #9CB080;
         --success:         #17935A;
         --warning:         #D97A1E;
         --danger:          #D14343;
-        --ring:            rgba(43,87,72,0.30);
+        --ring:            rgba(26,107,79,0.24);
 
         /* Elevation — crisp, tight, modern */
-        --shadow-xs:  0 1px 2px rgba(16,32,26,0.06);
+        --shadow-xs:  0 1px 3px rgba(0,0,0,0.04);
         --shadow-sm:  0 1px 2px rgba(16,32,26,0.05), 0 2px 6px -1px rgba(16,32,26,0.07);
         --shadow:     0 2px 4px -1px rgba(16,32,26,0.06), 0 6px 16px -4px rgba(16,32,26,0.10);
         --shadow-md:  0 4px 8px -2px rgba(16,32,26,0.08), 0 12px 28px -8px rgba(16,32,26,0.14);
@@ -251,29 +96,68 @@
         --r-pill: 9999px;
       }
 
-      .dark {
-        --bg:              #0C110F;
-        --bg-alt:          #141A18;
-        --fg:              #E9EEEB;
-        --fg-muted:        rgba(233,238,235,0.62);
-        --fg-subtle:       rgba(233,238,235,0.42);
+      /* Cool Slate & Cobalt: slate-900 buttons, cobalt accents */
+      :root[data-theme='cool-slate']:not(.dark) {
+        --bg: #F8FAFC; --bg-alt: #F1F5F9; --card: #FFFFFF; --card-hover: #F8FAFC;
+        --fg: #0F172A; --fg-muted: #475569; --fg-subtle: #7C889B;
+        --border: #E2E8F0; --border-strong: #CBD5E1;
+        --primary: #2563EB; --primary-hover: #1D4ED8; --accent-rgb: 37 99 235; --on-accent: #FFFFFF;
+        --ring: rgba(37,99,235,0.25); --kw-green-pale: #EFF6FF;
+        --primary-accent: #0F172A; --primary-accent-hover: #1E293B; --primary-accent-fg: #FFFFFF;
+        --badge-bg: #EFF6FF; --badge-text: #1E40AF; --badge-border: #BFDBFE;
+        --today-highlight: rgba(37,99,235,0.08);
+      }
 
-        --glass-bg:        rgba(20,26,24,0.88);
-        --glass-bg-strong: rgba(20,26,24,0.97);
-        --glass-border:    rgba(162,183,152,0.16);
+      /* Oatmeal & Terracotta: earthy, warm bronze */
+      :root[data-theme='terracotta']:not(.dark) {
+        --bg: #FDFBF7; --bg-alt: #F5F0E8; --card: #FFFFFF; --card-hover: #FCFAF6;
+        --fg: #1C1917; --fg-muted: #57534E; --fg-subtle: #8C847D;
+        --border: #E7E5E4; --border-strong: #D6D3D1;
+        --primary: #C2410C; --primary-hover: #9A3412; --accent-rgb: 194 65 12; --on-accent: #FFFFFF;
+        --ring: rgba(194,65,12,0.22); --kw-green-pale: #FFF1E6;
+        --primary-accent: #C2410C; --primary-accent-hover: #9A3412; --primary-accent-fg: #FFFFFF;
+        --badge-bg: #FFF1E6; --badge-text: #9A3412; --badge-border: #FED7AA;
+        --today-highlight: rgba(194,65,12,0.08);
+      }
+
+      /* Dark: deep bamboo emerald on near-black zinc */
+      .dark {
+        --bg:              #0B0F0E;
+        --bg-alt:          #111715;
+        --fg:              #E8EDEA;
+        --fg-muted:        rgba(232,237,234,0.62);
+        --fg-subtle:       rgba(232,237,234,0.40);
+
+        --glass-bg:        rgba(18,24,22,0.88);
+        --glass-bg-strong: rgba(18,24,22,0.97);
+        --glass-border:    rgba(16,185,129,0.14);
         --glass-shadow:    0 12px 40px rgba(0,0,0,0.55);
 
-        --card:            #161D1A;
-        --card-hover:      #1D2723;
-        --border:          rgba(162,183,152,0.14);
-        --border-strong:   rgba(162,183,152,0.26);
+        --card:            #121816;
+        --card-hover:      #18201D;
+        --border:          #1F2925;
+        --border-strong:   #2A3833;
 
-        --kw-green-pale:   rgba(43,87,72,0.24);
+        --kw-green:        #059669;
+        --kw-green-light:  #10B981;
+        --kw-green-pale:   rgba(6,78,59,0.40);
+        --kw-sage:         #10B981;
+        --kw-sage-light:   #34D399;
 
-        --primary:         #A9C08D;
-        --primary-hover:   #BED3A4;
+        --primary:         #10B981;
+        --primary-hover:   #34D399;
+        --accent-rgb:      16 185 129;
+        --on-accent:       #04140F;
         --secondary:       #8AA68D;
-        --ring:            rgba(169,192,141,0.34);
+        --success:         #10B981;
+        --ring:            rgba(16,185,129,0.34);
+        --primary-accent:       #10B981;
+        --primary-accent-hover: #34D399;
+        --primary-accent-fg:    #04140F;
+        --badge-bg:        rgba(6,78,59,0.40);
+        --badge-text:      #34D399;
+        --badge-border:    rgba(6,95,70,0.55);
+        --today-highlight: rgba(16,185,129,0.12);
 
         --shadow-xs:  0 1px 2px rgba(0,0,0,0.35);
         --shadow-sm:  0 1px 2px rgba(0,0,0,0.35), 0 2px 6px -1px rgba(0,0,0,0.40);
@@ -480,13 +364,11 @@
       .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
       .btn-primary {
-        background: var(--kw-green);
-        color: #fff;
-        box-shadow: var(--shadow-xs), inset 0 1px 0 rgba(255,255,255,0.16);
+        background: var(--primary-accent);
+        color: var(--primary-accent-fg);
+        box-shadow: var(--shadow-xs), inset 0 1px 0 rgba(255,255,255,0.12);
       }
-      .btn-primary:hover:not(:disabled) { background: var(--kw-green-light); box-shadow: 0 8px 22px -8px rgba(43,87,72,0.40); }
-      .dark .btn-primary { background: var(--kw-sage); color: var(--kw-forest); box-shadow: var(--shadow-xs); }
-      .dark .btn-primary:hover:not(:disabled) { background: var(--kw-sage-light); box-shadow: var(--shadow-sm); }
+      .btn-primary:hover:not(:disabled) { background: var(--primary-accent-hover); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--primary-accent) 45%, transparent); }
 
       .btn-glass {
         background: var(--card);
@@ -532,15 +414,13 @@
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        background: var(--kw-green);
-        color: #fff;
+        background: var(--primary-accent);
+        color: var(--primary-accent-fg);
         font-weight: 640;
         box-shadow: var(--shadow-xs), inset 0 1px 0 rgba(255,255,255,0.14);
         transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
       }
-      .dark .organic-btn-primary { background: var(--kw-sage); color: var(--kw-forest); }
-      .organic-btn-primary:hover:not(:disabled) { background: var(--kw-green-light); }
-      .dark .organic-btn-primary:hover:not(:disabled) { background: var(--kw-sage-light); }
+      .organic-btn-primary:hover:not(:disabled) { background: var(--primary-accent-hover); }
       .organic-btn-primary:active:not(:disabled) { transform: scale(0.988); }
 
       /* ── Form Inputs ─────────────────────────────────────────────── */

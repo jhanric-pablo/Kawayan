@@ -79,7 +79,7 @@ export const generateContentPlan = async (
     - OUTPUT ONLY JSON. No explanation before or after.
     
     The output must be ONLY a valid JSON array of exactly ${itemCount} objects:
-    [{"day": number, "title": "string", "topic": "string", "format": "Image" | "Carousel" | "Text" | "Video"}]
+    [{"day": number, "title": "string", "topic": "string", "format": "Image" | "Text" | "Video"}]
   `;
   try {
     logger.info("Generating content plan with prompt:", prompt);

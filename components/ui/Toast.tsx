@@ -1,30 +1,30 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
-import './toast.css';
+import DynamicIslandAlert, { IslandAction } from './DynamicIslandAlert';
 
 type ToastVariant = 'success' | 'error' | 'info';
+
+interface ToastOptions {
+  variant?: ToastVariant;
+  duration?: number;
+  /** One contextual button on the pill, e.g. "Review". */
+  action?: IslandAction;
+}
 
 interface ToastItem {
   id: number;
   message: string;
   variant: ToastVariant;
-  duration: number;
+  action?: IslandAction;
 }
 
 interface ToastAPI {
-  toast: (message: string, opts?: { variant?: ToastVariant; duration?: number }) => void;
+  toast: (message: string, opts?: ToastOptions) => void;
   success: (message: string, duration?: number) => void;
   error: (message: string, duration?: number) => void;
   info: (message: string, duration?: number) => void;
 }
 
 const ToastContext = createContext<ToastAPI | null>(null);
-
-const ICONS: Record<ToastVariant, React.ElementType> = {
-  success: CheckCircle2,
-  error: AlertCircle,
-  info: Info,
-};
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<ToastItem[]>([]);
@@ -37,10 +37,11 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (t) { clearTimeout(t); timers.current.delete(id); }
   }, []);
 
-  const push = useCallback((message: string, opts?: { variant?: ToastVariant; duration?: number }) => {
+  const push = useCallback((message: string, opts?: ToastOptions) => {
     const id = ++seq.current;
-    const duration = opts?.duration ?? 3200;
-    setItems((cur) => [...cur.slice(-3), { id, message, variant: opts?.variant ?? 'info', duration }]);
+    const duration = opts?.duration ?? (opts?.action ? 7000 : 3200);
+    // The same message twice (e.g. a repeated sync) shows once.
+    setItems((cur) => [...cur.filter((t) => t.message !== message).slice(-2), { id, message, variant: opts?.variant ?? 'info', action: opts?.action }]);
     timers.current.set(id, setTimeout(() => dismiss(id), duration));
   }, [dismiss]);
 
@@ -56,19 +57,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="kw-toast-stack" role="region" aria-label="Notifications">
-        {items.map((t) => {
-          const Icon = ICONS[t.variant];
-          return (
-            <div key={t.id} className={`kw-toast kw-toast--${t.variant}`} role="status">
-              <Icon className="kw-toast__icon w-4 h-4" aria-hidden />
-              <span className="kw-toast__msg">{t.message}</span>
-              <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="kw-toast__x">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          );
-        })}
+      <div
+        className="pointer-events-none fixed left-1/2 top-3 z-[130] flex w-[min(92vw,520px)] -translate-x-1/2 flex-col items-center gap-2"
+        role="region"
+        aria-label="Notifications"
+      >
+        {items.map((t) => (
+          <DynamicIslandAlert key={t.id} message={t.message} tone={t.variant} action={t.action} onDismiss={() => dismiss(t.id)} />
+        ))}
       </div>
     </ToastContext.Provider>
   );

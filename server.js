@@ -484,14 +484,20 @@ const sendUpstreamError = (res, error, fallback) => {
   res.status(error.status || 500).json({ error: error.message || fallback });
 };
 
-// Wallet & Payments — top-ups go through PayMongo Checkout (docs.paymongo.com).
-// The pending CREDIT transaction carries the checkout session id in its description;
-// the balance only changes once PayMongo reports that session as paid.
+// Wallet & Payments — everything is paid through PayMongo Checkout (docs.paymongo.com).
+// Wallet top-ups are pending CREDIT transactions; Pro is a pending DEBIT paid straight by
+// card/GCash/Maya, so it never touches the balance (the wallet is for extra posts only).
+// Either way the checkout session id rides in the description, and nothing changes until
+// PayMongo reports that session as paid.
 const PAYMONGO_API = 'https://api.paymongo.com/v1';
 const PLAN_PRICES = { PRO: 499 };
 const TOPUP_MIN = 100;
 const TOPUP_MAX = 50000;
 const checkoutSessionIdOf = (description = '') => /\((cs_[A-Za-z0-9]+)\)/.exec(description)?.[1];
+const planTitle = (plan) => plan.charAt(0) + plan.slice(1).toLowerCase();
+// "Pro plan (monthly) via PayMongo (cs_…)" → 'PRO'; top-ups → undefined.
+const planOf = (txn) =>
+  txn?.type === 'DEBIT' ? Object.keys(PLAN_PRICES).find((p) => txn.description?.startsWith(`${planTitle(p)} plan`)) : undefined;
 
 async function paymongo(path, { method = 'GET', body } = {}) {
   const key = process.env.PAYMONGO_SECRET_KEY;
@@ -513,27 +519,34 @@ async function paymongo(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-// Credits the user's pending PayMongo top-up once PayMongo says it's paid.
-async function settlePendingTopUp(userId) {
+// Settles the user's pending PayMongo payment once PayMongo says it's paid: a top-up
+// credits the wallet, a plan payment switches the plan.
+async function settlePendingPayment(userId) {
   const pending = await dbService.getPendingTransaction(userId);
   const sessionId = checkoutSessionIdOf(pending?.description);
   if (!sessionId) return { status: 'NONE', pending };
+  const plan = planOf(pending);
   const { data: session } = await paymongo(`/checkout_sessions/${sessionId}`);
   if (session.attributes.payments?.some((p) => p.attributes?.status === 'paid')) {
     try {
-      await dbService.approveTransaction(pending.id);
+      await dbService.approveTransaction(pending.id, !plan);
       const who = await dbService.describeUser(userId);
-      await dbService.logAudit(userId, 'wallet_topup', `${who} added ₱${pending.amount} via PayMongo (${sessionId})`);
+      if (plan) {
+        await dbService.updateSubscription(userId, plan);
+        await dbService.logAudit(userId, 'upgrade_plan', `${who} upgraded to ${plan} for ₱${pending.amount} via PayMongo (${sessionId})`);
+      } else {
+        await dbService.logAudit(userId, 'wallet_topup', `${who} added ₱${pending.amount} via PayMongo (${sessionId})`);
+      }
     } catch (error) {
-      if (!/not found/i.test(error.message)) throw error; // a parallel request already credited it
+      if (!/not found/i.test(error.message)) throw error; // a parallel request already settled it
     }
-    return { status: 'COMPLETED', amount: pending.amount };
+    return { status: 'COMPLETED', amount: pending.amount, plan };
   }
   if (session.attributes.status === 'expired') {
     await dbService.failTransaction(pending.id);
     return { status: 'FAILED' };
   }
-  return { status: 'PENDING', pending, sessionId, checkoutUrl: session.attributes.checkout_url };
+  return { status: 'PENDING', pending, plan, sessionId, checkoutUrl: session.attributes.checkout_url };
 }
 
 app.get('/api/wallet/:userId', authenticateToken, async (req, res) => {
@@ -588,11 +601,46 @@ app.post('/api/wallet/checkout', authenticateToken, async (req, res) => {
   }
 });
 
-// Called when the user returns from PayMongo (and on Billing load) to credit a paid top-up.
+// Pro goes straight to a PayMongo checkout for its price; nothing is taken from the wallet.
+app.post('/api/wallet/checkout-plan', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { plan } = req.body;
+  const price = PLAN_PRICES[plan];
+  if (!price) return res.status(400).json({ error: 'Unknown plan' });
+  try {
+    const wallet = await dbService.getWallet(userId); // also expires pending payments older than 12h
+    if (wallet.subscription === plan) return res.status(409).json({ error: `You're already on ${planTitle(plan)}.` });
+    if (await dbService.getPendingTransaction(userId)) {
+      return res.status(409).json({ error: 'You already have a payment in progress. Finish or cancel it first.' });
+    }
+    const origin = new URL(req.get('referer') || process.env.APP_URL || `${req.protocol}://${req.get('host')}`).origin;
+    const { data: session } = await paymongo('/checkout_sessions', {
+      method: 'POST',
+      body: {
+        data: {
+          attributes: {
+            line_items: [{ name: `Kawayan ${planTitle(plan)} (1 month)`, amount: price * 100, currency: 'PHP', quantity: 1 }],
+            payment_method_types: ['gcash', 'paymaya', 'card'],
+            description: `Kawayan ${planTitle(plan)} for ${req.user.email}`,
+            reference_number: `${userId}-${plan}-${Date.now()}`,
+            success_url: `${origin}/?success=true`,
+            cancel_url: `${origin}/?cancelled=true`,
+          },
+        },
+      },
+    });
+    await dbService.createTransaction(userId, price, `${planTitle(plan)} plan (monthly) via PayMongo (${session.id})`, 'DEBIT', 'PENDING');
+    res.json({ checkoutUrl: session.attributes.checkout_url });
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to start checkout');
+  }
+});
+
+// Called when the user returns from PayMongo (and on Billing load) to settle a paid payment.
 app.post('/api/wallet/verify', authenticateToken, async (req, res) => {
   try {
-    const { status, amount, checkoutUrl } = await settlePendingTopUp(req.user.userId);
-    res.json({ status, amount, checkoutUrl });
+    const { status, amount, plan, checkoutUrl } = await settlePendingPayment(req.user.userId);
+    res.json({ status, amount, plan, checkoutUrl });
   } catch (error) {
     sendUpstreamError(res, error, 'Failed to check payment');
   }
@@ -604,12 +652,13 @@ app.post('/api/wallet/cancel-transaction', authenticateToken, async (req, res) =
 
   try {
     // If PayMongo isn't configured we can't check the session; still let the user clear it locally.
-    const result = await settlePendingTopUp(userId).catch((error) => {
+    const result = await settlePendingPayment(userId).catch((error) => {
       if (error.status === 503) return { status: 'UNCHECKED' };
       throw error;
     });
     if (result.status === 'COMPLETED') {
-      return res.status(409).json({ error: `That payment already went through. ₱${result.amount} was added to your wallet.` });
+      const outcome = result.plan ? `You're on ${planTitle(result.plan)} now.` : `₱${result.amount} was added to your wallet.`;
+      return res.status(409).json({ error: `That payment already went through. ${outcome}` });
     }
     if (result.status === 'PENDING' && result.pending.id === transactionId) {
       // Close the PayMongo page too, so it can't be paid after we've cancelled it here.
@@ -644,6 +693,7 @@ app.get('/api/admin/pending-transactions', authenticateToken, requireAdmin, asyn
   }
 });
 
+// Wallet spending (extra posts). Plans are paid through /api/wallet/checkout-plan instead.
 app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
   const { userId, amount, description, plan } = req.body;
   const user = req.user;
@@ -652,9 +702,8 @@ app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
-  // Plan prices come from the server, never the client.
-  if (plan && !PLAN_PRICES[plan]) return res.status(400).json({ error: 'Unknown plan' });
-  const price = plan ? PLAN_PRICES[plan] : Number(amount);
+  if (plan) return res.status(400).json({ error: 'Plans are paid through checkout, not the wallet.' });
+  const price = Number(amount);
   if (!(price > 0)) return res.status(400).json({ error: 'Invalid amount' });
 
   try {
@@ -663,12 +712,7 @@ app.post('/api/wallet/purchase', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: `Not enough balance. You need ₱${price}, you have ₱${wallet.balance}.` });
     }
 
-    const planName = plan && plan.charAt(0) + plan.slice(1).toLowerCase();
-    await dbService.createTransaction(userId, price, plan ? `${planName} plan (monthly)` : description, 'DEBIT');
-    if (plan) {
-      await dbService.updateSubscription(userId, plan);
-      await dbService.logAudit(userId, 'upgrade_plan', `${await dbService.describeUser(userId)} upgraded to ${plan} for ₱${price}`);
-    }
+    await dbService.createTransaction(userId, price, description, 'DEBIT');
 
     const updatedWallet = await dbService.getWallet(userId);
     res.json(updatedWallet);
@@ -1110,7 +1154,7 @@ app.post('/api/social/publish', authenticateToken, async (req, res) => {
     await dbService.logAudit(
       req.user.userId,
       published ? 'publish_post' : 'schedule_post',
-      `${who} ${published ? 'published' : `scheduled for ${scheduledFor} (${timezone || 'Asia/Manila'})`} "${post.topic}" to ${where}`
+      `${who} ${published ? 'published' : `scheduled for ${scheduledFor} (${timezone || 'Asia/Manila'})`} "${post.topic}" to ${where} (post:${post.id})`
     );
     res.json(updated);
   } catch (error) {
@@ -1122,23 +1166,31 @@ app.post('/api/social/publish', authenticateToken, async (req, res) => {
 app.post('/api/social/sync', authenticateToken, async (req, res) => {
   try {
     const scheduled = (await dbService.getUserPosts(req.user.userId)).filter((p) => p.status === 'Scheduled');
-    if (scheduled.length === 0) return res.json({ published: 0, failed: 0 });
+    if (scheduled.length === 0) return res.json({ published: 0, failed: 0, failedIds: [] });
     const profileId = await getZernioProfileId(req.user.userId);
     const { posts: zPosts = [] } = await zernio(`/posts?profileId=${profileId}&limit=500`);
     let published = 0;
-    let failed = 0;
+    const failedIds = [];
+    // The outcome goes in the audit trail too, so the admin dispatch table can show it.
+    let who;
+    const logOutcome = async (action, post, what) => {
+      who ??= await dbService.describeUser(req.user.userId);
+      await dbService.logAudit(req.user.userId, action, `${who} — scheduled post "${post.topic}" ${what} (post:${post.id})`);
+    };
     for (const post of scheduled) {
       const z = zPosts.find((zp) => zp.title === post.id);
       if (!z) continue;
       if (z.status === 'published' || z.status === 'partial') {
         await dbService.savePost({ ...post, status: 'Published', publishedAt: z.publishedAt || new Date().toISOString(), externalLink: firstPlatformUrl(z) || post.externalLink });
         published++;
+        await logOutcome('post_published', post, 'went live');
       } else if (z.status === 'failed') {
         await dbService.savePost({ ...post, status: 'Draft' });
-        failed++;
+        failedIds.push(post.id);
+        await logOutcome('post_failed', post, 'failed to publish and went back to Draft');
       }
     }
-    res.json({ published, failed });
+    res.json({ published, failed: failedIds.length, failedIds });
   } catch (error) {
     sendUpstreamError(res, error, 'Failed to sync post status');
   }

@@ -45,7 +45,9 @@ const Billing: React.FC = () => {
     setCheckoutUrl(result?.status === 'PENDING' ? result.checkoutUrl || null : null);
 
     if (returnedFrom === 'success') {
-      if (result?.status === 'COMPLETED') toast.success(`${peso(result.amount || 0)} added to your wallet`);
+      if (result?.status === 'COMPLETED') {
+        toast.success(result.plan ? `You're on Pro. ${PRO_POST_LIMIT} posts a month starts now.` : `${peso(result.amount || 0)} added to your wallet`);
+      }
       else if (result?.status === 'PENDING') toast.info("We haven't received confirmation from PayMongo yet. Check back in a minute.");
     }
     if (returnedFrom === 'cancelled') toast.info('Payment cancelled. You were not charged.');
@@ -71,39 +73,13 @@ const Billing: React.FC = () => {
   const amountValue = Number(amount);
   const amountValid = Number.isInteger(amountValue) && amountValue >= TOPUP_MIN && amountValue <= TOPUP_MAX;
 
+  // One click: straight to a PayMongo checkout for Pro. The wallet is only for extra posts.
   const handleUpgrade = async () => {
-    if (!wallet) return;
-    if (wallet.balance < PRO_PRICE_PHP && wallet.transactions.some((t) => t.status === 'PENDING')) {
-      await dialog.alert({
-        title: 'Payment in progress',
-        message: `Your balance is ${peso(wallet.balance)}, short of ${peso(PRO_PRICE_PHP)}. Finish or cancel your pending top-up first, then upgrade.`,
-      });
-      return;
-    }
-    if (wallet.balance < PRO_PRICE_PHP) {
-      const shortfall = Math.max(TOPUP_MIN, Math.ceil((PRO_PRICE_PHP - wallet.balance) / 100) * 100);
-      const ok = await dialog.confirm({
-        title: 'Add funds first',
-        message: `Pro is ${peso(PRO_PRICE_PHP)} a month, paid from your wallet. Your balance is ${peso(wallet.balance)}. Add ${peso(shortfall)} now?`,
-        confirmLabel: `Add ${peso(shortfall)}`,
-      });
-      if (ok) await startTopUp(shortfall);
-      return;
-    }
-    const ok = await dialog.confirm({
-      title: 'Upgrade to Pro',
-      message: `${peso(PRO_PRICE_PHP)} will be taken from your wallet balance. You'll get ${PRO_POST_LIMIT} posts a month.`,
-      confirmLabel: 'Upgrade',
-    });
-    if (!ok) return;
     setBusy('plan');
     try {
-      await paymentService.purchaseSubscription('PRO', PRO_PRICE_PHP);
-      await refresh();
-      toast.success("You're on Pro");
+      await paymentService.startPlanCheckout('PRO'); // navigates away to PayMongo
     } catch (e: any) {
       toast.error(e.message);
-    } finally {
       setBusy(null);
     }
   };
@@ -188,7 +164,9 @@ const Billing: React.FC = () => {
           role="status"
         >
           <p className="flex-1 min-w-[14rem] text-sm" style={{ color: 'var(--fg)' }}>
-            A {peso(pending.amount)} top-up is waiting for payment.
+            {pending.type === 'DEBIT' && /^Pro plan/.test(pending.description)
+              ? `Your ${peso(pending.amount)} Pro payment is waiting.`
+              : `A ${peso(pending.amount)} top-up is waiting for payment.`}
           </p>
           {checkoutUrl && (
             <a href={checkoutUrl} className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>
@@ -245,10 +223,15 @@ const Billing: React.FC = () => {
                   Switch to Free
                 </button>
               ) : (
-                <button onClick={handleUpgrade} disabled={busy === 'plan'} className="btn btn-primary btn-sm">
-                  {busy === 'plan' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Upgrade to Pro · {peso(PRO_PRICE_PHP)}
-                </button>
+                <>
+                  <button onClick={handleUpgrade} disabled={busy === 'plan' || !!pending} className="btn btn-primary btn-sm">
+                    {busy === 'plan' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Upgrade to Pro · {peso(PRO_PRICE_PHP)}/month
+                  </button>
+                  <p className="text-xs mt-2" style={{ color: 'var(--fg-subtle)' }}>
+                    {pending ? 'Finish or cancel the payment above first.' : 'Pay with GCash, Maya or card. Your wallet isn’t used.'}
+                  </p>
+                </>
               )}
             </div>
           </div>
@@ -258,7 +241,7 @@ const Billing: React.FC = () => {
         <section className="surface p-6">
           <p className="text-[13px] font-medium" style={labelStyle}>Wallet balance</p>
           <p className="font-display text-3xl font-semibold mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
-          <p className="text-sm mt-1" style={labelStyle}>Pays for Pro and extra posts.</p>
+          <p className="text-sm mt-1" style={labelStyle}>For extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
 
           <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
             <label htmlFor="topup-amount" className="text-[13px] font-medium" style={labelStyle}>Add funds</label>

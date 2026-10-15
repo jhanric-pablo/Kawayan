@@ -1,3 +1,4 @@
+import './tailwind.css'; // first: Tailwind sits before component CSS, as the CDN did
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -7,7 +8,6 @@ import './styles/accessibility.css';
 import App from './App';
 import OrganicDialogProvider from './components/OrganicDialog';
 import { ToastProvider } from './components/ui/Toast';
-import AccessibilityWidget from './components/AccessibilityWidget';
 import { initAccessibility } from './utils/accessibility';
 
 // Apply saved accessibility preferences before first paint
@@ -30,7 +30,6 @@ root.render(
       <ToastProvider>
         <OrganicDialogProvider>
           <App />
-          <AccessibilityWidget />
         </OrganicDialogProvider>
       </ToastProvider>
     </BrowserRouter>

@@ -1,0 +1,181 @@
+/** Tailwind build config (moved from the CDN script in index.html). */
+export default {
+  content: [
+    './index.html',
+    './*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './services/**/*.ts',
+    './utils/**/*.ts',
+    './constants/**/*.ts',
+    './lib/**/*.{ts,tsx}',
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        // Follow the active palette (index.html tokens). `brand` takes opacity: bg-brand/10.
+        brand: 'rgb(var(--accent-rgb) / <alpha-value>)',
+        'on-brand': 'var(--on-accent)',
+        badge: { DEFAULT: 'var(--badge-bg)', text: 'var(--badge-text)', border: 'var(--badge-border)' },
+        today: 'var(--today-highlight)',
+        background: '#F6F7F7',
+        foreground: '#0F1A16',
+        primary: '#2B5748',
+        'primary-light': '#37715A',
+        'primary-foreground': '#FFFFFF',
+        secondary: '#5E7F63',
+        accent: '#9CB080',
+        'accent-foreground': '#0F1A16',
+        glass: {
+          light: 'rgba(255,255,255,0.85)',
+          medium: 'rgba(255,255,255,0.65)',
+          dark: 'rgba(18,24,22,0.85)',
+        },
+        canvas: {
+          light: '#F6F7F7',
+          dark: '#0C110F',
+        },
+        slate: {
+          50: '#F7F8F8',
+          100: '#EFF1F1',
+          200: '#E1E4E4',
+          300: '#C7CDCC',
+          400: '#98A2A0',
+          500: '#6B7773',
+          600: '#4E5A56',
+          700: '#3A4441',
+          800: '#252D2A',
+          850: '#1B211F',
+          900: '#121716',
+        },
+        emerald: {
+          50: '#EDF4F0',
+          100: '#D8E9E0',
+          200: '#AFD3C1',
+          300: '#7FB79C',
+          400: '#4F9878',
+          500: '#2B5748',
+          600: '#224739',
+          700: '#1A362D',
+          800: '#122420',
+          900: '#0B1512',
+          450: '#367158',
+        }
+      },
+      fontFamily: {
+        display: ['"Space Grotesk"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        ui: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      fontSize: {
+        '2xs': ['0.65rem', { lineHeight: '1rem' }],
+        xs: ['0.75rem', { lineHeight: '1.125rem' }],
+        sm: ['0.875rem', { lineHeight: '1.375rem' }],
+        base: ['1rem', { lineHeight: '1.625rem' }],
+        lg: ['1.125rem', { lineHeight: '1.75rem' }],
+        xl: ['1.25rem', { lineHeight: '1.875rem' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem' }],
+        '3xl': ['1.875rem', { lineHeight: '2.375rem' }],
+        '4xl': ['2.25rem', { lineHeight: '2.75rem' }],
+        '5xl': ['3rem', { lineHeight: '3.5rem' }],
+      },
+      spacing: {
+        '4.5': '1.125rem',
+        '13': '3.25rem',
+        '18': '4.5rem',
+        '22': '5.5rem',
+      },
+      borderRadius: {
+        'sm': '6px',
+        DEFAULT: '9px',
+        'md': '12px',
+        'lg': '14px',
+        'xl': '18px',
+        '2xl': '24px',
+        '3xl': '30px',
+        '4xl': '38px',
+      },
+      animation: {
+        'float': 'float 6s ease-in-out infinite',
+        'scroll': 'scroll 20s linear infinite',
+        'scroll-y': 'scroll-y 24s linear infinite',
+        'float-gentle': 'float-gentle 5s ease-in-out infinite',
+        'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
+        'slide-up': 'slide-up 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+        'fade-in': 'fade-in 0.35s ease forwards',
+        'scale-in': 'scale-in 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        'shimmer': 'shimmer 2.5s ease-in-out infinite',
+        'island-in': 'island-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-20px)' },
+        },
+        scroll: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-100%)' },
+        },
+        'scroll-y': {
+          '0%': { transform: 'translateY(0)' },
+          '100%': { transform: 'translateY(-50%)' },
+        },
+        'float-gentle': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'pulse-dot': {
+          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+          '50%': { opacity: '0.4', transform: 'scale(0.75)' },
+        },
+        'slide-up': {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'scale-in': {
+          '0%': { opacity: '0', transform: 'scale(0.92)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% center' },
+          '100%': { backgroundPosition: '200% center' },
+        },
+        // Dynamic Island: drops from above the viewport and springs into place
+        'island-in': {
+          '0%': { opacity: '0', transform: 'translateY(-140%) scale(0.86)' },
+          '55%': { opacity: '1' },
+          '100%': { opacity: '1', transform: 'none' },
+        },
+      },
+      boxShadow: {
+        'xs': '0 1px 2px rgba(16,32,26,0.06)',
+        'sm': '0 1px 2px rgba(16,32,26,0.05), 0 2px 6px -1px rgba(16,32,26,0.07)',
+        DEFAULT: '0 2px 4px -1px rgba(16,32,26,0.06), 0 6px 16px -4px rgba(16,32,26,0.10)',
+        'md': '0 4px 8px -2px rgba(16,32,26,0.08), 0 12px 28px -8px rgba(16,32,26,0.14)',
+        'lg': '0 8px 16px -4px rgba(16,32,26,0.10), 0 24px 48px -12px rgba(16,32,26,0.18)',
+        'xl': '0 16px 32px -8px rgba(16,32,26,0.14), 0 40px 72px -16px rgba(16,32,26,0.24)',
+        '2xl': '0 24px 48px -12px rgba(16,32,26,0.18), 0 56px 100px -24px rgba(16,32,26,0.30)',
+        'accent': '0 8px 24px -8px rgba(43,87,72,0.34)',
+        'accent-sm': '0 4px 14px -4px rgba(43,87,72,0.26)',
+        'accent-lg': '0 16px 40px -12px rgba(43,87,72,0.38)',
+        'glass': '0 8px 24px rgba(16,32,26,0.10)',
+        'glass-dark': '0 8px 24px rgba(0,0,0,0.40)',
+        'float': '0 8px 16px -4px rgba(16,32,26,0.10), 0 24px 48px -12px rgba(16,32,26,0.18)',
+        'inset-top': 'inset 0 1px 0 rgba(255,255,255,0.5)',
+        'none': 'none',
+      },
+      backdropBlur: {
+        xs: '4px',
+        sm: '8px',
+        DEFAULT: '16px',
+        md: '20px',
+        lg: '28px',
+        xl: '40px',
+      }
+    }
+  }
+};

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { CalendarPlus } from 'lucide-react';
 import type { KawayanCalendarItem, KawayanStatus } from './mapCalendarEvents';
+import './kawayanCalendar.css';
 
 interface Props {
   items: KawayanCalendarItem[];
@@ -38,7 +39,7 @@ const AgendaView: React.FC<Props> = ({ items, currentDate, selectedDay, onDayCli
       <div className="kw-agenda kw-agenda--empty">
         <CalendarPlus className="w-6 h-6" aria-hidden />
         <p className="kw-agenda__empty-title">Nothing planned for {monthLabel}</p>
-        <p className="kw-agenda__empty-hint">Pick a day in the grid, or use AI Content Planning to draft a month.</p>
+        <p className="kw-agenda__empty-hint">Click a day on the timeline, or use Plan month to draft the whole month.</p>
       </div>
     );
   }

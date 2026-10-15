@@ -56,6 +56,66 @@ const ToggleRow: React.FC<{
   </label>
 );
 
+/** Text size, contrast, link, font and motion options. Lives in Settings → Appearance. */
+export const AccessibilityOptions: React.FC = () => {
+  const [settings, setSettings] = useState<AccessibilitySettings>(() => initAccessibility());
+  const patch = useCallback((next: Partial<AccessibilitySettings>) => {
+    setSettings(updateAccessibilitySettings(next));
+  }, []);
+  const fontLevel = settings.fontLevel;
+
+  return (
+    <div className="space-y-1">
+      <div className="px-3 py-2">
+        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--fg)' }}>Text size</p>
+        <div className="flex items-center gap-2 max-w-xs">
+          <button
+            type="button"
+            onClick={() => patch({ fontLevel: Math.max(0, fontLevel - 1) as AccessibilitySettings['fontLevel'] })}
+            disabled={fontLevel === 0}
+            className="btn btn-outline btn-sm !px-2.5 disabled:opacity-40"
+            aria-label="Decrease text size"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <span
+            className="flex-1 text-center text-sm font-medium py-1.5 rounded-[var(--r)]"
+            style={{ background: 'var(--bg-alt)', color: 'var(--fg)' }}
+            aria-live="polite"
+          >
+            {FONT_LABELS[fontLevel]}
+          </span>
+          <button
+            type="button"
+            onClick={() => patch({ fontLevel: Math.min(3, fontLevel + 1) as AccessibilitySettings['fontLevel'] })}
+            disabled={fontLevel === 3}
+            className="btn btn-outline btn-sm !px-2.5 disabled:opacity-40"
+            aria-label="Increase text size"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <ToggleRow id="a11y-high-contrast" label="High contrast" description="Stronger text and border contrast for easier reading." checked={settings.highContrast} onChange={(highContrast) => patch({ highContrast })} icon={<Contrast className="w-4 h-4" />} />
+      <ToggleRow id="a11y-highlight-links" label="Highlight links" description="Underline all links across the site." checked={settings.highlightLinks} onChange={(highlightLinks) => patch({ highlightLinks })} icon={<Link2 className="w-4 h-4" />} />
+      <ToggleRow id="a11y-readable-font" label="Readable font" description="Use a simple system font for body text." checked={settings.readableFont} onChange={(readableFont) => patch({ readableFont })} icon={<BookOpen className="w-4 h-4" />} />
+      <ToggleRow id="a11y-reduce-motion" label="Reduce motion" description="Minimize animations and transitions." checked={settings.reduceMotion} onChange={(reduceMotion) => patch({ reduceMotion })} icon={<PauseCircle className="w-4 h-4" />} />
+      <div className="px-3 pt-2">
+        <button
+          type="button"
+          onClick={() => setSettings(resetAccessibilitySettings())}
+          className="inline-flex items-center gap-2 text-sm font-medium"
+          style={{ color: 'var(--primary)' }}
+        >
+          <RotateCcw className="w-4 h-4" aria-hidden /> Reset to defaults
+        </button>
+        <p className="text-xs mt-1" style={{ color: 'var(--fg-subtle)' }}>Saved in this browser.</p>
+      </div>
+    </div>
+  );
+};
+
+/** Floating button on public pages (signed-in users get the options in Settings). */
 const AccessibilityWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [settings, setSettings] = useState<AccessibilitySettings>(() => initAccessibility());

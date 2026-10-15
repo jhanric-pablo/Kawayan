@@ -1,10 +1,10 @@
 import { ContentIdea, GeneratedPost, AIResponseSchema } from '../types';
 
-/** Models name formats freely ("Reel", "IGTV", "Carousel Image"); fold them into the four we support. */
+/** Models name formats freely ("Reel", "IGTV", "Carousel Image"); fold them into the three we support.
+ *  Carousels (and older saved ones) become Image: Kawayan makes one image per post. */
 export const normalizeFormat = (format: unknown): ContentIdea['format'] => {
   const f = String(format ?? '').toLowerCase();
   if (/reel|video|tiktok|igtv|live|vlog|short/.test(f)) return 'Video';
-  if (/carousel|album|slide/.test(f)) return 'Carousel';
   if (/text|quote|poll|tweet|status/.test(f)) return 'Text';
   return 'Image';
 };
@@ -191,21 +191,21 @@ export class ValidationService {
   static createFallbackContentIdeas(month: string, itemCount: number = 8): ContentIdea[] {
     const templates = [
       { title: 'New Month Kickoff', topic: `Fresh start for ${month} — showcase what makes us unique`, format: 'Image' as const },
-      { title: 'Behind the Scenes', topic: 'Peek sa araw-araw na hustle ng team namin', format: 'Carousel' as const },
+      { title: 'Behind the Scenes', topic: 'Peek sa araw-araw na hustle ng team namin', format: 'Image' as const },
       { title: 'Customer Love', topic: 'Real stories mula sa mga loyal customers namin', format: 'Image' as const },
       { title: 'Product Spotlight', topic: 'Ito ang bestseller namin at bakit sulit siya', format: 'Video' as const },
-      { title: 'Weekend Vibes', topic: 'Weekend promo at deals na hindi pwedeng palampasin', format: 'Carousel' as const },
+      { title: 'Weekend Vibes', topic: 'Weekend promo at deals na hindi pwedeng palampasin', format: 'Image' as const },
       { title: 'Tips & Tricks', topic: 'Practical tips related sa aming industry', format: 'Text' as const },
       { title: 'Community Shoutout', topic: 'Taglish appreciation post para sa community namin', format: 'Image' as const },
       { title: 'Mid-Month Momentum', topic: 'Halfway through the month — ano ang next big thing', format: 'Video' as const },
       { title: 'Team Feature', topic: 'Meet the people behind the brand', format: 'Image' as const },
-      { title: 'Seasonal Hook', topic: `Seasonal angle for ${month} na relevant sa audience`, format: 'Carousel' as const },
+      { title: 'Seasonal Hook', topic: `Seasonal angle for ${month} na relevant sa audience`, format: 'Image' as const },
       { title: 'FAQ Breakdown', topic: 'Sagot sa pinakamadalas itanong ng customers', format: 'Text' as const },
       { title: 'Social Proof', topic: 'Reviews at testimonials na pinaka-impactful', format: 'Image' as const },
-      { title: 'Limited Offer', topic: 'Time-sensitive deal na kailangan i-grab ngayon', format: 'Carousel' as const },
+      { title: 'Limited Offer', topic: 'Time-sensitive deal na kailangan i-grab ngayon', format: 'Image' as const },
       { title: 'Culture Post', topic: 'Values namin at bakit ito matters sa inyo', format: 'Video' as const },
       { title: 'Collab Tease', topic: 'Sneak peek ng upcoming partnership o collab', format: 'Image' as const },
-      { title: 'Month Wrap-Up', topic: 'Thank you post at preview ng next month', format: 'Carousel' as const },
+      { title: 'Month Wrap-Up', topic: 'Thank you post at preview ng next month', format: 'Image' as const },
     ];
 
     const count = Math.max(1, itemCount);

@@ -1,14 +1,14 @@
-import { ContentIdea, GeneratedPost } from '../../types';
+import type { ContentIdea, GeneratedPost } from '../../types';
+import type { SocialAccount } from '../../services/socialService';
+import { PostChannels, clockTime, platformsFor } from '../../utils/workspaceFeed';
 
 /**
  * Calendar data mapping for the Kawayan content planner.
  *
- * The filtering rules here are a 1:1 port of the previous Schedule-X mapping:
+ * Used by the agenda (list) view and for the timeline's idea cards:
  *  - posts are shown for the visible month only
  *  - an idea is hidden once a post exists for that same day
  *  - idea days are clamped into the visible month
- *
- * Only the output shape changed (TOAST UI Calendar event objects).
  */
 
 export type KawayanStatus = 'idea' | 'draft' | 'scheduled' | 'published';
@@ -26,26 +26,8 @@ export interface KawayanCalendarItem {
   format?: string;
   kind: 'post' | 'idea';
   postId?: string;
-}
-
-/** Shape TOAST UI Calendar accepts for `events` (subset we use). */
-export interface KawayanEvent {
-  id: string;
-  calendarId: KawayanStatus;
-  title: string;
-  isAllday: true;
-  category: 'allday';
-  start: string;
-  end: string;
-  isReadOnly: true;
-  raw: {
-    day: number;
-    kind: 'post' | 'idea';
-    status: KawayanStatus;
-    statusLabel: KawayanCalendarItem['statusLabel'];
-    format?: string;
-    postId?: string;
-  };
+  /** An idea's position in the plan, for edits. */
+  index?: number;
 }
 
 const STATUS_LABEL: Record<KawayanStatus, KawayanCalendarItem['statusLabel']> = {
@@ -114,30 +96,71 @@ export function buildCalendarItems(
       statusLabel: 'Idea',
       format: idea.format,
       kind: 'idea',
+      index: idx,
     });
   });
 
   return items;
 }
 
-/** Convert normalized items into TOAST UI Calendar events (status → calendarId → colour). */
-export function itemsToCalendarEvents(items: KawayanCalendarItem[]): KawayanEvent[] {
-  return items.map((item) => ({
-    id: item.key,
-    calendarId: item.status,
-    title: item.title,
-    isAllday: true,
-    category: 'allday',
-    start: item.date,
-    end: item.date,
-    isReadOnly: true,
-    raw: {
-      day: item.day,
-      kind: item.kind,
-      status: item.status,
-      statusLabel: item.statusLabel,
-      format: item.format,
-      postId: item.postId,
-    },
-  }));
+/* ── Channel timeline ── */
+
+export type LaneId = 'plan' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin';
+export type CardStatus = 'idea' | 'draft' | 'scheduled' | 'published' | 'failed';
+
+export interface TimelineCardItem {
+  key: string;
+  day: number;
+  status: CardStatus;
+  title: string;
+  format?: string;
+  imageUrl?: string;
+  /** Scheduled clock time, e.g. "9:00 AM", when known. */
+  time?: string;
+  post?: GeneratedPost;
+  ideaIndex?: number;
+}
+
+/**
+ * Sorts the visible month into timeline lanes, keyed `${lane}:${day}`. Drafts and ideas haven't
+ * been sent anywhere, so they go in 'plan'; scheduled, published and failed posts go in each
+ * channel they were sent to (or 'plan' when no channel is known).
+ */
+export function bucketByLane(
+  posts: GeneratedPost[],
+  ideas: ContentIdea[],
+  month: Date,
+  channels: PostChannels,
+  accounts: SocialAccount[],
+  failedIds: string[]
+) {
+  const cells = new Map<string, TimelineCardItem[]>();
+  const laneCount = new Map<LaneId, number>();
+  const add = (lane: LaneId, item: TimelineCardItem) => {
+    const k = `${lane}:${item.day}`;
+    cells.set(k, [...(cells.get(k) ?? []), item]);
+    laneCount.set(lane, (laneCount.get(lane) ?? 0) + 1);
+  };
+  const prefix = `${month.getFullYear()}-${pad(month.getMonth() + 1)}-`;
+  posts.forEach((post) => {
+    if (!post.date.startsWith(prefix)) return;
+    const failed = post.status === 'Draft' && failedIds.includes(post.id);
+    const status: CardStatus = failed ? 'failed' : post.status === 'Published' ? 'published' : post.status === 'Scheduled' ? 'scheduled' : 'draft';
+    const sentTo: LaneId[] = status === 'draft' ? [] : platformsFor(post, channels, accounts);
+    const item: TimelineCardItem = {
+      key: post.id,
+      day: Number(post.date.slice(8, 10)),
+      status,
+      title: post.topic,
+      format: post.format,
+      imageUrl: post.imageUrl,
+      time: status === 'scheduled' ? clockTime(channels[post.id]?.at) : undefined,
+      post,
+    };
+    (sentTo.length ? sentTo : (['plan'] as LaneId[])).forEach((lane) => add(lane, { ...item, key: `${post.id}:${lane}` }));
+  });
+  buildCalendarItems(posts, ideas, month).forEach((i) => {
+    if (i.kind === 'idea') add('plan', { key: i.key, day: i.day, status: 'idea', title: i.title, format: i.format, ideaIndex: i.index });
+  });
+  return { cells, laneCount };
 }

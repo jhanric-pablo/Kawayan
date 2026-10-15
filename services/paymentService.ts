@@ -58,8 +58,21 @@ class PaymentService {
     window.location.href = data.checkoutUrl;
   }
 
-  // Credits a paid top-up; safe to call any time.
-  async verifyTopUp(): Promise<{ status: TopUpStatus; amount?: number; checkoutUrl?: string }> {
+  // Sends the browser straight to a PayMongo checkout for the plan; the wallet isn't used.
+  async startPlanCheckout(plan: 'PRO'): Promise<void> {
+    const response = await fetch('/api/wallet/checkout-plan', {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ plan }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 503) throw new Error("Online payments aren't switched on for this site yet.");
+    if (!response.ok) throw new Error(data.error || 'Could not start the payment.');
+    window.location.href = data.checkoutUrl;
+  }
+
+  // Settles a paid top-up or plan payment; safe to call any time.
+  async verifyTopUp(): Promise<{ status: TopUpStatus; amount?: number; plan?: 'PRO'; checkoutUrl?: string }> {
     const response = await fetch('/api/wallet/verify', {
       method: 'POST',
       headers: this.getAuthHeader(),
@@ -67,29 +80,6 @@ class PaymentService {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not check the payment.');
     return data;
-  }
-
-  async purchaseSubscription(plan: 'PRO' | 'ENTERPRISE', cost: number): Promise<boolean> {
-    const userId = this.getUserId();
-    if (!userId) throw new Error("Not authenticated");
-
-    const response = await fetch('/api/wallet/purchase', {
-      method: 'POST',
-      headers: this.getAuthHeader(),
-      body: JSON.stringify({
-        userId,
-        amount: cost,
-        description: `Subscription Upgrade: ${plan}`,
-        plan
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Purchase failed");
-    }
-
-    return true;
   }
 
   async cancelSubscription(): Promise<boolean> {

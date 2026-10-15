@@ -49,5 +49,5 @@ export const socialService = {
       }),
     }),
 
-  sync: () => request<{ published: number; failed: number }>('/api/social/sync', { method: 'POST' }),
+  sync: () => request<{ published: number; failed: number; failedIds: string[] }>('/api/social/sync', { method: 'POST' }),
 };
