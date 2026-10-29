@@ -153,7 +153,8 @@ const Billing: React.FC = () => {
       {wallet.paymentsTestMode && (
         <p className="text-[13px] -mt-2" style={{ color: 'var(--fg-muted)' }}>
           <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: 'var(--warning)' }} />
-          Test mode: payments use PayMongo's sandbox, so no real money is charged.
+          Test mode: payments use PayMongo's sandbox, so no real money is charged. Pay with card 4343 4343 4343 4345 (any future
+          expiry, any CVC), or pick GCash or Maya and click Authorize on PayMongo's test page.
         </p>
       )}
 

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Captions, CaptionsOff, Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-react';
 
-/** Chapters of public/demo/kawayan-demo.mp4 (a real screen recording with a voice-over; AI waits sped up).
- *  Each chapter's narration starts after its `at`, so jumping never lands mid-sentence. */
+/** Chapters of public/demo/kawayan-promo.mp4 (the promo from ../kawayan-promo, built from real app screens).
+ *  Each chapter's narration starts just after its `at`, so jumping never lands mid-sentence. */
 const CHAPTERS = [
-  { at: 0, title: 'Plan your month', text: 'Set a focus and Kawayan drafts 16 dated post ideas.' },
-  { at: 10.9, title: 'AI writes the post', text: 'A Taglish caption, a matching visual and a virality score.' },
-  { at: 20.2, title: 'Preview everywhere', text: 'See it as it will look on Instagram, TikTok and Facebook.' },
-  { at: 26, title: 'Schedule it', text: 'Pick a time and it goes out on Facebook and Instagram.' },
+  { at: 0, title: 'Meet Kawayan', text: 'Why posting every day is hard, and who Kawayan is for.' },
+  { at: 11.1, title: 'Plan and write', text: 'Kawayan drafts the month and writes each post in Taglish.' },
+  { at: 22.9, title: 'Schedule and track', text: 'Facebook and Instagram on one timeline, posted for you.' },
+  { at: 33, title: 'Make it yours', text: 'Four themes, an admin console, and the plans.' },
 ];
 
 interface Props {
@@ -29,7 +29,7 @@ const DemoModal: React.FC<Props> = ({ open, onClose, onStart }) => {
   const videoRef = useRef<FullscreenVideo>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(40.5);
+  const [duration, setDuration] = useState(48.2);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -104,8 +104,8 @@ const DemoModal: React.FC<Props> = ({ open, onClose, onStart }) => {
     >
       <div className="lp-demo__panel">
         <div className="lp-demo__title">
-          <h2 id="lp-demo-title">Kawayan in 40 seconds</h2>
-          <p>A real recording of the app. AI wait times are sped up.</p>
+          <h2 id="lp-demo-title">Kawayan in under a minute</h2>
+          <p>A quick tour built from real screens of the app.</p>
         </div>
         <button type="button" className="lp-demo__cta" onClick={onStart}>
           Start Free Trial <ArrowRight className="w-4 h-4" />
@@ -119,12 +119,12 @@ const DemoModal: React.FC<Props> = ({ open, onClose, onStart }) => {
             <video
               ref={videoRef}
               className="lp-demo__video"
-              src="/demo/kawayan-demo.mp4"
-              poster="/demo/kawayan-demo.jpg"
+              src="/demo/kawayan-promo.mp4"
+              poster="/demo/kawayan-promo.jpg"
               width={1920}
-              height={1200}
+              height={1080}
               playsInline
-              aria-label="Screen recording: planning a month of posts, writing a Taglish caption and visual with AI, previewing it on Instagram, TikTok and Facebook, then scheduling it"
+              aria-label="Kawayan promo: planning a month of posts, writing Taglish captions with AI, scheduling to Facebook and Instagram, tracking posts, themes and the admin console"
               onClick={toggle}
               onPlay={() => {
                 setPlaying(true);
@@ -136,7 +136,7 @@ const DemoModal: React.FC<Props> = ({ open, onClose, onStart }) => {
               onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
             >
-              <track kind="captions" src="/demo/kawayan-demo.vtt" srcLang="en" label="English" default />
+              <track kind="captions" src="/demo/kawayan-promo.vtt" srcLang="en" label="English" default />
             </video>
           )}
           {!playing && (

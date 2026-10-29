@@ -667,16 +667,21 @@ export class SupabaseService {
   async getAllUsers(): Promise<User[]> {
     const { data: rows, error } = await this.supabase
       .from('users')
-      .select('id, email, role, business_name, created_at')
+      .select('id, email, role, business_name, created_at, wallets(balance, subscription)')
       .order('created_at', { ascending: false });
     if (error || !rows) return [];
-    return rows.map(row => ({
-      id: row.id,
-      email: row.email,
-      role: row.role,
-      businessName: row.business_name,
-      createdAt: row.created_at,
-    }));
+    return rows.map((row: any) => {
+      const wallet = Array.isArray(row.wallets) ? row.wallets[0] : row.wallets;
+      return {
+        id: row.id,
+        email: row.email,
+        role: row.role,
+        businessName: row.business_name,
+        createdAt: row.created_at,
+        balance: wallet?.balance ?? 0,
+        subscription: wallet?.subscription ?? 'FREE',
+      };
+    });
   }
 
   async updateUser(userId: string, data: any): Promise<void> {
@@ -898,11 +903,13 @@ export class SupabaseService {
       .gte('created_at', startFilter)
       .lte('created_at', endFilter);
 
+    // Money actually received: paid PayMongo checkouts (wallet top-ups and plan upgrades).
+    // Admin balance adjustments are COMPLETED credits too, but they aren't income.
     const { data: revenueData } = await this.supabase
       .from('transactions')
       .select('amount')
       .eq('status', 'COMPLETED')
-      .eq('type', 'CREDIT')
+      .ilike('description', '%via PayMongo%')
       .gte('date', startFilter)
       .lte('date', endFilter);
     const revenue = revenueData ? revenueData.reduce((sum, r) => sum + r.amount, 0) : 0;
@@ -982,13 +989,7 @@ export class SupabaseService {
       const [year, month] = key.split('-');
       const date = new Date(parseInt(year), parseInt(month)-1, 1);
       const active = monthActiveMap[key].size;
-      // total users up to that month
-      const { count: totalUsersTill } = this.supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .lte('created_at', new Date(parseInt(year), parseInt(month)-1, 28).toISOString());
-      // This is async but we are in async function, but we already have totalUsers count above. For simplicity, we'll use the overall total for the period.
-      // We'll compute rate based on total users in that month's cohort - but we'll approximate.
+      // Approximation: active posters that month over all users today, not that month's cohort.
       const rate = totalUsers > 0 ? Math.round((active / totalUsers) * 100) : 0;
       return {
         name: date.toLocaleDateString('en-US', { month: 'short' }),

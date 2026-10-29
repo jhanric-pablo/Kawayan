@@ -447,7 +447,7 @@ html:has(.lp-demo[open]) { overflow: hidden; }
 .lp-demo__stage {
   grid-area: stage;
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   border-radius: 14px;
   overflow: hidden;
   background: #f6f8f7; /* the app's page color, until the first frame paints */

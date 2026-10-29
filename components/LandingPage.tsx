@@ -382,7 +382,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           <div className="text-center mt-14 reveal">
             <button type="button" className="lp-watch" onClick={() => setDemoOpen(true)}>
               <span className="lp-play" aria-hidden><Play className="w-3 h-3" /></span>
-              Watch it happen in 40 seconds
+              Watch it happen in under a minute
             </button>
           </div>
         </div>

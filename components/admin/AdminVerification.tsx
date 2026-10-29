@@ -25,7 +25,7 @@ const TAG: Record<string, string> = {
 };
 
 const StatusTag: React.FC<{ status: string }> = ({ status }) => (
-  <span className={clsx('inline-flex shrink-0 rounded border px-1.5 text-[10.5px] font-semibold capitalize leading-[18px]', TAG[status] ?? TAG.pending)}>{status}</span>
+  <span className={clsx('inline-flex shrink-0 rounded-full border px-2 text-[11px] font-semibold capitalize leading-5', TAG[status] ?? TAG.pending)}>{status}</span>
 );
 
 const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -101,31 +101,31 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
   const counts = (f: VerifFilter) => (f === 'all' ? verifications.length : verifications.filter((v) => v.status === f).length);
 
   return (
-    <div className="grid min-h-[calc(100vh-9rem)] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--card)] lg:grid-cols-[340px_minmax(0,1fr)]">
+    <div className="grid min-h-[calc(100vh-12rem)] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-xs)] lg:grid-cols-[340px_minmax(0,1fr)]">
       {/* Queue */}
       <aside className="flex min-h-0 flex-col border-b border-[var(--border)] lg:border-b-0 lg:border-r" aria-label="Submissions">
-        <div className="space-y-2 border-b border-[var(--border)] p-2">
-          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
+        <div className="space-y-2.5 border-b border-[var(--border)] p-3">
+          <div className="adm-segment adm-segment--full" role="group" aria-label="Filter by status">
             {(['pending', 'verified', 'rejected', 'all'] as const).map((f) => (
               <button
                 key={f}
                 type="button"
                 aria-pressed={filter === f}
                 onClick={() => onFilter(f)}
-                className="rounded border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium capitalize text-[var(--fg-muted)] hover:text-[var(--fg)] aria-pressed:border-[var(--fg)] aria-pressed:bg-[var(--fg)] aria-pressed:text-[var(--bg)]"
+                className="capitalize"
               >
                 {f} <span className="font-mono opacity-70">{counts(f)}</span>
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--bg)] px-2 focus-within:border-[var(--primary)]">
+          <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-alt)] px-3 focus-within:border-[var(--primary)]">
             <Search className="h-3.5 w-3.5 shrink-0 text-[var(--fg-subtle)]" aria-hidden />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Business, email or account ID"
               aria-label="Filter submissions"
-              className="h-7 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--fg-subtle)]"
+              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--fg-subtle)]"
             />
           </label>
         </div>
@@ -142,12 +142,12 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
                   onClick={() => onSelect(v.id)}
                   aria-current={v.id === selectedId || undefined}
                   className={clsx(
-                    'block w-full px-3 py-2 text-left hover:bg-[var(--bg-alt)]',
+                    'block w-full px-4 py-3 text-left hover:bg-[var(--bg-alt)]',
                     v.id === selectedId && 'bg-[var(--bg-alt)] shadow-[inset_2px_0_0_var(--primary)]',
                   )}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{v.businessName || 'Unnamed business'}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{v.businessName || 'Unnamed business'}</span>
                     <StatusTag status={v.status} />
                   </span>
                   <span className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--fg-muted)]">
@@ -170,15 +170,15 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
           <p className="m-auto p-8 text-xs text-[var(--fg-muted)]">Select a submission to review.</p>
         ) : (
           <>
-            <header className="flex items-start gap-3 border-b border-[var(--border)] px-4 py-2.5">
+            <header className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-4">
               <div className="min-w-0 flex-1">
-                <h2 className="truncate text-sm font-semibold">{selected.businessName || 'Unnamed business'}</h2>
+                <h2 className="truncate font-display text-base font-bold">{selected.businessName || 'Unnamed business'}</h2>
                 <p className="truncate font-mono text-[11px] text-[var(--fg-muted)]">{selected.email}</p>
               </div>
               <StatusTag status={selected.status} />
             </header>
 
-            <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-1 border-b border-[var(--border)] px-4 py-2.5 text-xs sm:grid-cols-[96px_minmax(0,1fr)_96px_minmax(0,1fr)]">
+            <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-b border-[var(--border)] px-5 py-3.5 text-xs sm:grid-cols-[96px_minmax(0,1fr)_96px_minmax(0,1fr)]">
               <dt className="text-[var(--fg-muted)]">Account ID</dt>
               <dd className="truncate font-mono text-[11px]">{selected.userId}</dd>
               <dt className="text-[var(--fg-muted)]">Phone</dt>
@@ -221,7 +221,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
             </div>
 
             {selected.status === 'pending' && (
-              <footer className="sticky bottom-0 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card)] px-4 py-2">
+              <footer className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t border-[var(--border)] bg-[var(--card)] px-5 py-3">
                 <span className="mr-auto text-[11px] text-[var(--fg-muted)]">Approving gives the owner full access right away.</span>
                 <button type="button" onClick={() => onReject(selected)} className="btn btn-danger btn-sm">
                   <X className="h-3.5 w-3.5" /> Reject <Kbd>R</Kbd>
