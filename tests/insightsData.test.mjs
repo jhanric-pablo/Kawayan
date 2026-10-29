@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import {
   dailyHistory, combineHistories, periods, summarize, postStats, postsInPeriod, comparePosts, toCsv,
-} from '../utils/insightsData.ts';
+} from '../src/utils/insightsData.ts';
 
 const today = new Date(2026, 9, 6, 15); // 6 Oct 2026, mid-afternoon
 

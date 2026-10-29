@@ -3,7 +3,7 @@
  * Run: npx tsx tests/timelineLanes.test.mjs
  */
 import assert from 'node:assert/strict';
-import { bucketByLane } from '../components/calendar/mapCalendarEvents.ts';
+import { bucketByLane } from '../src/components/calendar/mapCalendarEvents.ts';
 
 const month = new Date(2026, 9, 1); // October 2026
 const post = (id, date, status) => ({ id, userId: 'u1', date, topic: id, caption: '', imagePrompt: '', status, regenCount: 0, history: [] });

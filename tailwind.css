@@ -1,5 +1,0 @@
-/* Built by Vite + PostCSS (was the Tailwind CDN). Imported first in index.tsx so it sits
-   where the CDN injected it: after index.html's design tokens, before component CSS. */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;

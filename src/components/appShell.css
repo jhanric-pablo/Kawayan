@@ -1,0 +1,53 @@
+/* ── Account menu (header) ── */
+.am { position: relative; }
+.am__btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px 0 3px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card); transition: border-color 0.15s;
+}
+.am__btn:hover, .am__btn[aria-expanded='true'] { border-color: var(--border-strong); }
+.am__avatar {
+  width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--primary-accent); color: var(--primary-accent-fg); font-size: 12px; font-weight: 700;
+}
+.am__chev { width: 14px; height: 14px; color: var(--fg-muted); }
+.am__menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; width: 250px; padding: 6px;
+  border-radius: var(--radius-md); background: var(--card); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg);
+  animation: am-pop 0.14s ease-out both;
+}
+@keyframes am-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.am__who { display: grid; gap: 2px; padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.am__who b { font-size: 13.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am__who span { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am__plan { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.am__plan button { font-weight: 700; color: var(--primary); }
+.am__plan button:hover { text-decoration: underline; }
+.am__item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: var(--radius);
+  font-size: 13.5px; font-weight: 500; color: var(--fg); text-align: left; outline: none;
+}
+.am__item svg { width: 16px; height: 16px; color: var(--fg-muted); }
+.am__item:hover, .am__item:focus-visible { background: var(--bg-alt); }
+.am__item--out { color: var(--danger); }
+.am__item--out svg { color: var(--danger); }
+
+/* ── Bottom tab bar (phones) ── */
+.kw-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+  display: flex; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 1px solid var(--border); box-shadow: 0 -6px 20px -14px rgba(0, 0, 0, 0.35);
+}
+.kw-tabbar button {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 2px;
+  border-radius: var(--radius); font-size: 10.5px; font-weight: 600; color: var(--fg-subtle); transition: color 0.15s;
+}
+.kw-tabbar button svg { width: 21px; height: 21px; }
+.kw-tabbar button[aria-current='page'] { color: var(--primary); }
+.kw-tabbar button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* content and fixed bars clear the tab bar */
+body.has-tabbar main { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+body.has-tabbar .in-tray { bottom: calc(76px + env(safe-area-inset-bottom)) !important; }
+body.has-tabbar .st-savebar { bottom: calc(76px + env(safe-area-inset-bottom)); }
+@media (prefers-reduced-motion: reduce) {
+  .am__menu { animation: none; }
+}

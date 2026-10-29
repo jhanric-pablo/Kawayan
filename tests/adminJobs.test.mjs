@@ -3,7 +3,7 @@
  * Run: npx tsx tests/adminJobs.test.mjs
  */
 import assert from 'node:assert/strict';
-import { buildJobs } from '../utils/adminJobs.ts';
+import { buildJobs } from '../src/utils/adminJobs.ts';
 
 const who = 'Kapebara Café <owner@kapebara.ph> (id:u1)';
 const log = (id, action, details, timestamp) => ({ id, user_id: 'u1', action, details, timestamp });

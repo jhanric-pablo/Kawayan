@@ -1,4 +1,4 @@
-<img src="logo.png" alt="Kawayan logo" width="72" align="right">
+<img src="public/logo.png" alt="Kawayan logo" width="72" align="right">
 
 # Kawayan
 
@@ -20,8 +20,9 @@ The free trial allows 8 posts a month. Pro is ₱499 a month for 16 posts and de
 
 | Part | What we used |
 | --- | --- |
-| Frontend | React 19, TypeScript, Vite, Tailwind |
-| Backend | Express 5 (`server.js`), Socket.IO for support chat and call signalling |
+| Frontend | React 19, TypeScript, Vite, Tailwind 4 |
+| UI components | shadcn/ui on Base UI, themed with our own palette |
+| Backend | Express 5, Zod for request validation, Socket.IO for support chat and call signalling |
 | Database and file storage | Supabase (Postgres) |
 | Text generation | `gpt-oss-120b` on Groq, falling back to Cloudflare Workers AI |
 | Image generation | Stable Diffusion XL on Cloudflare Workers AI |
@@ -66,16 +67,26 @@ The tests in `tests/` are plain `node:assert` scripts. They cover the logic that
 ## Project layout
 
 ```
-components/   React screens, grouped by area (calendar, admin, auth, landing, tour)
-services/     Clients for AI, payments, social, support, and Supabase
-utils/        Tier limits, insights maths, mailer, session helpers
-server.js     Express API, including the AI fallback, PayMongo, and Zernio calls
-scripts/      Supabase schema and the system guide PDF generator
-tests/        Test scripts
-md/           Longer documents written for the capstone paper
+src/
+  components/   React screens, grouped by area (calendar, admin, auth, landing, tour)
+  components/ui shadcn/ui components (dialog, menu, sheet, popover, tabs, and so on)
+  styles/       theme.css holds every colour, font, radius and shadow token
+  services/     Clients for AI, payments, social, support, and Supabase
+  utils/        Tier limits, insights maths, mailer, session helpers
+  constants/    Industries, brand voices, terms of service text
+server.js       Starts the API: middleware, static files, and the routes below
+server/
+  routes/       One file per area: auth, posts, payments, admin, verification, social, support, ai
+  shared.js     Auth checks, the Zod validate() helper, and the database client
+  realtime.js   Socket.IO for support chat, calls, and live updates
+public/         Logo, privacy policy, and terms pages
+scripts/        Supabase schema
+tests/          Test scripts
 ```
 
-The documents in `md/` are the system guide, API reference, and schema notes from our paper. Some still describe an older setup (SQLite, Xendit, Gemini). Where they disagree with the code, the code is right.
+Every request body is checked with a Zod schema before it reaches the database, and anything not in the schema is dropped. The schemas sit at the top of each route file.
+
+To add a shadcn component, run `npx shadcn@latest add <name>`. Its colors come from the tokens in `src/styles/theme.css`, so it follows the light, dark, Cool Slate, and Terracotta themes without extra work.
 
 ## Limitations
 

@@ -3,7 +3,7 @@
  * Run: npx tsx tests/aiValidation.test.mjs
  */
 import assert from 'node:assert/strict';
-import { normalizeFormat, ValidationService } from '../services/validationService.ts';
+import { normalizeFormat, ValidationService } from '../src/services/validationService.ts';
 
 assert.equal(normalizeFormat('Reel'), 'Video');
 assert.equal(normalizeFormat('IGTV'), 'Video');

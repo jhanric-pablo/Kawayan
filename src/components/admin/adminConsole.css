@@ -1,0 +1,237 @@
+/* ═══════════════════════════════════════════════════════════════
+   Admin console — panels, KPI tiles, tables and controls the tabs share.
+   Soft cards on the theme's own tokens, so every theme (and dark) applies.
+   The shell (top bar, sidebar) is in AdminDashboard.tsx.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar nav ───────────────────────────────────────────────── */
+.adm-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.625rem;
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.adm-nav:hover { background: var(--bg-alt); color: var(--fg); }
+.adm-nav[aria-current='page'] {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-weight: 700;
+}
+.dark .adm-nav[aria-current='page'] { color: var(--fg); background: color-mix(in srgb, var(--primary) 26%, transparent); }
+.adm-nav__count {
+  min-width: 1.375rem;
+  padding: 0 0.4rem;
+  border-radius: 9999px;
+  background: var(--bg-alt);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+.adm-nav[aria-current='page'] .adm-nav__count { background: var(--card); color: inherit; }
+
+/* ── Panels ─────────────────────────────────────────────────────── */
+.adm-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+.adm-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+.adm-panel__title { font-family: var(--font-display); font-weight: 700; font-size: 0.9375rem; color: var(--fg); }
+.adm-panel__desc { font-size: 0.75rem; color: var(--fg-muted); margin-top: 0.125rem; }
+
+/* A headline number beside a panel title */
+.adm-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.adm-figure small { font-family: var(--font-ui); font-size: 0.6875rem; font-weight: 500; color: var(--fg-muted); }
+
+/* ── KPI tiles ─────────────────────────────────────────────────── */
+.adm-kpi {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon label' 'value value' 'hint hint';
+  align-items: center;
+  column-gap: 0.625rem;
+  row-gap: 0.25rem;
+  padding: 1rem;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-xs);
+}
+.adm-kpi--link { cursor: pointer; transition: border-color 0.14s ease, transform 0.14s ease; }
+.adm-kpi--link:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.adm-kpi__icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  background: var(--kw-green-pale);
+  color: var(--primary);
+}
+.dark .adm-kpi__icon { color: var(--kw-sage-light); }
+.adm-kpi__label { grid-area: label; font-size: 0.75rem; font-weight: 600; color: var(--fg-muted); }
+.adm-kpi__value {
+  grid-area: value;
+  margin-top: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.adm-kpi__hint { grid-area: hint; font-size: 0.6875rem; color: var(--fg-subtle); }
+.adm-kpi--accent {
+  border-color: transparent;
+  background: linear-gradient(140deg, var(--kw-forest), var(--primary));
+}
+.adm-kpi--accent .adm-kpi__icon { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.adm-kpi--accent .adm-kpi__label,
+.adm-kpi--accent .adm-kpi__hint { color: rgba(255, 255, 255, 0.78); }
+.adm-kpi--accent .adm-kpi__value { color: #fff; }
+
+/* ── Segmented control (range presets, filters, tabs) ──────────── */
+.adm-segment {
+  display: inline-flex;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border-radius: 0.75rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+}
+.adm-segment--full { display: flex; width: 100%; }
+.adm-segment > button {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: 0.5625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+.adm-segment > button:hover { color: var(--fg); }
+.adm-segment > button[aria-pressed='true'],
+.adm-segment > button[aria-selected='true'] {
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: var(--shadow-sm);
+}
+.dark .adm-segment > button[aria-pressed='true'],
+.dark .adm-segment > button[aria-selected='true'] { background: color-mix(in srgb, var(--fg) 12%, var(--card)); }
+
+/* ── Data tables ───────────────────────────────────────────────── */
+.adm-table-wrap { overflow-x: auto; }
+.adm-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.adm-table thead th {
+  text-align: left;
+  padding: 0.625rem 1rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.adm-table thead th.text-right { text-align: right; }
+.adm-table thead th button { font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.adm-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  vertical-align: middle;
+}
+.adm-table tbody tr:last-child td { border-bottom: none; }
+.adm-table tbody tr { transition: background 0.12s ease; }
+.adm-table tbody tr:hover { background: var(--bg-alt); }
+.adm-table__mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem; color: var(--fg-muted); }
+.adm-table__primary { font-weight: 600; color: var(--fg); }
+.adm-table__money { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.dark .adm-table__money { color: var(--kw-sage-light); }
+
+.adm-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 0.625rem;
+  border: 1px solid transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.adm-icon-btn:hover { background: var(--bg-alt); color: var(--fg); border-color: var(--border); }
+.adm-icon-btn--danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+.adm-icon-btn--primary:hover { background: var(--kw-green-pale); color: var(--primary); border-color: color-mix(in srgb, var(--kw-green) 22%, transparent); }
+
+.adm-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 7rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 0.8125rem;
+}
+.adm-spinner {
+  width: 28px; height: 28px;
+  margin: 3rem auto;
+  border-radius: 9999px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--primary);
+  animation: adm-spin 0.7s linear infinite;
+}
+@keyframes adm-spin { to { transform: rotate(360deg); } }
+
+.adm-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-kpi--link:hover { transform: none; }
+}

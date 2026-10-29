@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 // tourPlacement.ts is plain TS with only type syntax; strip it so node can
 // import it without a build step.
 const here = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(here, '..', 'utils', 'tourPlacement.ts'), 'utf8');
+const src = readFileSync(join(here, '..', 'src', 'utils', 'tourPlacement.ts'), 'utf8');
 const js = src
   .replace(/export interface [\s\S]*?\n}\n/g, '')
   .replace(/: Rect \| null|: Size|: Placement|: 'top' \| 'bottom'|: number/g, '')
