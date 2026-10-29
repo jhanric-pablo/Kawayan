@@ -1,34 +1,98 @@
-# Kawayan AI - Social Media Content Manager for PH SMEs
+<img src="logo.png" alt="Kawayan logo" width="72" align="right">
 
-Kawayan AI is a professional content automation and management platform tailored for Filipino Small and Medium Enterprises (SMEs).
+# Kawayan
 
-## 🚀 Key Features
-- **AI Content Planning**: 7-day and monthly social media calendars in Taglish.
-- **Hybrid AI Engine**: Cloud-first (Google Gemini) with Local-fallback (Ollama).
-- **Social Media Integration**: TikTok, Facebook, and Instagram connection and insights.
-- **Administrative Governance**: Audit logs, user management, and manual wallet adjustments.
-- **Dedicated Support**: Built-in help desk with live call capabilities.
+Kawayan plans, writes, and schedules social media posts for small businesses in the Philippines. A business owner fills in a short brand survey. Kawayan then drafts a month of Facebook and Instagram posts in Taglish, with captions and images, and puts them on a calendar where the owner can edit them before they go out.
 
-## 📖 Documentation
-All detailed documentation is available in the [`/md`](./md) directory. Follow the logical flow below:
+This is our capstone project. It runs end to end: real accounts, a real database, payments through PayMongo in test mode, and posting to connected Facebook and Instagram pages. It hasn't been used by paying customers, and some parts are sized for a demo, not for heavy traffic. See [Limitations](#limitations).
 
-0. [**System Guide**](./md/SYSTEM_GUIDE.md) — **Capstone submission**. Complete 20-section technical manual ([PDF](./md/SYSTEM_GUIDE.pdf) via `npm run guide:system-pdf`).
-1. [**User Guide**](./md/USER_GUIDE.md) - **Start Here**. Overview for SMEs, Support, and Admins.
-2. [**Feature Checklist**](./md/FEATURE_CHECKLIST.md) - Functional scope status (done / enhanced / N/A).
-3. [**System Manual**](./md/SYSTEM_MANUAL.md) - Technical operations and troubleshooting.
-4. [**Architecture**](./md/ARCHITECTURE.md) - Tech stack and system design.
-5. [**Database Schema**](./md/DATABASE_SCHEMA.md) - Entity definitions and relationships.
-6. [**Developer Guide**](./md/DEVELOPER_GUIDE.md) - Setup, commands, and contributions.
-7. [**API Guide**](./md/API_GUIDE.md) - Backend REST endpoint documentation.
-8. [**Account Types**](./md/ACCOUNTS.md) - Detailed role and permission matrix.
-9. [**Tables Summary**](./md/ALL_TABLES.md) - Quick reference for database tables.
-10. [**Social Auth**](./md/SOCIAL_AUTH.md) - Configuration for TikTok/Facebook.
-11. [**Payment Setup**](./md/PAYMENT_SETUP.md) - Xendit integration guide.
+## What it does
 
-## 🛠️ Quick Start
-1. `npm install`
-2. `cp .env.example .env` (Add your Gemini API Key)
-3. `npm run dev:full`
+**For business owners.** Sign up, answer the brand survey (industry, tone, audience), and upload a business document for verification. Then generate a whole month's content plan in one go, or write single posts in the post studio with a phone-sized preview. Each post sits on a timeline with one lane per connected account, and moves from draft to scheduled to published. The insights page compares how posts performed and exports the numbers.
 
----
-&copy; 2025 Kawayan AI. Designed for the Philippine SME ecosystem.
+**For support staff.** A ticket queue, plus in-app video calls with users over WebRTC.
+
+**For admins.** Approving business verifications, managing users and wallet balances, checking pending payments, and reading the audit log.
+
+The free trial allows 8 posts a month. Pro is ₱499 a month for 16 posts and deeper analytics. Extra posts cost ₱150 each from the wallet.
+
+## How it's built
+
+| Part | What we used |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Tailwind |
+| Backend | Express 5 (`server.js`), Socket.IO for support chat and call signalling |
+| Database and file storage | Supabase (Postgres) |
+| Text generation | `gpt-oss-120b` on Groq, falling back to Cloudflare Workers AI |
+| Image generation | Stable Diffusion XL on Cloudflare Workers AI |
+| Payments | PayMongo (GCash, Maya, cards) |
+| Posting to Facebook and Instagram | Zernio |
+| Email | Resend |
+| Hosting | Render (`render.yaml`) |
+
+Groq goes first because it's faster. When it hits its free daily limit, Cloudflare takes over with the same model.
+
+## Running it locally
+
+You'll need Node 20 or newer and a free Supabase project.
+
+1. Install dependencies.
+   ```sh
+   npm install
+   ```
+2. Copy the environment file and fill it in. Each variable has a comment explaining where to get it.
+   ```sh
+   cp .env.example .env
+   ```
+   Only the Supabase keys are required for the app to start. The other keys turn on features: Groq or Cloudflare for AI, PayMongo for payments, Zernio for posting, Resend for email.
+3. In the Supabase SQL editor, run `scripts/supabase_schema.sql`. Running it again is safe.
+4. Start the frontend and API together.
+   ```sh
+   npm run dev:full
+   ```
+   The app opens at <http://localhost:3000>. The API runs on port 3001.
+
+Other scripts:
+
+```sh
+npm run typecheck              # type-check without building
+npm run build                  # production build into dist/
+npm start                      # serve dist/ and the API from one process
+npx tsx tests/<name>.test.mjs  # run one test file
+```
+
+The tests in `tests/` are plain `node:assert` scripts. They cover the logic that's easy to break: AI plan validation, timeline lanes, insights maths, admin jobs, and tour placement. Each one prints a line when it passes and throws when it fails.
+
+## Project layout
+
+```
+components/   React screens, grouped by area (calendar, admin, auth, landing, tour)
+services/     Clients for AI, payments, social, support, and Supabase
+utils/        Tier limits, insights maths, mailer, session helpers
+server.js     Express API, including the AI fallback, PayMongo, and Zernio calls
+scripts/      Supabase schema and the system guide PDF generator
+tests/        Test scripts
+md/           Longer documents written for the capstone paper
+```
+
+The documents in `md/` are the system guide, API reference, and schema notes from our paper. Some still describe an older setup (SQLite, Xendit, Gemini). Where they disagree with the code, the code is right.
+
+## Limitations
+
+- PayMongo runs in test mode, so no real money moves.
+- Posting works for Facebook and Instagram only.
+- The AI providers are on free tiers, so many plan generations in one day can hit the daily limit.
+- Render's free plan sleeps when idle. The first request after a quiet period can take up to a minute.
+
+## Team
+
+| Name | GitHub |
+| --- | --- |
+| Karl Benjamin Bughaw | |
+| Jhanric Pablo | [@jhanric-pablo](https://github.com/jhanric-pablo) |
+| | [@AfgunIsGun](https://github.com/AfgunIsGun) |
+| | [@arod821](https://github.com/arod821) |
+
+## License
+
+BSD 2-Clause. See [LICENSE](LICENSE).
