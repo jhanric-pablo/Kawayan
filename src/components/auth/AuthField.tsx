@@ -12,6 +12,8 @@ interface Props {
   autoFocus?: boolean;
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
   placeholder?: string;
+  /** On the label's line, at the right (e.g. "Forgot password?"). */
+  labelAside?: React.ReactNode;
 }
 
 /**
@@ -20,10 +22,17 @@ interface Props {
  */
 const AuthField: React.FC<Props> = ({
   id, label, value, onChange, type = 'text', trailing,
-  required, autoComplete, autoFocus, inputMode, placeholder,
+  required, autoComplete, autoFocus, inputMode, placeholder, labelAside,
 }) => (
   <div className="ax-field">
-    <label htmlFor={id} className="ax-label">{label}</label>
+    {labelAside ? (
+      <div className="ax-label-row">
+        <label htmlFor={id} className="ax-label">{label}</label>
+        {labelAside}
+      </div>
+    ) : (
+      <label htmlFor={id} className="ax-label">{label}</label>
+    )}
     <div className={`ax-field__box${trailing ? ' ax-field__box--trailing' : ''}`}>
       <input
         id={id}

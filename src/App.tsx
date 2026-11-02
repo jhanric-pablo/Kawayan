@@ -17,6 +17,7 @@ import { usePhone } from './utils/usePhone';
 import InsightsDashboard from './components/InsightsDashboard';
 import SocialAccounts from './components/SocialAccounts';
 import HelpDesk from './components/HelpDesk';
+import OnboardingBar from './components/onboarding/OnboardingBar';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
 import VerificationStatusScreen from './components/VerificationStatus';
@@ -805,6 +806,9 @@ const App: React.FC = () => {
                 <span className="badge badge-sage ml-1">Support</span>
               )}
             </div>
+
+            {/* Onboarding: where you are, and the help desk */}
+            {isLoggedIn && user?.role === 'user' && view === ViewState.VERIFICATION && <OnboardingBar current={1} />}
 
             {/* Nav items + actions */}
             <div className="flex items-center gap-2">

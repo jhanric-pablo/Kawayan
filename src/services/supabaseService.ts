@@ -290,6 +290,9 @@ export class SupabaseService {
       brand_colors: JSON.stringify(profile.brandColors || []),
       contact_email: profile.contactEmail || null,
       contact_phone: profile.contactPhone || null,
+      // Only sent when the caller has them (the columns may not exist before the migration).
+      ...(profile.city !== undefined ? { city: profile.city || null } : {}),
+      ...(profile.language !== undefined ? { language: profile.language || null } : {}),
     };
 
     if (existing) {
@@ -327,6 +330,9 @@ export class SupabaseService {
       brandColors: row.brand_colors ? JSON.parse(row.brand_colors) : [],
       contactEmail: row.contact_email,
       contactPhone: row.contact_phone,
+      // Present only once the migration has added the columns.
+      ...('city' in row ? { city: row.city ?? '' } : {}),
+      ...('language' in row ? { language: row.language ?? null } : {}),
     };
   }
 

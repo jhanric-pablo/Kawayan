@@ -119,10 +119,10 @@ export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, t
     Brand Identity:
     - Target Audience: ${profile.targetAudience}
     - Brand Voice: ${profile.brandVoice}
-    - Key Themes: ${profile.keyThemes}
+    - Key Themes: ${profile.keyThemes}${profile.city ? `\n    - Location: ${profile.city} (use local references from here when they fit)` : ''}
 
     Instructions:
-    1.  **Caption:** Write a compelling, high-engagement caption in natural, modern Taglish (mix of Tagalog and English). 
+    1.  **Caption:** Write a compelling, high-engagement caption in ${profile.language === 'English' ? 'clear, friendly Philippine English (no Tagalog)' : profile.language === 'Filipino' ? 'natural Filipino (Tagalog), with English only for brand or product names' : 'natural, modern Taglish (mix of Tagalog and English)'}. 
         - DO NOT use generic phrases like "Check out our amazing..." or "Perfect for you".
         - BE CREATIVE. Use "Hugot", storytelling, or relatable humor that matches the brand voice.
         - Include relevant emojis and 3-5 hyper-local hashtags.

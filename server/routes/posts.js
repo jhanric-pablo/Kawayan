@@ -18,6 +18,9 @@ const profileSchema = z.object({
   brandColors: z.array(z.string().max(20)).max(20).optional(),
   contactEmail: optionalText(254),
   contactPhone: optionalText(50),
+  // Need the brand_profiles city / language columns (scripts/migrations/2026-11-02-brand-city-language.sql).
+  city: optionalText(120),
+  language: z.enum(['Taglish', 'English', 'Filipino']).nullish(),
 });
 
 const postSchema = z.object({

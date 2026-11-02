@@ -37,6 +37,10 @@ export interface BrandProfile {
   brandColors?: string[]; // Array of HEX codes
   contactEmail?: string;
   contactPhone?: string;
+  /** City or area (needs the 2026-11-02 migration; absent until the column exists). */
+  city?: string | null;
+  /** Caption language (same migration). */
+  language?: 'Taglish' | 'English' | 'Filipino' | null;
 }
 
 export interface ContentIdea {

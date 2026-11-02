@@ -394,14 +394,17 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Right rail: business, ticket details, other tickets — **FE** (check and fill what's missing)
 
 ## F7. Auth, Brand DNA, Verification, Landing leftovers
-- [ ] Login: "Forgot password?" beside the password label, "Kept safe" divider + trust list, "Staff sign in" link — **FE**
-- [ ] Sign up: "Log in instead" in the top bar, stepper "1 · Account / 2 · Brand DNA / 3 · Verification" — **FE** (keeps the app's own fields)
-- [ ] Brand DNA: stepper top bar with Help desk link — **FE**; "Where are you?" — **MIG** (same `city` column); Language tabs — **MIG** (`brand_profiles.language`) — hidden until the columns exist
-- [ ] Verification: stepper top bar, "While you wait" cards (Brand DNA, opens after approval, Help desk) — **FE**
+- [x] Login: "Forgot password?" beside the password label, "Kept safe" divider + trust list, "Staff sign in" link — **FE**
+- [x] Sign up: "Log in instead" in the top bar, stepper "1 · Account / 2 · Brand DNA / 3 · Verification" — **FE** (keeps the app's own fields)
+- [x] Brand DNA: stepper top bar with Help desk link — **FE**; "Where are you?" — **MIG** (same `city` column); Language tabs — **MIG** (`brand_profiles.language`) — hidden until the columns exist
+- [x] Verification: stepper top bar, "While you wait" cards (Brand DNA, opens after approval, Help desk) — **FE**
 - [x] Landing — **have** (Phase 1); Integrations / Gallery / Contact stay as ideas (no app content)
 
 ## Migrations for me to run
-(filled in as they are written)
+1. `scripts/migrations/2026-11-02-brand-city-language.sql` — adds `brand_profiles.city` (text) and
+   `brand_profiles.language` (text, Taglish / English / Filipino). Until it runs, Settings hides
+   "Where are you?" and "Language" and nothing is sent for them; after it runs both rows appear,
+   save with the brand profile, and captions use the language and the city as local context.
 
 ### Phase 2 progress log
 
@@ -519,3 +522,13 @@ rail. Added to the rail's Business section: Verification (Approved / Waiting / S
 submitted) and Channels (FB ✓ · IG · expired) from the new staff-only
 `GET /api/staff/owners/:userId/summary` (read-only; never creates a Zernio profile; "—" if
 Zernio can't be reached). "Earlier tickets" is now "Other tickets".
+
+**F7 — Auth, Brand DNA, Verification.** Login: "Forgot password?" sits on the Password label
+line, a "Kept safe" divider heads the trust list, and "Staff sign in" links to the staff login.
+Sign up: "Log in instead" replaces Home in the top bar; its own 3-step wizard (Account / Business
+/ Verify) stays. The onboarding stepper reflects the app's real order — 1 Account, 2
+Verification, 3 Brand DNA: on the verification screen it sits in the top bar with a Help desk
+button (the same help panel), and Brand DNA shows it above the form. Verification adds "While you
+wait" cards (Brand DNA next, connect pages, Help desk). City ("Where are you?") and Language are
+in Settings once the migration runs (see Migrations). Not added: the mockup's testimonial quote
+(it would be a made-up customer).

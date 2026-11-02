@@ -677,3 +677,25 @@
 .bs-preview__post-k { font-family: var(--font-mono); font-weight: 500; color: var(--fg-muted); }
 .bs-preview__post-t { color: var(--fg); }
 .bs-preview__foot { color: var(--fg-muted); border-top-color: var(--border); }
+
+/* ═══════════════ Onboarding steps in the top bar (mockup .ob-top) ═══════════ */
+.ob-top { display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0; margin: 0 1.25rem; }
+.ob-top__tools { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; flex: none; }
+.ob-steps { display: flex; align-items: center; gap: 0.5rem; flex: 1; max-width: 440px; min-width: 0; margin: 0 auto; }
+.ob-steps__s { display: flex; align-items: center; gap: 0.45rem; flex: 1; min-width: 0; font-size: var(--text-ui); color: var(--fg-muted); padding-top: 0.45rem; border-top: 2px solid var(--border); }
+.ob-steps__s.is-done, .ob-steps__s.is-now { color: var(--fg); border-top-color: var(--green); }
+.ob-steps__s.is-now { font-weight: 500; }
+.ob-steps__n { display: grid; place-items: center; line-height: 1; width: 18px; height: 18px; flex: none; border-radius: 999px; font-size: 11px; font-family: var(--font-mono); border: 1px solid var(--border-strong); }
+.ob-steps__s.is-done .ob-steps__n { background: var(--green); border-color: var(--green); color: #fff; }
+.ob-steps__s.is-done .ob-steps__n svg { width: 11px; height: 11px; }
+.ob-steps__s.is-now .ob-steps__n { border-color: var(--green); color: var(--green-ink); }
+.ob-steps__l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .ob-steps__l { display: none; } .ob-top { margin: 0 0.5rem; gap: 0.5rem; } .ob-top__tools .btn span { display: none; } }
+
+/* "While you wait" cards on the verification screen */
+.vs-wait { display: grid; gap: 0.6rem; margin-top: 1.25rem; }
+.vs-wait__h { font-size: 15px; font-weight: 600; color: var(--fg); }
+.vs-wait__c { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); text-align: left; }
+.vs-wait__c svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--green-ink); }
+.vs-wait__c b { display: block; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
+.vs-wait__c span { display: block; font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.45; }

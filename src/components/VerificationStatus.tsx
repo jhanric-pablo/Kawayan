@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut,
-  Shield, ArrowRight, Check, Sparkles, Send,
+  Shield, ArrowRight, Check, Sparkles, Send, Link2, LifeBuoy,
 } from 'lucide-react';
 import { VerificationStatus as VStatus } from '../types';
 import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
@@ -263,7 +263,6 @@ const VerificationStatus: React.FC<Props> = ({
       <div className="ob-orb ob-orb--2" />
 
       <div className="ob-inner vs-inner">
-        {Brand}
 
         <div className="vs-card">
           <div className="vs-card__accent" />
@@ -407,6 +406,24 @@ const VerificationStatus: React.FC<Props> = ({
               <div className="vs-note">
                 <Shield />
                 <span>You&apos;ll get full access the instant an admin approves your document. No need to refresh.</span>
+              </div>
+            )}
+
+            {(status === 'pending' || resubmitted) && (
+              <div className="vs-wait">
+                <p className="vs-wait__h">While you wait</p>
+                <div className="vs-wait__c">
+                  <Sparkles aria-hidden />
+                  <span><b>Brand DNA comes next</b><span>Once you’re approved, you’ll tell Kawayan how your shop sounds. Every caption follows it.</span></span>
+                </div>
+                <div className="vs-wait__c">
+                  <Link2 aria-hidden />
+                  <span><b>Then connect your pages</b><span>Link your Facebook Page and Instagram in Settings › Channels so posts go out on time.</span></span>
+                </div>
+                <div className="vs-wait__c">
+                  <LifeBuoy aria-hidden />
+                  <span><b>Questions?</b><span>Open the Help desk at the top. A person replies there and by email.</span></span>
+                </div>
               </div>
             )}
 

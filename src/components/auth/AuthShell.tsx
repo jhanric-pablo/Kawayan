@@ -18,6 +18,8 @@ interface Props {
   aside?: React.ReactNode;
   /** 'center': one centred card on a dotted page (password reset). Default 'split'. */
   layout?: 'split' | 'center';
+  /** Replaces "Home" in the top bar (sign-up's "Log in instead"). */
+  barAction?: { label: string; onClick: () => void };
   children: React.ReactNode;
 }
 
@@ -30,7 +32,7 @@ const COLLAGE = ['/hero/ai/panaderia-1.jpg', '/hero/ai/milktea-2.jpg', '/hero/ai
  * Shared by sign-in, sign-up, staff login and password reset.
  */
 const AuthShell: React.FC<Props> = ({
-  onBack, title, subtitle, darkMode, toggleTheme, headerExtra, footer, aside, layout = 'split', children,
+  onBack, title, subtitle, darkMode, toggleTheme, headerExtra, footer, aside, layout = 'split', barAction, children,
 }) => (
   <MotionConfig reducedMotion="user">
     <LazyMotion features={domMax} strict>
@@ -40,9 +42,13 @@ const AuthShell: React.FC<Props> = ({
             <KawayanLogo size={17} />
           </button>
           <div className="ax__tools">
-            <button type="button" className="ax__back" onClick={onBack}>
-              <ArrowLeft aria-hidden /> Home
-            </button>
+            {barAction ? (
+              <button type="button" className="ax__back" onClick={barAction.onClick}>{barAction.label}</button>
+            ) : (
+              <button type="button" className="ax__back" onClick={onBack}>
+                <ArrowLeft aria-hidden /> Home
+              </button>
+            )}
             {toggleTheme && (
               <m.button
                 type="button"

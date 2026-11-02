@@ -332,6 +332,12 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                 </select>
               </SettingRow>
 
+              {'city' in brand && (
+                <SettingRow label="Where are you?" htmlFor="st-city" hint="Your city or area. Captions can mention nearby places and local events.">
+                  <input id="st-city" className="input" placeholder="e.g. Parañaque City" value={brand.city || ''} onChange={(e) => setBrandField('city', e.target.value)} maxLength={120} />
+                </SettingRow>
+              )}
+
               <SettingRow label="Contact details" hint="Saved on your brand profile, so they’re in one place.">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
@@ -397,6 +403,19 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                   </div>
                 </div>
               </SettingRow>
+
+              {'language' in brand && (
+                <SettingRow label="Language" labelId="st-lang-label" hint="Captions use this by default.">
+                  <div className="kw-segpick kw-segpick--text max-w-sm" role="radiogroup" aria-labelledby="st-lang-label">
+                    {(['Taglish', 'English', 'Filipino'] as const).map((l) => {
+                      const on = (brand.language || 'Taglish') === l;
+                      return (
+                        <button key={l} type="button" role="radio" aria-checked={on} onClick={() => setBrandField('language', l)}>{l}</button>
+                      );
+                    })}
+                  </div>
+                </SettingRow>
+              )}
 
               <SettingRow label="Target audience" htmlFor="st-audience" hint="Who your posts speak to. Be specific: place, age, what they care about.">
                 <input id="st-audience" className="input" placeholder="e.g. Working moms in Quezon City" value={brand.targetAudience} onChange={(e) => setBrandField('targetAudience', e.target.value)} />

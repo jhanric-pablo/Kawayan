@@ -308,6 +308,11 @@ const Login: React.FC<Props> = ({
         required
         autoComplete={isSignUp ? 'new-password' : 'current-password'}
         trailing={eyeToggle}
+        labelAside={!isSignUp && !isAdminLogin ? (
+          <button type="button" className="ax-label-link" onClick={() => { setForgotMode(true); setForgotEmail(email); clearMessages(); }}>
+            Forgot password?
+          </button>
+        ) : undefined}
       />
       {isSignUp && !isAdminLogin && <PasswordMeter password={password} />}
     </>
@@ -335,9 +340,13 @@ const Login: React.FC<Props> = ({
     </div>
   ) : (
     <div className="ax__foot">
+      <span className="ax-or">Kept safe</span>
       <span className="ax__foot-item"><KeyRound /> Passwords are hashed, never stored as text</span>
       <span className="ax__foot-item"><Check /> Business permits checked by hand</span>
       <span className="ax__foot-item"><Wallet /> No credit card to start</span>
+      {!isSignUp && !forgotMode && (
+        <button type="button" className="ax-link mt-1" onClick={() => onNavigate(ViewState.ADMIN_LOGIN)}>Staff sign in</button>
+      )}
     </div>
   );
 
@@ -352,6 +361,7 @@ const Login: React.FC<Props> = ({
       footer={footer}
       aside={isSignUp && !isAdminLogin && !forgotMode ? <SignupStory key="story" /> : undefined}
       headerExtra={isSignUp && !isAdminLogin && !forgotMode ? <StepProgress steps={SIGNUP_STEPS} current={step} /> : undefined}
+      barAction={isSignUp && !isAdminLogin && !forgotMode ? { label: 'Log in instead', onClick: () => switchMode(false) } : undefined}
     >
       {/* ── Forgot password ── */}
       {forgotMode ? (
@@ -535,15 +545,6 @@ const Login: React.FC<Props> = ({
               </m.button>
             </div>
 
-            {!isSignUp && !isAdminLogin && (
-              <button
-                type="button"
-                className="ax-link"
-                onClick={() => { setForgotMode(true); setForgotEmail(email); clearMessages(); }}
-              >
-                Forgot password?
-              </button>
-            )}
 
             {isAdminLogin && (
               <button type="button" className="ax-link" onClick={() => onNavigate(ViewState.LOGIN)}>

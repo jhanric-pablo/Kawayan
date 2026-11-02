@@ -5,6 +5,7 @@ import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import { BRAND_VOICES } from '../constants/brandVoices';
 import Stepper, { Step } from './ui/Stepper';
 import './onboarding.css';
+import OnboardingBar from './onboarding/OnboardingBar';
 
 interface Props {
   onComplete: (profile: BrandProfile) => void;
@@ -76,6 +77,7 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
       <div className="ob-inner bs-wrap">
         {/* ─────────── main column ─────────── */}
         <div>
+          <div className="mb-6 flex"><OnboardingBar current={2} help={false} /></div>
           <div className="bs-head">
             <span className="bs-eyebrow"><Sparkles /> Brand DNA Setup</span>
             <h1>Let&apos;s set up your brand</h1>

@@ -628,7 +628,7 @@ input:focus, textarea:focus, select:focus {
 .kw-segpick { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .kw-segpick button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); text-align: left; font-size: var(--text-xs); color: var(--fg-muted); cursor: pointer; }
 .kw-segpick button b { display: block; font-size: 18px; font-weight: 600; color: var(--fg); }
-.kw-segpick button[aria-pressed='true'] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.kw-segpick button[aria-pressed='true'], .kw-segpick button[aria-checked='true'] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
 .kw-segpick button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Month planner page */
@@ -684,3 +684,4 @@ input:focus, textarea:focus, select:focus {
 .kw-tlist > button[aria-current="true"] { background: var(--muted); box-shadow: inset 2px 0 0 var(--green); }
 .kw-tlist b { font-weight: 500; font-size: 14px; }
 @media (max-width: 1023px) { .kw-split > .is-away { display: none; } .kw-split__main { height: min(80vh, 720px); } }
+.kw-segpick--text button { text-align: center; font-size: var(--text-ui); font-weight: 500; color: var(--fg); padding: 8px 10px; }

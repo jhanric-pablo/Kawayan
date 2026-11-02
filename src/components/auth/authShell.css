@@ -325,3 +325,12 @@
 }
 .ax-steps__seg.is-done i,
 .ax-steps__seg.is-current i { transform: none; }
+
+/* Label with a link on the same line ("Password · Forgot password?") */
+.ax-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.ax-label-row .ax-label { margin-bottom: 0; }
+.ax-label-link { font-size: var(--text-ui); font-weight: 500; color: var(--fg-muted); }
+.ax-label-link:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 0.2em; }
+/* "Kept safe" divider over the trust list */
+.ax-or { display: flex; align-items: center; gap: 0.75rem; font-size: var(--text-xs); color: var(--fg-muted); }
+.ax-or::before, .ax-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
