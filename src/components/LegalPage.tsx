@@ -41,7 +41,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
           <button type="button" onClick={onBack} aria-label="Kawayan home" className="inline-flex rounded-md p-1">
             <KawayanLogo size={17} />
           </button>
-          <nav className="flex rounded-full border border-(--border) bg-(--card) p-1" aria-label="Legal documents">
+          <nav className="flex gap-0.5 rounded-[9px] bg-(--muted) p-[3px]" aria-label="Legal documents">
             {(['terms', 'privacy'] as const).map((d) => (
               <button
                 key={d}
@@ -49,8 +49,8 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
                 onClick={() => onSwitch(d)}
                 aria-current={d === doc ? 'page' : undefined}
                 className={clsx(
-                  'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:text-sm',
-                  d === doc ? 'bg-(--primary) text-(--on-accent)' : 'text-(--fg-muted) hover:text-(--fg)',
+                  'min-h-8 rounded-[7px] px-3 text-ui font-medium transition-colors sm:px-4',
+                  d === doc ? 'bg-(--card) text-(--fg) shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-(--fg-muted) hover:text-(--fg)',
                 )}
               >
                 {d === 'terms' ? 'Terms' : 'Privacy'}
@@ -67,7 +67,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
             <button type="button" onClick={onBack} className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-(--fg-muted) hover:text-(--fg)">
               <ArrowLeft className="h-4 w-4" aria-hidden /> Back to Kawayan
             </button>
-            <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">{title}</h1>
+            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{title}</h1>
             <p className="mt-3 text-sm text-(--fg-subtle)">
               Updated {LEGAL_UPDATED}{doc === 'terms' && <> · Version {TOS_VERSION}</>}
             </p>
@@ -79,7 +79,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
             <ul className="grid gap-4">
               {highlights.map((h) => (
                 <li key={h} className="flex gap-3 text-sm leading-relaxed">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--badge-bg) text-(--badge-text)" aria-hidden>
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--green-soft) text-(--green-ink)" aria-hidden>
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
                   {h}
@@ -102,7 +102,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
                       onClick={() => jump(s.id)}
                       className={clsx(
                         '-ml-px w-full border-l-2 py-1.5 pl-3 text-left text-[13px] leading-snug transition-colors',
-                        active === s.id ? 'border-(--primary) font-semibold text-(--fg)' : 'border-transparent text-(--fg-muted) hover:text-(--fg)',
+                        active === s.id ? 'border-(--green) font-medium text-(--fg)' : 'border-transparent text-(--fg-muted) hover:text-(--fg)',
                       )}
                     >
                       <span className="tabular-nums text-(--fg-subtle)">{i + 1}.</span> {s.title}
@@ -116,7 +116,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
           <div className="grid gap-12">
             {sections.map((s, i) => (
               <section key={s.id} id={s.id} className="scroll-mt-24">
-                <h2 className="flex items-baseline gap-3 text-xl font-bold tracking-tight">
+                <h2 className="flex items-baseline gap-3 text-xl font-semibold tracking-tight">
                   <span className="text-base tabular-nums text-(--fg-subtle)">{i + 1}.</span>
                   {s.title}
                 </h2>
@@ -124,8 +124,8 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
                   <div className="grid max-w-[65ch] gap-3 text-[15px] leading-relaxed text-(--fg-muted)">
                     {s.body.map((p) => <p key={p}>{p}</p>)}
                   </div>
-                  <p className="order-first rounded-xl bg-(--bg-alt) px-4 py-3 text-sm leading-relaxed text-(--fg) xl:order-none xl:self-start">
-                    <span className="mb-1 block text-2xs font-bold uppercase tracking-wider text-(--fg-subtle)">In short</span>
+                  <p className="order-first rounded-xl border border-(--border) bg-(--muted) px-4 py-3 text-sm leading-relaxed text-(--fg) xl:order-none xl:self-start">
+                    <span className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-(--fg-subtle)">In short</span>
                     {s.summary}
                   </p>
                 </div>
@@ -134,7 +134,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
 
             <footer className="flex flex-col gap-3 rounded-2xl border border-(--border) bg-(--card) p-5 text-sm sm:flex-row sm:items-center sm:justify-between">
               <p className="text-(--fg-muted)">Questions? Ask us through Help and support inside the app.</p>
-              <button type="button" onClick={() => onSwitch(other)} className="font-semibold text-(--primary) hover:underline">
+              <button type="button" onClick={() => onSwitch(other)} className="font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
                 Read the {LEGAL_DOCS[other].title} →
               </button>
             </footer>

@@ -50,6 +50,7 @@ const ResetPassword: React.FC<Props> = ({ token, onNavigate }) => {
 
   return (
     <AuthShell
+      layout="center"
       onBack={() => onNavigate(ViewState.LANDING)}
       title={done ? 'You’re all set' : 'Set a new password'}
       subtitle={done

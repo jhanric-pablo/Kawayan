@@ -31,7 +31,7 @@ const META: Record<MetaKey, {
   body: string;
 }> = {
   pending: {
-    accent: '#D97706',
+    accent: 'var(--amber)',
     icon: <Clock />,
     badge: 'Under Review',
     title: 'Verification in progress',

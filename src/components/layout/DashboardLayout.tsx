@@ -251,7 +251,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
     },
   });
 
-  const current = navItems.find((i) => i.id === view);
+  const current = navItems.find((i) => i.id === view) ?? (view === ViewState.SURVEY ? { label: 'Brand DNA' } : undefined);
   const narrow = collapsed && !phone; // icon-only sidebar
   const groups = [
     { label: 'Workspace', items: navItems.filter((i) => !ACCOUNT_VIEWS.has(i.id)) },

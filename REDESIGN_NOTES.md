@@ -102,13 +102,13 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [ ] Landing: How it works
 - [ ] Landing: Why Kawayan (animation unchanged)
 - [ ] Landing: pricing / CTA / footer (whatever exists in `LandingPage.tsx`)
-- [ ] Log in (`Login`, `AuthShell`, `AuthField`)
-- [ ] Sign up (`SignupStory`, `StepProgress`, `PasswordMeter`)
-- [ ] Staff login (ADMIN_LOGIN)
-- [ ] Reset password (`ResetPassword`)
-- [ ] Brand DNA survey (`BrandSurvey`, `VoicePreview`)
-- [ ] Verification status (`VerificationStatus`) — pending / rejected / none / upload
-- [ ] Legal pages (`LegalPage` privacy + terms)
+- [x] Log in (`Login`, `AuthShell`, `AuthField`)
+- [x] Sign up (`SignupStory`, `StepProgress`, `PasswordMeter`)
+- [x] Staff login (ADMIN_LOGIN)
+- [x] Reset password (`ResetPassword`)
+- [x] Brand DNA survey (`BrandSurvey`, `VoicePreview`)
+- [x] Verification status (`VerificationStatus`) — pending / rejected / none / upload
+- [x] Legal pages (`LegalPage` privacy + terms)
 
 ### Staff
 - [ ] Admin console shell (near-black sidebar)
@@ -208,3 +208,14 @@ my messages on green-soft, internal notes on dashed amber, mono timestamps.
 Check: Settings → each section, save bar, Appearance theme switch, Replay tour; Billing top-up and
 cancel pending; Social connect; Help → message, call, Assistant.
 Left: nothing for these screens.
+
+**Step 6 — auth, onboarding, legal.** Log in / sign up / staff login now use the mockup's split
+layout: form on the left (left-aligned 30px title, 40px fields, 8px buttons), a muted dotted panel on
+the right with three existing AI sample images (sign-up shows its "what happens next" story card
+there instead). Reset password is a centred card on a dotted page. Step bar, strength meter, permit
+upload, terms checkbox and errors restyled. Brand DNA and Verification lose the coloured orbs and
+the dark-green preview card: neutral cards, mono labels, green only for done steps/selected voice.
+Legal pages: tabs-style Terms/Privacy switch, green rail on the active section.
+Check: sign up all 3 steps (permit upload), staff login at /admin-portal, reset link, Brand DNA all
+4 steps, verification pending / rejected (re-upload) / approved, /privacy and /terms.
+Left: the mockup's testimonial card beside the login form is not added (it is a sample quote).
