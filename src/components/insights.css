@@ -264,3 +264,21 @@
 .in-hbar__track { height: 10px; border-radius: 99px; background: var(--muted); overflow: hidden; }
 .in-hbar__track i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
 @media (max-width: 1279px) { .in-hide-md { display: none; } }
+
+/* ── Phase 3: mockup APP.insights ── */
+.in { display: flex; flex-direction: column; gap: 20px; }
+.in .kw-stats, .in-grid { margin-bottom: 0; }
+.in-grid { gap: 20px; }
+.in .kw-stat .in-spark { height: 34px; margin-top: 4px; }
+.in-up { color: var(--green-ink); font-weight: 500; }
+.in-down { color: var(--danger); font-weight: 500; }
+.in .kw-card-h .in-legend { margin: 0; }
+.in-hbar__track i { width: 100%; transform-origin: left; transition: transform 0.3s var(--ease); }
+@media (prefers-reduced-motion: reduce) { .in-hbar__track i { transition: none; } }
+.in-more > summary { cursor: pointer; padding: 14px 20px; font-size: var(--text-ui); font-weight: 500; color: var(--fg-muted); list-style: none; }
+.in-more > summary::-webkit-details-marker { display: none; }
+.in-more > summary::before { content: '+'; display: inline-block; width: 1em; color: var(--fg-muted); }
+.in-more[open] > summary::before { content: '−'; }
+.in-more[open] > summary { border-bottom: 1px solid var(--border); color: var(--fg); }
+.in-note { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); }
+.in .card > .in-table-wrap { margin: 0; border-top: 0; }

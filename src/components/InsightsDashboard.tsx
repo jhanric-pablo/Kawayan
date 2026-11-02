@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from './ui/chart';
 import {
   ArrowDown, ArrowDownRight, ArrowUp, ArrowUpDown, ArrowUpRight, ChevronDown, Download,
-  FileJson, FileSpreadsheet, GitCompareArrows, Image as ImageIcon, Trophy, X,
+  FileJson, FileSpreadsheet, GitCompareArrows, Image as ImageIcon, Trophy, X, Users, Eye, Heart, BarChart3,
 } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { GeneratedPost } from '../types';
@@ -41,6 +42,8 @@ const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFracti
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 const span = (ds: Day[]) => `${shortDate(ds[0].date)} – ${shortDate(ds[ds.length - 1].date)}`;
 const round2 = (n: number) => Math.round(n * 100) / 100;
+/** KPI numbers like the mockup: 1,284 · 18.4k. */
+const compactKpi = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : num(n));
 
 function saveFile(name: string, body: string, type: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
@@ -94,17 +97,6 @@ const Thumb: React.FC<{ post: PostStats; className?: string }> = ({ post, classN
 
 interface ChartRow { label: string; prevLabel: string; cur: number; prev: number }
 
-const ChartTip: React.FC<{ active?: boolean; payload?: readonly { payload?: ChartRow }[]; metric: string }> = ({ active, payload, metric }) => {
-  const row = payload?.[0]?.payload;
-  if (!active || !row) return null;
-  return (
-    <div className="in-tip">
-      <div className="in-tip__row"><span><i className="in-line" />{row.label}</span><b>{num(row.cur)}</b></div>
-      <div className="in-tip__row"><span><i className="in-line is-prev" />{row.prevLabel}</span><b>{num(row.prev)}</b></div>
-      <div className="in-tip__foot"><span>{metric}</span><Delta change={row.prev ? (row.cur - row.prev) / row.prev : 0} /></div>
-    </div>
-  );
-};
 
 interface DownloadItem {
   title: string;
@@ -293,6 +285,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'date', dir: -1 });
   const [selected, setSelected] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
+  const [moreCols, setMoreCols] = useState(false);
   const closeCompare = useCallback(() => setComparing(false), []);
 
   useEffect(() => {
@@ -442,183 +435,166 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
     );
   };
 
+  const KPI_ICON: Record<string, React.FC<{ className?: string }>> = { followers: Users, reach: Eye, interactions: Heart };
+  const changeLine = (k: (typeof kpis)[number]) => {
+    const diff = k.current - k.previous;
+    const shown = k.key === 'followers' ? `${diff >= 0 ? '+' : '−'}${num(Math.abs(diff))}` : `${k.change >= 0 ? '+' : '−'}${Math.abs(k.change * 100).toFixed(0)}%`;
+    const up = k.key === 'followers' ? diff >= 0 : k.change >= 0;
+    return <><span className={up ? 'in-up' : 'in-down'}>{shown}</span> vs previous {days} days</>;
+  };
+  const metricName = CHART_METRICS.find((m) => m.key === metric)!.label;
+  const chartConfig = {
+    cur: { label: span(current), color: 'var(--green)' },
+    prev: { label: span(previous), color: 'var(--fg-muted)' },
+  } satisfies ChartConfig;
+
   return (
     <div className="in animate-fade-in">
-      <div className="page-head">
+      {/* Header: title, date range, Export CSV */}
+      <div className="kw-page-h">
         <div>
-          <h1 className="page-head__title">Insights</h1>
-          <p className="page-head__sub">How your pages are growing and which posts work best.</p>
+          <h1>Insights</h1>
+          <p>How your pages are growing and which posts work best.</p>
         </div>
         <div className="in-controls">
-          <KwSelect aria-label="Date range" size="sm" className="h-9! w-auto! min-w-36" value={String(range)} onValueChange={(v) => setRange((v === 'year' ? 'year' : Number(v)) as Range)} options={RANGES.map((r) => ({ value: String(r), label: RANGE_LABEL[r] }))} />
-          <div className="in-seg" role="group" aria-label="Platform">
-            <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
-            {(['facebook', 'instagram'] as Platform[]).map((p) => {
-              const Glyph = GLYPHS[p];
-              return (
-                <button key={p} type="button" aria-pressed={filter === p} onClick={() => setFilter(p)}>
-                  <Glyph className="w-3.5 h-3.5" /> {PLATFORM_NAMES[p]}
-                </button>
-              );
-            })}
-          </div>
-          <DownloadMenu caption={`${RANGE_LABEL[range]} · ${scopeName}`} items={downloads} onDone={(name) => toast.success(`Downloaded ${name}`)} />
+          <KwSelect aria-label="Date range" className="w-auto! min-w-40" value={String(range)} onValueChange={(v) => setRange((v === 'year' ? 'year' : Number(v)) as Range)} options={RANGES.map((r) => ({ value: String(r), label: RANGE_LABEL[r] }))} />
+          <KwSelect
+            aria-label="Platform"
+            className="w-auto! min-w-36"
+            value={filter}
+            onValueChange={(v) => setFilter(v as PlatformFilter)}
+            options={[{ value: 'all', label: 'All platforms' }, { value: 'facebook', label: 'Facebook' }, { value: 'instagram', label: 'Instagram' }]}
+          />
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => {
+              const [name, body, type] = downloads[0].file();
+              saveFile(name, body, type);
+              toast.success(`Downloaded ${name}`);
+            }}
+          >
+            <Download className="h-4 w-4" aria-hidden /> Export CSV
+          </button>
         </div>
       </div>
 
-      <p className="in-note">
-        <i aria-hidden />
-        <span>Demo data, generated for each account</span>
-        <span>{span(current)} vs {span(previous)}</span>
-      </p>
-
-      <div className="in-kpis">
-        {kpis.filter((k) => k.key !== 'rate').map((k) => (
-          <div key={k.key} className="surface in-kpi">
-            <div className="in-kpi__top">
-              <span className="in-kpi__label">{k.label}</span>
-              <Delta change={k.change} points={k.points} />
+      {/* 4 KPI cards with sparklines */}
+      <div className="kw-stats">
+        {kpis.filter((k) => k.key !== 'rate').map((k) => {
+          const Icon = KPI_ICON[k.key] ?? Eye;
+          return (
+            <div key={k.key} className="card kw-stat">
+              <div className="kw-stat__h">{k.label} <Icon aria-hidden /></div>
+              <b>{compactKpi(k.current)}</b>
+              <small>{changeLine(k)}</small>
+              <Spark values={current.map((d) => d[k.key as 'followers' | 'reach' | 'interactions'])} />
             </div>
-            <div className="in-kpi__value">{k.points ? pct(k.current) : num(k.current)}</div>
-            <div className="in-kpi__prev">
-              Previous<span className="in-hide-sm"> {days} days</span> <b>{k.points ? pct(k.previous) : num(k.previous)}</b>
-            </div>
-            <Spark values={current.map((d) => (k.key === 'rate' ? (d.reach ? d.interactions / d.reach : 0) : d[k.key]))} />
-          </div>
-        ))}
-        <div className="surface in-kpi">
-          <div className="in-kpi__top">
-            <span className="in-kpi__label">Avg reach score</span>
-            {avgNow != null && avgPrev != null && (
-              <span className={`in-delta ${avgNow > avgPrev ? 'is-up' : avgNow < avgPrev ? 'is-down' : 'is-flat'}`}>
-                {avgNow >= avgPrev ? '+' : '−'}{Math.abs(avgNow - avgPrev)}
-              </span>
-            )}
-          </div>
-          <div className="in-kpi__value">{avgNow ?? '—'}</div>
-          <div className="in-kpi__prev">
-            {avgNow == null ? 'No scored posts in this period' : avgPrev != null ? <>Previous<span className="in-hide-sm"> period</span> <b>{avgPrev}</b></> : `From ${scoredNow.length} post${scoredNow.length > 1 ? 's' : ''}`}
-          </div>
+          );
+        })}
+        <div className="card kw-stat">
+          <div className="kw-stat__h">Avg reach score <BarChart3 aria-hidden /></div>
+          <b>{avgNow ?? '—'}</b>
+          <small>
+            {avgNow == null ? 'No scored posts in this period' : avgPrev != null ? <><span className={avgNow >= avgPrev ? 'in-up' : 'in-down'}>{avgNow >= avgPrev ? '+' : '−'}{Math.abs(avgNow - avgPrev)}</span> vs previous {days} days</> : `From ${scoredNow.length} post${scoredNow.length > 1 ? 's' : ''}`}
+          </small>
           <Spark values={scoredNow.map((p) => p.viralityScore || 0)} />
         </div>
       </div>
 
+      {/* Daily reach | By platform + best time */}
       <div className="in-grid">
-        <section className="surface in-card">
-          <div className="in-card__head">
-            <div>
-              <h2>Daily {CHART_METRICS.find((m) => m.key === metric)!.label.toLowerCase()}</h2>
-              <p>{RANGE_LABEL[range]} against the {days} days before.</p>
-            </div>
-            <div className="in-seg" role="group" aria-label="Chart metric">
-              {CHART_METRICS.map((m) => (
-                <button key={m.key} type="button" aria-pressed={metric === m.key} onClick={() => setMetric(m.key)}>
-                  {m.label}
-                </button>
-              ))}
+        <section className="card overflow-hidden">
+          <div className="kw-card-h">
+            <h3>Daily {metricName.toLowerCase()}</h3>
+            <div className="in-legend">
+              <span><i className="in-line" /> {span(current)}</span>
+              <span><i className="in-line is-prev" /> {span(previous)}</span>
             </div>
           </div>
-          <div className="in-legend">
-            <span><i className="in-line" /> {span(current)}</span>
-            <span><i className="in-line is-prev" /> {span(previous)}</span>
+          <div className="px-3 pb-3 pt-4">
+            <ChartContainer config={chartConfig} className="aspect-auto! h-[240px] w-full">
+              <AreaChart data={chartData} margin={{ top: 8, right: 10, bottom: 4, left: 4 }} accessibilityLayer>
+                <defs>
+                  <linearGradient id="inFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-cur)" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="var(--color-cur)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} interval="preserveStartEnd" />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={48}
+                  tickFormatter={(v: number) => compact.format(v)}
+                  domain={metric === 'followers' ? ['auto', 'auto'] : [0, 'auto']}
+                  label={{ value: metricName, angle: -90, position: 'insideLeft', offset: 2, style: { fill: 'var(--fg-muted)', fontSize: 11, textAnchor: 'middle' } }}
+                />
+                <ChartTooltip
+                  cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
+                  content={<ChartTooltipContent indicator="line" labelFormatter={(_, payload) => {
+                    const row = payload?.[0]?.payload as ChartRow | undefined;
+                    return row ? `${row.label} · vs ${row.prevLabel}` : '';
+                  }} />}
+                />
+                <Area type="monotone" dataKey="prev" stroke="var(--color-prev)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={false} />
+                <Area
+                  type="monotone"
+                  dataKey="cur"
+                  stroke="var(--color-cur)"
+                  strokeWidth={2}
+                  fill="url(#inFill)"
+                  isAnimationActive={false}
+                  dot={(props: any) =>
+                    props.index === chartData.length - 1 ? (
+                      <circle key="last" cx={props.cx} cy={props.cy} r={4} fill="var(--green)" stroke="var(--card)" strokeWidth={2} />
+                    ) : (
+                      <g key={props.index} />
+                    )
+                  }
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--green)' }}
+                />
+              </AreaChart>
+            </ChartContainer>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={chartData} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
-              <CartesianGrid vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} tickMargin={8} minTickGap={28} interval="preserveStartEnd" />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                width={44}
-                tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }}
-                tickFormatter={(v: number) => compact.format(v)}
-                domain={metric === 'followers' ? ['auto', 'auto'] : [0, 'auto']}
-              />
-              <Tooltip
-                content={(p) => <ChartTip active={p.active} payload={p.payload as any} metric={CHART_METRICS.find((m) => m.key === metric)!.label} />}
-                cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
-              />
-              <Area type="monotone" dataKey="prev" stroke="var(--fg-muted)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={false} />
-              <Area
-                type="monotone"
-                dataKey="cur"
-                stroke="var(--green)"
-                strokeWidth={2}
-                fill="var(--green-soft)"
-                fillOpacity={1}
-                dot={(props: any) =>
-                  props.index === chartData.length - 1 ? (
-                    <circle key="last" cx={props.cx} cy={props.cy} r={4} fill="var(--green)" stroke="var(--card)" strokeWidth={2} />
-                  ) : (
-                    <g key={props.index} />
-                  )
-                }
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--green)' }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
         </section>
 
-        <section className="surface in-card">
-          <div className="in-card__head">
-            <div>
-              <h2>By platform</h2>
-              <p>Reach, {RANGE_LABEL[range].toLowerCase()}.</p>
+        <section className="card overflow-hidden">
+          <div className="kw-card-h"><h3>By platform</h3></div>
+          <div className="flex flex-col gap-5 p-5">
+            <div className="in-hbar">
+              {reachTotals.map(({ platform, total }) => {
+                const Glyph = GLYPHS[platform];
+                return (
+                  <div key={platform} className="in-hbar__row">
+                    <span className="in-hbar__name"><Glyph className="w-3.5 h-3.5" /> {PLATFORM_NAMES[platform]}</span>
+                    <span className="in-hbar__track" aria-hidden><i style={{ transform: `scaleX(${total / reachMax})` }} /></span>
+                    <span className="mono text-right">{compact.format(total)}</span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div className="in-hbar">
-            {reachTotals.map(({ platform, total }) => {
-              const Glyph = GLYPHS[platform];
-              return (
-                <div key={platform} className="in-hbar__row">
-                  <span className="in-hbar__name"><Glyph className="w-3.5 h-3.5" /> {PLATFORM_NAMES[platform]}</span>
-                  <span className="in-hbar__track" aria-hidden><i style={{ width: `${(total / reachMax) * 100}%` }} /></span>
-                  <span className="mono text-right">{compact.format(total)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <hr className="my-4 border-(--border)" />
-          <div className="in-plat">
-            {byPlatform.map(({ platform, followers, reach }) => {
-              const Glyph = GLYPHS[platform];
-              return (
-                <div key={platform} className={`in-plat__row${filter === platform ? ' is-active' : ''}`}>
-                  <div className="in-plat__name"><Glyph /> {PLATFORM_NAMES[platform]}</div>
-                  {[followers, reach].map((k) => (
-                    <div key={k.key} className="in-plat__line">
-                      <span>{k.label}</span>
-                      <span>
-                        {num(k.previous)}<span className="in-plat__arrow" aria-label="to">→</span><b>{num(k.current)}</b>
-                      </span>
-                      <Delta change={k.change} />
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-          <hr className="my-4 border-(--border)" />
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-(--fg)">Best time to post</span>
-            <p className="text-sm text-(--fg-muted)">
-              {bestPart
-                ? <>Your posts that went out in the <b className="text-(--fg)">{bestPart.part.name} ({bestPart.part.range})</b> reached the most people, about {num(bestPart.avg)} each.</>
-                : 'Kawayan suggests a time once at least 3 of your posts in this period have gone out.'}
-            </p>
+            <hr className="border-(--border)" />
+            <div className="flex flex-col gap-1.5">
+              <span className="kw-label">Best time to post</span>
+              <p className="text-sm text-(--fg-muted)">
+                {bestPart
+                  ? <>Your posts that went out in the <b className="text-(--fg)">{bestPart.part.name} ({bestPart.part.range})</b> reached the most people, about {num(bestPart.avg)} each.</>
+                  : 'Kawayan suggests a time once at least 3 of your posts in this period have gone out.'}
+              </p>
+            </div>
           </div>
         </section>
       </div>
 
-      <section className="surface in-card">
-        <div className="in-card__head">
-          <div>
-            <h2>Post performance</h2>
-            <p>
-              {posts ? `${rows.length} posts, ${RANGE_LABEL[range].toLowerCase()}.` : 'Loading your posts…'} Tick up to {MAX_COMPARE} to compare them side by side.
-            </p>
-          </div>
+      <section className="card overflow-hidden">
+        <div className="kw-card-h">
+          <h3>Post performance</h3>
           <div className="flex items-center gap-2">
+            <button type="button" className="btn btn-ghost btn-sm" aria-pressed={moreCols} onClick={() => setMoreCols((v) => !v)} title="Link clicks and engagement rate">
+              {moreCols ? 'Fewer columns' : 'More columns'}
+            </button>
             <span className="text-xs text-(--fg-muted)">{selectedPosts.length < 2 ? `Pick ${2 - selectedPosts.length} to compare` : `${selectedPosts.length} picked`}</span>
             <button type="button" className="btn btn-outline btn-sm" disabled={selectedPosts.length < 2} onClick={() => setComparing(true)}>
               <GitCompareArrows className="w-3.5 h-3.5" /> Compare
@@ -634,8 +610,8 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                 {sortTh('date', 'Posted', 'in-hide-sm')}
                 {sortTh('reach', 'Reach', 'in-hide-sm')}
                 {sortTh('interactions', 'Interactions', 'in-hide-sm')}
-                {sortTh('clicks', 'Link clicks', 'in-hide-sm in-hide-md')}
-                {sortTh('engagementRate', 'Eng. rate')}
+                {moreCols && sortTh('clicks', 'Link clicks', 'in-hide-sm')}
+                {moreCols && sortTh('engagementRate', 'Eng. rate')}
                 <th>Score</th>
               </tr>
             </thead>
@@ -643,7 +619,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
               {posts === null
                 ? [0, 1, 2].map((i) => (
                     <tr key={i} className="is-locked">
-                      <td colSpan={8}><div className="in-skel" /></td>
+                      <td colSpan={moreCols ? 8 : 6}><div className="in-skel" /></td>
                     </tr>
                   ))
                 : sorted.map((p) => {
@@ -683,13 +659,15 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                         <td className="in-hide-sm mono">{shortDate(p.date)}</td>
                         <td className="in-hide-sm">{num(p.reach)}</td>
                         <td className="in-hide-sm">{num(p.interactions)}</td>
-                        <td className="in-hide-sm in-hide-md">{num(p.clicks)}</td>
-                        <td>
-                          <span className="in-rate">
-                            <span className="in-rate__bar in-hide-sm"><b style={{ width: `${(p.engagementRate / maxRate) * 100}%` }} /></span>
-                            {pct(p.engagementRate)}
-                          </span>
-                        </td>
+                        {moreCols && <td className="in-hide-sm">{num(p.clicks)}</td>}
+                        {moreCols && (
+                          <td>
+                            <span className="in-rate">
+                              <span className="in-rate__bar in-hide-sm"><b style={{ width: `${(p.engagementRate / maxRate) * 100}%` }} /></span>
+                              {pct(p.engagementRate)}
+                            </span>
+                          </td>
+                        )}
                         <td>
                           {p.viralityScore != null ? <span className={`badge mono ${p.viralityScore >= 75 ? 'badge-green' : ''}`}>{p.viralityScore}</span> : <span className="text-(--fg-muted)">—</span>}
                         </td>
@@ -700,6 +678,51 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           </table>
         </div>
       </section>
+
+      {/* More: the extras that aren't in the mockup's main layout */}
+      <details className="card in-more">
+        <summary>More: platform details, chart metric and other downloads</summary>
+        <div className="grid gap-5 p-5 lg:grid-cols-2">
+          <div className="grid gap-3">
+            <span className="kw-label">Chart shows</span>
+            <div className="in-seg w-fit" role="group" aria-label="Chart metric">
+              {CHART_METRICS.map((m) => (
+                <button key={m.key} type="button" aria-pressed={metric === m.key} onClick={() => setMetric(m.key)}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <span className="kw-label mt-2">Downloads</span>
+            <DownloadMenu caption={`${RANGE_LABEL[range]} · ${scopeName}`} items={downloads} onDone={(name) => toast.success(`Downloaded ${name}`)} />
+            <p className="text-xs text-(--fg-muted)">Engagement rate {kpis.find((k) => k.key === 'rate') ? `${pct(kpis.find((k) => k.key === 'rate')!.current)} (previous ${pct(kpis.find((k) => k.key === 'rate')!.previous)})` : '—'}.</p>
+          </div>
+          <div className="in-plat">
+            {byPlatform.map(({ platform, followers, reach }) => {
+              const Glyph = GLYPHS[platform];
+              return (
+                <div key={platform} className={`in-plat__row${filter === platform ? ' is-active' : ''}`}>
+                  <div className="in-plat__name"><Glyph /> {PLATFORM_NAMES[platform]}</div>
+                  {[followers, reach].map((k) => (
+                    <div key={k.key} className="in-plat__line">
+                      <span>{k.label}</span>
+                      <span>
+                        {num(k.previous)}<span className="in-plat__arrow" aria-label="to">→</span><b>{num(k.current)}</b>
+                      </span>
+                      <Delta change={k.change} />
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </details>
+
+      <p className="in-note">
+        <i aria-hidden />
+        <span>Demo data, generated for each account</span>
+        <span>{span(current)} vs {span(previous)}</span>
+      </p>
 
       {selectedPosts.length > 0 && (
         <div className="in-tray" role="region" aria-label="Posts to compare">

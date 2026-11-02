@@ -629,3 +629,15 @@ steps (`phone: false` on the sidebar-only steps) and the drawer closes when the 
 "Step X of Y", title, body (+ a tip on desktop), Back / Next / Skip, Esc, focus trapped. First run,
 "Take the tour" and saving completion unchanged. Also: verification card no longer overflows on
 phones, and the phone top bar shows one logo (the wordmark's `hidden` was overridden by `.kw-logo`).
+
+**7 — Insights matches APP.insights.** Header: date-range Select (plus a platform Select, the old
+platform filter) and "Export CSV" (post-performance CSV). 4 KPI cards (Followers, Reach,
+Interactions, Avg reach score) in the shared `kw-stat` style with icon, value, green/red change vs
+the previous period and a green sparkline. "Daily reach": shadcn Chart (ChartContainer +
+ChartTooltip/Content, colours from our tokens) with a green line + soft area for this period, a
+dashed grey previous period, labelled axes, last-point dot and a legend in the card header. Side
+card: "By platform" bars and "Best time to post". "Post performance": thumbnails, Posted / Reach /
+Interactions / Score (green badge at 75+), checkboxes, Compare (tray and compare dialog unchanged).
+Kept, placed below: "More columns" (link clicks, engagement rate), and a "More" panel with the chart
+metric switch, all downloads (posts CSV, growth CSV, full JSON report) and per-platform
+followers/reach detail; the "Demo data, generated for each account" note sits at the bottom.
