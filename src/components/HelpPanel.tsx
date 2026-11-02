@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Channel } from 'stream-chat';
 import TextareaAutosize from 'react-textarea-autosize';
 import Markdown from 'react-markdown';
@@ -221,7 +222,10 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
     thread: { title: active?.assigneeName ? `${active.assigneeName} · Kawayan` : 'Kawayan support', sub: active ? `#${active.ticketNum} · ${active.subject}` : '' },
   }[screen];
 
-  return (
+  // Portalled to <body>: a parent with backdrop-filter / transform / filter (e.g. the sticky top
+  // bar on the verification screen) would otherwise become the containing block for this
+  // position:fixed panel and squash it to that parent's height.
+  return createPortal(
     <LazyMotion features={domMax}>
       <MotionConfig reducedMotion="user" transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}>
         {call && session && (
@@ -538,7 +542,8 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
           )}
         </aside>
       </MotionConfig>
-    </LazyMotion>
+    </LazyMotion>,
+    document.body,
   );
 };
 

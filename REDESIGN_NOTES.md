@@ -549,3 +549,16 @@ in Settings once the migration runs (see Migrations). Not added: the mockup's te
 7. Help desk: open a ticket, reply with a screenshot, Mark resolved; from the support inbox, reply and add an internal note.
 8. Admin: Verification → pick a reason + note → Send back; another one → Approve. Overview shows system status.
 9. Settings: Export my data downloads JSON; Delete account needs your email typed (try on a test account).
+
+# Phase 3
+
+**3 — Help panel tabs did nothing for owners under review.** Cause: on the verification screen the
+help panel is mounted inside the app's sticky top `<nav class="glass-panel">`, which has
+`backdrop-filter: blur(12px)`. A filter / backdrop-filter / transform on an ancestor makes it the
+containing block for `position: fixed` children, so the panel's `fixed inset-y-0` resolved to the
+60 px nav instead of the viewport: header and tab bar showed, the body between them was 0 px tall,
+so tabs switched but nothing appeared. (Checked with `elementFromPoint` on the tabs and by walking
+the panel's ancestors' computed styles; server routes, Stream token, ticket fetch and the assistant
+have no verification gate and returned fine.) Fix: `HelpPanel` renders through `createPortal` to
+`document.body`, so it is viewport-fixed from any parent (verification bar, owner app, Brand DNA).
+Tested with a pending account: Home, Messages (own tickets only) and Assistant all open full height.
