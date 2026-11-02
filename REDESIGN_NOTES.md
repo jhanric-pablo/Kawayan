@@ -293,3 +293,112 @@ dropdown-menu, popover, sheet, stepper.css, switch, tabs.
 9. Theme: top-bar toggle, Settings › Appearance, admin Settings › Appearance; accessibility widget
    (public pages) and Settings › Accessibility (text size, high contrast, reduce motion).
 10. Phone: open/close the drawer, ⌘K help on desktop, landing phone menu.
+
+---
+
+# Phase 2 gap list
+
+Every element the mockup shows, per screen. Tags: **have** = already in the app (restyle only),
+**FE** = to add, frontend only, **API** = needs a new (additive) endpoint, **MIG** = needs a
+migration in `scripts/migrations/` (UI hides it until the column exists).
+`[x]` = done in Phase 2.
+
+Note: the brief points to PH holidays in `src/services/aiService.ts`, but no holiday data exists in
+the app (only a prompt rule). Phase 2 adds `src/utils/phCalendar.ts` (fixed-date PH regular and
+special holidays, movable ones like Holy Week and National Heroes Day, and paydays on the 15th and
+the last day), used by the calendar tags and the Month planner's "Dates Kawayan found".
+
+## A. App shell
+- [ ] Sidebar header: business avatar (initials), name, "<Plan> plan" — **FE**; "· city" — **MIG** (`brand_profiles.city`, hidden until it exists)
+- [ ] Group "Plan": Calendar, Month planner (new page), Post studio (new page) + drafts badge, Insights — **FE**
+- [ ] Group "Account": Settings + red channel-problem badge, Plan and billing, Help desk (new page) — **FE**
+- [ ] Social accounts stay reachable (Settings › Channels links to it; `/social` still works) — **have**
+- [ ] Quota card "<Month> posts X / limit", bar, "Resets <1st>. Drafts don't count." — **FE** (counts from loaded posts, as today)
+- [ ] Account button (avatar, name, email) → menu: Settings, Plan and billing, Help desk, Take the tour, Appearance Light/Dark/System, Log out — **FE** (System = follows the OS; saved on this device, Light/Dark still saved to the account)
+- [x] Top bar: sidebar toggle, breadcrumb "Business › Page", theme toggle — **have**
+- [ ] Search box with ⌘K focusing it, searches loaded posts by title/caption, opens the post — **FE** (⌘K currently opens Help; it moves to search, Help keeps its sidebar entry and the "?" shortcut)
+- [ ] Bell with unread dot; popover "Needs you / All", one action per item (Fix now, Review, Open ticket), "Mark all as read" — **FE**
+- [x] Phones: sidebar as a drawer — **have**
+
+## B. Calendar
+- [ ] Header "<Month YYYY>", drafts line, "New post", green "Plan <next month>" → Month planner page — **FE**
+- [ ] 4 stat cards: posts X/limit + left on plan; drafts to approve + next due; needs attention (held/failed) + reason; avg reach score + change vs last month (hidden when last month has none) — **FE** (last month's posts fetched with the existing month query)
+- [ ] Amber banner for held/failed posts: post name, date, Reconnect → Settings › Channels — **FE**
+- [x] Toolbar: month title, prev / Today / next, channel filter, Month / Timeline / List — **have**
+- [x] Month view: weekday header, hatched out-of-month, green today, chip styles, drag-and-drop — **have**
+- [ ] PH holiday and payday tags in day cells — **FE** (new `phCalendar.ts`)
+- [ ] Selected chip outline — **FE**
+- [ ] Held = scheduled post whose page lost access → red-border chip — **FE**
+- [x] Timeline view by channel — **have** (lanes per channel, days across)
+- [ ] List view as a table: post, when, channels, status, reach — **FE** (replaces the agenda list layout; same data and click-through)
+- [x] Legend — **have** (mono tag sample added) 
+- [ ] Detail panel: image, title, date/time, status, held alert, channel badges, caption + "Version X of 3", reach bar + reason — **FE**
+- [ ] Panel actions by status, wired to existing handlers: draft Approve and schedule / Edit / Regenerate; held Reconnect / Move date / Retry; posted View on Facebook / Insights / Duplicate; scheduled Edit post / Move date / Unschedule — **FE** + Duplicate (new handler through the existing save-post call) + Unschedule — **API** (`POST /api/social/unschedule`)
+- [x] UpNext, tour targets, empty-month pitch, idea editing — **have**
+
+## C. Month planner page
+- [ ] New sidebar page (`/planner`) using the calendar's planning state and the same generate calls; "Plan month" and the empty-month pitch open it — **FE**
+- [ ] "Your month": month select, 8 / 12 / 16 cards limited by plan and open days, Formats chips, "Dates Kawayan found" checkboxes, notes, "Generate N posts", hint — **FE**
+- [ ] Formats, dates and notes passed to the AI as new optional arguments to `generateContentPlan` (the `/api/ai/text` request is unchanged) — **FE**
+- [ ] "Generating": "X of N ready" + bar, cards appear one by one, shimmer skeletons, Cancel / Add to calendar — **FE** (Cancel stops after the post being written; posts already written stay as drafts)
+- [x] Existing planning modal behaviour (ideas list, edit/delete idea, batch create) — **have** (kept on the page)
+
+## D. Insights
+- [ ] Header: date range select (Last 7 days / Last 30 days / This year) + Export CSV (existing downloads) — **FE** (90 days stays as an option)
+- [ ] KPI cards with sparkline + change: Followers, Reach, Interactions, Avg reach score — **FE** (Avg reach score from real post scores; the engagement-rate card moves into the table/compare)
+- [ ] "Daily reach" chart: green line + soft area, dashed previous, axis labels, dot on last point, legend — **FE** (recharts; metric switch kept)
+- [ ] "By platform": horizontal bars with totals — **FE**
+- [ ] "Best time to post": one sentence from the posts' day part with the highest average reach — **FE** (only when enough posts have a known time; otherwise hidden)
+- [ ] Post performance table: thumbnail + title, posted, reach, interactions, score badge (green 75+), checkboxes, "Pick 2 to compare", Compare → existing compare view — **FE**
+- [x] "Demo data, generated for each account" note — **have**
+
+## E. Post studio page
+- [ ] New sidebar page (`/studio`) with the composer's logic; no post chosen → drafts list to pick from + New post — **FE**
+- [ ] Header: title, status line, Save draft, green "Approve and schedule" — **FE**
+- [ ] Image card: image, "Image made by Kawayan AI" (or "Your photo"), New image, Upload my own photo — **FE**
+- [ ] Caption card: version picker 1–3 (used-up disabled), textarea + counter, quick tweaks (Shorter, More Taglish, More playful, More polished, Fresh hashtags, Add a call to action), hashtags, reach score, date + time, slots (Lunch break / After work / Prime time), "Post to" switches with Reconnect badge — **FE**
+- [ ] Phone preview with Facebook / Instagram tabs — **have** (PhonePreview)
+- [x] Composer modal everywhere it opens today — **have**
+
+## F1. Plan and billing
+- [ ] Current plan card: price, Active badge, usage bar, reset line, "Buy 1 extra post", "Cancel at the end of the month" — **FE** (extra post opens the studio's paid-extra flow; the wallet is charged only when the post is written, as today)
+- [x] Dark wallet card — **have**; "Add funds" control — **have**
+- [ ] 3-column plan comparison (Free / Pro / Enterprise) — **FE**
+- [ ] Payment history table: date, description, method, amount, status badge, receipt / Retry — **FE** (method = "Wallet" / "PayMongo" from the transaction type; receipt = the PayMongo reference; Retry re-opens checkout for a failed top-up)
+
+## F2. Settings
+- [ ] Left section menu: Business, Voice & audience, Channels, Appearance, Login & security, Payments & plans, Accessibility — **FE**
+- [x] Label-left / control-right rows, save bar — **have**
+- [ ] Channels section (Connected / Reconnect states, Connect) inside Settings — **FE** (reuses SocialAccounts)
+- [x] Appearance theme cards — **have**; System option — **FE**
+- [ ] Payments & plans section (summary + link to billing) — **FE**
+- [ ] Export my data (JSON download of profile, posts, plans, payments, tickets) — **FE**
+- [ ] Delete account — **API** (`DELETE /api/auth/me`, confirm by typing the email)
+
+## F3. Help desk (owner)
+- [ ] Help desk page (`/help`): ticket list with status badges + search, conversation thread (mine tinted green), reply box with attachment, "Ask the assistant" card, New ticket — **FE** (reuses the Help panel's ticket/chat logic; the slide-over panel stays)
+
+## F4. Staff — Admin overview
+- [ ] 4 stat cards: Businesses, Permits to review, Payments to verify, Open tickets — **FE**
+- [ ] "Sign-ups, last 14 days" bar chart — **FE** (from the loaded users list)
+- [ ] System status list (API, Database, AI, Zernio, PayMongo) + "Allow registrations" switch — **API** (`GET /api/admin/system-status`: configured/ok flags only, never key values). The switch mirrors the existing Settings switch (local state today, see risks)
+- [x] Recent activity from the audit log — **have**
+
+## F5. Staff — Verification
+- [ ] Pending / Approved / Sent back tabs — **FE** (existing filters renamed)
+- [ ] 3 panes: queue, document viewer, right rail (business info, checks list, send-back reason + note, Approve / Send back) — **FE** (checks are a reviewer aid, not saved; reason + note become the existing rejection reason)
+
+## F6. Staff — Support inbox
+- [x] Mine / Unassigned / All; Open / Waiting / Snoozed / Resolved; priority, number, business, "Reply due in…" — **have** (priority, SLA, snooze and labels already exist on tickets; no migration needed)
+- [x] Thread with Claim / Snooze / Resolve, internal notes (amber), Reply / Internal note tabs, saved replies, R / E hints — **have**
+- [ ] Right rail: business, ticket details, other tickets — **FE** (check and fill what's missing)
+
+## F7. Auth, Brand DNA, Verification, Landing leftovers
+- [ ] Login: "Forgot password?" beside the password label, "Kept safe" divider + trust list, "Staff sign in" link — **FE**
+- [ ] Sign up: "Log in instead" in the top bar, stepper "1 · Account / 2 · Brand DNA / 3 · Verification" — **FE** (keeps the app's own fields)
+- [ ] Brand DNA: stepper top bar with Help desk link — **FE**; "Where are you?" — **MIG** (same `city` column); Language tabs — **MIG** (`brand_profiles.language`) — hidden until the columns exist
+- [ ] Verification: stepper top bar, "While you wait" cards (Brand DNA, opens after approval, Help desk) — **FE**
+- [x] Landing — **have** (Phase 1); Integrations / Gallery / Contact stay as ideas (no app content)
+
+## Migrations for me to run
+(filled in as they are written)
