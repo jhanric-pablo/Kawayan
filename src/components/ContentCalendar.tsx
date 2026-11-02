@@ -15,6 +15,7 @@ import PostDetailSheet from './calendar/PostDetailSheet';
 import { StatusBadge } from './calendar/TimelinePostCard';
 import { buildCalendarItems, heldPlatforms, monthItems } from './calendar/mapCalendarEvents';
 import PostTable from './calendar/PostTable';
+import PlannerPage from './calendar/PlannerPage';
 import { dayTags } from '../utils/phCalendar';
 import PostComposer from './calendar/PostComposer';
 import PlanningModal from './calendar/PlanningModal';
@@ -49,6 +50,12 @@ interface Props {
   onOpenChannels?: () => void;
   /** Opens the Month planner page for a month (YYYY-MM). Without it, the planner dialog opens. */
   onOpenPlanner?: (month: string) => void;
+  /** Which page this is: the calendar (default), the Month planner or the Post studio. They share state. */
+  page?: 'calendar' | 'planner' | 'studio';
+  /** Planner page: the month to plan (YYYY-MM). */
+  plannerMonth?: string | null;
+  /** Planner page: "Add to calendar". */
+  onShowCalendar?: () => void;
 }
 
 /** `date` (YYYY-MM-DD) lets the calendar switch to the post's month first; it only loads one month at a time. */
@@ -59,7 +66,7 @@ const announceFeedChange = () => window.dispatchEvent(new Event(FEED_EVENT));
 type CalendarView = 'month' | 'timeline' | 'list';
 const VIEW_KEY = 'kawayan_calendar_view';
 
-const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone, onOpenInsights, onOpenChannels, onOpenPlanner }) => {
+const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone, onOpenInsights, onOpenChannels, onOpenPlanner, page = 'calendar', plannerMonth, onShowCalendar }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   // Month grid first; the choice is remembered on this device.
@@ -190,10 +197,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
   // The ideas a batch run would turn into posts: exactly the ones on screen that are still
   // ahead, have no post yet, and one per day.
-  const pendingIdeas = () => {
+  const pendingIdeas = (list: ContentIdea[] = ideas) => {
     const { minDay, maxDay } = getScheduleDayRange(currentDate);
     const seenDays = new Set<number>();
-    return ideas.filter((idea) => {
+    return list.filter((idea) => {
       if (idea.day < minDay || idea.day > maxDay || postStatusByDay[idea.day] || seenDays.has(idea.day)) return false;
       seenDays.add(idea.day);
       return true;
@@ -352,6 +359,51 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     setCalendarDataVersion((v) => v + 1);
     setDataLoaded(true);
     setLoadedMonth(monthKey);
+  };
+
+  // Month planner page: the posts written in the current run, and a flag to stop after the current one.
+  const [runPosts, setRunPosts] = useState<GeneratedPost[]>([]);
+  const cancelRunRef = useRef(false);
+
+  /** Plans ideas for the month on screen (same AI call as "Plan month") and saves them. Returns them, or null. */
+  const planIdeas = async (count: number, extras: { formats?: string[]; dates?: { day: number; name: string }[]; notes?: string }) => {
+    const monthName = currentDate.toLocaleString('default', { month: 'long' });
+    let newIdeas = await generateContentPlan(profile, monthName, count, batchStrategy, extras);
+    newIdeas = normalizeIdeasToBatchCount(newIdeas, count, scheduleRange, takenDays);
+    setIdeas(newIdeas);
+    await dbService.savePlan(userId, monthName, newIdeas);
+    return newIdeas;
+  };
+
+  /** Planner page: plan the month, then write a post for every idea (drafts), one by one. */
+  const generateMonth = async (count: number, extras: { formats?: string[]; dates?: { day: number; name: string }[]; notes?: string }) => {
+    if (count <= 0) {
+      toast.info(maxPlanCount === 0 && openDayCount === 0 ? 'No open days left this month. Plan next month instead.' : 'No posts left in your plan this month.');
+      return;
+    }
+    if (
+      ideas.length > 0 &&
+      !(await dialog.confirm({
+        title: 'Re-plan the month?',
+        message: 'This replaces your current ideas, including any edits. Posts you already created stay on the calendar.',
+        confirmLabel: 'Re-plan and write',
+      }))
+    ) {
+      return;
+    }
+    setRunPosts([]);
+    setLoadingPlan(true);
+    setBatchProgress({ current: 0, total: count });
+    let planned: ContentIdea[] | null = null;
+    try {
+      planned = await planIdeas(count, extras);
+    } catch (e: any) {
+      toast.error(e.message?.includes('quota') ? "Kawayan's AI has used up today's free allowance. Please try again later." : 'Could not plan the month. Please try again.');
+      setLoadingPlan(false);
+      setBatchProgress(null);
+      return;
+    }
+    await handleBatchGenerate(planned);
   };
 
   const handleGeneratePlan = async () => {
@@ -551,10 +603,13 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
-  const handleBatchGenerate = async () => {
-    const pending = pendingIdeas();
+  const handleBatchGenerate = async (list?: ContentIdea[]) => {
+    const source = list ?? ideas;
+    const pending = pendingIdeas(source);
+    cancelRunRef.current = false;
+    setRunPosts([]);
 
-    if (!ideas.length) {
+    if (!source.length) {
       toast.info('Plan the month first to get content ideas.');
       return;
     }
@@ -586,6 +641,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         const post = await createPostFromIdea(idea, `${Date.now()}-${idea.day}-${i}`);
         await persistPost(post);
         created++;
+        setRunPosts((prev) => [...prev, post]);
 
         if (selectedDay === idea.day) {
           setGeneratedContent(post);
@@ -593,12 +649,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
         setBatchProgress({ current: i + 1, total: cappedPending.length });
 
+        if (cancelRunRef.current) break;
         if (i < cappedPending.length - 1) {
           await new Promise((r) => setTimeout(r, 400));
         }
       }
 
-      toast.success(`Created ${created} post${created === 1 ? '' : 's'}. They're drafts on your calendar.`);
+      toast.success(cancelRunRef.current
+        ? `Stopped. ${created} post${created === 1 ? ' was' : 's were'} saved as drafts.`
+        : `Created ${created} post${created === 1 ? '' : 's'}. They're drafts on your calendar.`);
       await refreshPostsFromDb();
     } catch (e: any) {
       if (e.message?.includes('quota')) {
@@ -1021,6 +1080,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   };
 
   const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  // Planner page: open on the month asked for (from "Plan <next month>").
+  useEffect(() => {
+    if (page !== 'planner' || !plannerMonth) return;
+    const [y, m] = plannerMonth.split('-').map(Number);
+    if (y !== currentDate.getFullYear() || m - 1 !== currentDate.getMonth()) setCurrentDate(new Date(y, m - 1, 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, plannerMonth]);
+
   // ── Header stats (mockup .stats): this month, compared with last month's posts ──
   const [prevMonthPosts, setPrevMonthPosts] = useState<GeneratedPost[] | null>(null);
   useEffect(() => {
@@ -1080,6 +1147,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     <LazyMotion features={domMax}>
     <div className="relative w-full flex flex-col gap-5 pb-16 font-sans text-(--fg)">
 
+      {page === 'calendar' && (<>
       {/* ── Header (mockup .page-h) ── */}
       <div className="kw-page-h">
         <div>
@@ -1163,7 +1231,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         </div>
       )}
 
-      {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => setPlanningOpen(true)} />}
+      {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => openPlannerFor(currentDate)} />}
 
       <div className={sideDetail ? 'kw-work' : undefined}>
       {/* ─────────────  Channel timeline (primary)  ───────────── */}
@@ -1251,7 +1319,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             <button
               type="button"
               data-tour="plan-month"
-              onClick={() => setPlanningOpen(true)}
+              onClick={() => openPlannerFor(currentDate)}
               className="btn btn-outline btn-sm"
               aria-label="Plan month"
             >
@@ -1329,7 +1397,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             <div className="kw-empty-cta">
               <div className="kw-empty-cta__card">
                 <b>Your {currentDate.toLocaleDateString('en-PH', { month: 'long' })} is empty.</b>
-                <button type="button" onClick={() => setPlanningOpen(true)} className="btn btn-primary">
+                <button type="button" onClick={() => openPlannerFor(currentDate)} className="btn btn-primary">
                   Plan {batchPostCount} posts in 15 seconds <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -1378,6 +1446,36 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       )}
       </div>
 
+      </>)}
+      {page === 'planner' && (
+        <PlannerPage
+          month={currentDate}
+          monthOptions={[0, 1, 2].map((i) => new Date(new Date().getFullYear(), new Date().getMonth() + i, 1))}
+          onMonthChange={(d) => setCurrentDate(d)}
+          planLabel={planLabelText}
+          batchPostCount={batchPostCount}
+          monthlyPostCount={monthlyPostCount}
+          maxPlanCount={maxPlanCount}
+          scheduleRange={scheduleRange}
+          focus={batchStrategy}
+          onFocusChange={setBatchStrategy}
+          busy={loadingPlan}
+          progress={batchProgress}
+          runPosts={runPosts}
+          ideas={ideas}
+          createCount={createCount}
+          postStatusByDay={postStatusByDay}
+          onGenerate={generateMonth}
+          onCancel={() => { cancelRunRef.current = true; toast.info('Stopping after the post being written…'); }}
+          onAddToCalendar={() => onShowCalendar?.()}
+          onWriteIdeas={() => handleBatchGenerate()}
+          onUpdateIdea={handleUpdateIdea}
+          onDeleteIdea={handleDeleteIdea}
+          onOpenDay={handleDayClick}
+          onOpenPost={(p) => openPost(p)}
+          onOpenBilling={onOpenBilling}
+        />
+      )}
       {/* ── AI content-planning dialog (opened from the toolbar) ── */}
       <PlanningModal
         open={planningOpen}
@@ -1404,7 +1502,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         paused={selectedDay !== null}
         onOpenBilling={onOpenBilling}
         onGeneratePlan={handleGeneratePlan}
-        onBatchGenerate={handleBatchGenerate}
+        onBatchGenerate={() => handleBatchGenerate()}
         onUpdateIdea={handleUpdateIdea}
         onDeleteIdea={handleDeleteIdea}
         onOpenDay={handleDayClick}

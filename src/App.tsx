@@ -45,7 +45,7 @@ import {
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
-import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
+import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3, Sparkles, PencilLine, LifeBuoy } from 'lucide-react';
 import KawayanLogo, { KawayanMark } from './components/KawayanLogo';
 
 const App: React.FC = () => {
@@ -86,6 +86,8 @@ const App: React.FC = () => {
   const [tourFirstRun, setTourFirstRun] = useState(false);
   // Shell → calendar requests (Create post, search hits, notifications).
   const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
+  // Month planner page: which month to open on (YYYY-MM).
+  const [plannerMonth, setPlannerMonth] = useState<string | null>(null);
   const loginInProgressRef = useRef(false);
   const sessionRestoredRef = useRef(false);
   const handleLoginRef = useRef<(user: User, initialView?: ViewState) => Promise<void>>(async () => {});
@@ -429,6 +431,9 @@ const App: React.FC = () => {
     if (!user || user.role !== 'user' || brandProfile || verifStatus !== 'verified') return;
     const needsProfile = [
       ViewState.CALENDAR,
+      ViewState.PLANNER,
+      ViewState.STUDIO,
+      ViewState.HELP,
       ViewState.SETTINGS,
       ViewState.INSIGHTS,
       ViewState.SOCIAL,
@@ -519,6 +524,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'], group: 'Plan', tour: 'nav-support' },
     { id: ViewState.CALENDAR, label: 'Calendar', icon: ChartGantt, roles: ['user'], group: 'Plan', tour: 'nav-timeline' },
+    { id: ViewState.PLANNER, label: 'Month planner', icon: Sparkles, roles: ['user'], group: 'Plan', tour: 'nav-planner' },
     { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'], group: 'Plan', tour: 'nav-insights' },
     { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
     { id: ViewState.SOCIAL, label: 'Channels', icon: Share2, roles: ['user'], group: 'Account', tour: 'nav-social' },
@@ -596,11 +602,35 @@ const App: React.FC = () => {
   const pageClass = `w-full ${
     isAuthView ? 'min-h-[calc(100vh-0px)]' :
     view === ViewState.LANDING ? '' :
-    view === ViewState.CALENDAR ? 'py-6 px-2 sm:px-6 lg:px-8' :
+    view === ViewState.CALENDAR || view === ViewState.PLANNER || view === ViewState.STUDIO ? 'py-6 px-2 sm:px-6 lg:px-8' :
     adminConsole || view === ViewState.SUPPORT_DASHBOARD ? '' :
     (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
     'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
   }`;
+
+  // Calendar, Month planner and Post studio are one ContentCalendar (shared state) in different layouts.
+  const calendarPage = (mode: 'calendar' | 'planner' | 'studio') =>
+    user && brandProfile ? (
+      <ContentCalendar
+        page={mode}
+        profile={brandProfile}
+        userId={user.id}
+        onOpenSocial={() => navigateView(ViewState.SOCIAL)}
+        onOpenBilling={() => navigateView(ViewState.BILLING)}
+        intent={calendarIntent}
+        onIntentDone={() => setCalendarIntent(null)}
+        onOpenInsights={() => goTo(ViewState.INSIGHTS)}
+        onOpenChannels={() => goTo(ViewState.SOCIAL)}
+        onOpenPlanner={(m) => {
+          setPlannerMonth(m);
+          goTo(ViewState.PLANNER);
+        }}
+        plannerMonth={plannerMonth}
+        onShowCalendar={() => goTo(ViewState.CALENDAR)}
+      />
+    ) : (
+      <AppHydrationLoader />
+    );
 
   const page = blockForHydration ? (
     <AppHydrationLoader />
@@ -655,13 +685,9 @@ const App: React.FC = () => {
                   </div>
                 );
               }
-              return (user && brandProfile) ? (
-                <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} intent={calendarIntent} onIntentDone={() => setCalendarIntent(null)} onOpenInsights={() => goTo(ViewState.INSIGHTS)} onOpenChannels={() => goTo(ViewState.SOCIAL)} />
-              ) : user ? (
-                <AppHydrationLoader />
-              ) : (
-                <AppHydrationLoader />
-              );
+              return calendarPage('calendar');
+            case ViewState.PLANNER:
+              return calendarPage('planner');
             case ViewState.SETTINGS:
               return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:

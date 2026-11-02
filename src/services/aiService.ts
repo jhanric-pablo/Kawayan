@@ -52,10 +52,21 @@ export const generateContentPlan = async (
   month: string,
   itemCount: number = 8,
   /** The owner's focus for the month, e.g. "Promo / limited-time sale". */
-  focus = ''
+  focus = '',
+  /** Optional extras from the Month planner page; older callers leave them out. */
+  extras: { formats?: string[]; dates?: { day: number; name: string }[]; notes?: string } = {}
 ): Promise<ContentIdea[]> => {
     const focusRule = focus.trim()
       ? `- THIS MONTH'S FOCUS, set by the owner: "${focus.trim()}". Build most ideas around it, mixed with a few evergreen posts.`
+      : '';
+    const formatRule = extras.formats?.length
+      ? `- Use only these formats: ${extras.formats.join(', ')}.`
+      : '';
+    const datesRule = extras.dates?.length
+      ? `- The owner picked these dates to post about (day: occasion): ${extras.dates.map((d) => `${d.day}: ${d.name}`).join('; ')}. Put one idea on each of these days, tied to the occasion.`
+      : '';
+    const notesRule = extras.notes?.trim()
+      ? `- The owner's notes for this month: "${extras.notes.trim().slice(0, 600)}". Respect them (for example, don't plan posts on days they say they're closed).`
       : '';
     const prompt = `
     Analyze the following brand profile:
@@ -75,6 +86,9 @@ export const generateContentPlan = async (
     - USE TAGLISH. The 'title' and 'topic' must be in natural, modern Taglish (mix of Tagalog/English) or Filipino.
     - PHILIPPINE CONTEXT. Tie ideas to Philippine seasons, events and paydays (15th and 30th). Never use holidays Filipinos don't celebrate, like Thanksgiving.
     ${focusRule}
+    ${formatRule}
+    ${datesRule}
+    ${notesRule}
     - NO MADE-UP OFFERS. Unless the owner's focus names them, never invent prices, percentages, "buy X get Y" deals, freebies or giveaways. Say "a special promo" or "a bundle deal" and let the owner add the details.
     - Spread 'day' values evenly across the month (1–28), starting from today when planning the current month.
     - OUTPUT ONLY JSON. No explanation before or after.

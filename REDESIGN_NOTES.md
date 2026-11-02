@@ -310,7 +310,7 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 
 ## A. App shell
 - [x] Sidebar header: business avatar (initials), name, "<Plan> plan" — **FE**; "· city" — **MIG** (`brand_profiles.city`, hidden until it exists)
-- [ ] Group "Plan": Calendar, Month planner (new page), Post studio (new page) + drafts badge, Insights — **FE**
+- [ ] Group "Plan": Calendar, Month planner (new page) ✓, Post studio (new page) + drafts badge, Insights — **FE**
 - [x] Group "Account": Settings + red channel-problem badge, Plan and billing, Help desk (new page) — **FE**
 - [x] Social accounts stay reachable (Settings › Channels links to it; `/social` still works) — **have**
 - [x] Quota card "<Month> posts X / limit", bar, "Resets <1st>." — **FE**. It says "Drafts count too." instead of the mockup's "Drafts don't count": the app (and the server's TIER_LIMIT check) counts every saved post, drafts included, and that rule was not changed.
@@ -337,10 +337,10 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] UpNext, tour targets, empty-month pitch, idea editing — **have**
 
 ## C. Month planner page
-- [ ] New sidebar page (`/planner`) using the calendar's planning state and the same generate calls; "Plan month" and the empty-month pitch open it — **FE**
-- [ ] "Your month": month select, 8 / 12 / 16 cards limited by plan and open days, Formats chips, "Dates Kawayan found" checkboxes, notes, "Generate N posts", hint — **FE**
-- [ ] Formats, dates and notes passed to the AI as new optional arguments to `generateContentPlan` (the `/api/ai/text` request is unchanged) — **FE**
-- [ ] "Generating": "X of N ready" + bar, cards appear one by one, shimmer skeletons, Cancel / Add to calendar — **FE** (Cancel stops after the post being written; posts already written stay as drafts)
+- [x] New sidebar page (`/planner`) using the calendar's planning state and the same generate calls; "Plan month" and the empty-month pitch open it — **FE**
+- [x] "Your month": month select, 8 / 12 / 16 cards limited by plan and open days, Formats chips, "Dates Kawayan found" checkboxes, notes, "Generate N posts", hint — **FE**
+- [x] Formats, dates and notes passed to the AI as new optional arguments to `generateContentPlan` (the `/api/ai/text` request is unchanged) — **FE**
+- [x] "Generating": "X of N ready" + bar, cards appear one by one, shimmer skeletons, Cancel / Add to calendar — **FE** (Cancel stops after the post being written; posts already written stay as drafts)
 - [x] Existing planning modal behaviour (ideas list, edit/delete idea, batch create) — **have** (kept on the page)
 
 ## D. Insights
@@ -430,3 +430,17 @@ posted: View on Facebook / Insights / Duplicate; scheduled: Edit post / Move dat
 New: Duplicate (draft copy on the next free day via the existing save-post call), Unschedule
 (new additive endpoint `POST /api/social/unschedule`). The toolbar "Plan month" stays (secondary)
 for the month on screen; the shell's lost-access banner is hidden on the calendar, which shows its own.
+
+**C — Month planner page.** New `/planner` page (sidebar "Month planner"). It is the same
+ContentCalendar (shared state, same AI calls) in a different layout: "Your month" card (month
+select for this month and the next two, 8 / 12 / 16 cards limited by the plan and open days, plus
+"All that's left" when fewer fit; Formats chips Single photo / Text post / Video — the app's real
+formats; "Dates Kawayan found" checkboxes from `phCalendar.ts`; "Anything special this month?";
+the existing focus presets; green "Generate N posts"; the failed-calls hint) and a "Generating"
+card ("X of N ready" + bar, drafts appear one by one as they're saved, pulsing skeletons for the
+rest, Cancel stops after the post being written, "Add to calendar" goes back to the calendar).
+The existing ideas list (edit title, remove, write posts for them) stays on the page.
+`generateContentPlan` takes a new optional `extras` argument (formats, dates, notes) folded into the
+prompt; the `/api/ai/text` request is unchanged, so older callers work as before. "Plan <next
+month>", the toolbar "Plan month", the empty-month pitch and Up next now open this page; the
+planner dialog component is still there (used if the page isn't wired).
