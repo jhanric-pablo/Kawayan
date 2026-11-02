@@ -31,13 +31,13 @@ const ToggleRow: React.FC<{
   // The whole row toggles; the switch itself carries the name and description for screen readers.
   <div
     onClick={(e) => { if (!(e.target as HTMLElement).closest('[role="switch"]')) onChange(!checked); }}
-    className="flex items-center gap-3 rounded-xl p-3 cursor-pointer transition-colors hover:bg-(--bg-alt)"
+    className="flex min-h-11 items-center gap-3 rounded-lg p-2.5 cursor-pointer transition-colors hover:bg-(--muted)"
   >
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-badge text-badge-text" aria-hidden>
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-(--border) bg-(--card) text-(--fg)" aria-hidden>
       {icon}
     </span>
     <span className="min-w-0 flex-1">
-      <span id={`${id}-label`} className="block text-sm font-semibold text-(--fg)">{label}</span>
+      <span id={`${id}-label`} className="block text-sm font-medium text-(--fg)">{label}</span>
       <span id={`${id}-desc`} className="mt-0.5 block text-xs leading-snug text-(--fg-muted)">{description}</span>
     </span>
     <Switch id={id} checked={checked} onCheckedChange={onChange} aria-labelledby={`${id}-label`} aria-describedby={`${id}-desc`} />
@@ -55,7 +55,7 @@ export const AccessibilityOptions: React.FC = () => {
   return (
     <div className="space-y-1">
       <div className="px-3 py-2">
-        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--fg)' }}>Text size</p>
+        <p className="text-sm font-medium mb-2" style={{ color: 'var(--fg)' }}>Text size</p>
         <div className="flex items-center gap-2 max-w-xs">
           <button
             type="button"
@@ -68,7 +68,7 @@ export const AccessibilityOptions: React.FC = () => {
           </button>
           <span
             className="flex-1 text-center text-sm font-medium py-1.5 rounded-(--radius)"
-            style={{ background: 'var(--bg-alt)', color: 'var(--fg)' }}
+            style={{ background: 'var(--muted)', color: 'var(--fg)' }}
             aria-live="polite"
           >
             {FONT_LABELS[fontLevel]}
@@ -93,7 +93,7 @@ export const AccessibilityOptions: React.FC = () => {
           type="button"
           onClick={() => setSettings(resetAccessibilitySettings())}
           className="inline-flex items-center gap-2 text-sm font-medium"
-          style={{ color: 'var(--primary)' }}
+          style={{ color: 'var(--fg)' }}
         >
           <RotateCcw className="w-4 h-4" aria-hidden /> Reset to defaults
         </button>
@@ -143,10 +143,10 @@ const AccessibilityWidget: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-labelledby="a11y-widget-title"
-          className="a11y-widget-panel w-[min(100vw-3rem,320px)] rounded-2xl border shadow-xl overflow-hidden"
+          className="a11y-widget-panel w-[min(100vw-2rem,320px)] rounded-xl border overflow-hidden animate-scale-in motion-reduce:animate-none"
           style={{
-            background: 'var(--glass-bg-strong, #fff)',
-            borderColor: 'var(--glass-border, rgba(43,87,72,0.2))',
+            background: 'var(--card)',
+            borderColor: 'var(--border)',
             boxShadow: 'var(--shadow-lg)',
           }}
         >
@@ -155,15 +155,15 @@ const AccessibilityWidget: React.FC = () => {
             style={{ borderColor: 'var(--border)' }}
           >
             <div className="flex items-center gap-2">
-              <Accessibility className="w-5 h-5" style={{ color: 'var(--kw-green, #2B5748)' }} aria-hidden />
-              <h2 id="a11y-widget-title" className="text-sm font-bold" style={{ color: 'var(--fg)' }}>
+              <Accessibility className="w-4 h-4" style={{ color: 'var(--green-ink)' }} aria-hidden />
+              <h2 id="a11y-widget-title" className="text-[15px] font-semibold tracking-tight" style={{ color: 'var(--fg)' }}>
                 Accessibility
               </h2>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              className="grid h-9 w-9 place-items-center rounded-lg hover:bg-(--muted) transition-colors"
               aria-label="Close accessibility panel"
             >
               <X className="w-4 h-4" style={{ color: 'var(--fg-muted)' }} />
@@ -180,14 +180,14 @@ const AccessibilityWidget: React.FC = () => {
                   type="button"
                   onClick={() => patch({ fontLevel: Math.max(0, fontLevel - 1) as AccessibilitySettings['fontLevel'] })}
                   disabled={fontLevel === 0}
-                  className="btn btn-glass p-2! min-w-0! disabled:opacity-40"
+                  className="btn btn-outline w-9 px-0! disabled:opacity-40"
                   aria-label="Decrease text size"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
                 <span
-                  className="flex-1 text-center text-sm font-medium py-2 rounded-xl"
-                  style={{ background: 'rgba(43,87,72,0.08)', color: 'var(--fg)' }}
+                  className="flex-1 text-center text-sm font-medium py-2 rounded-lg"
+                  style={{ background: 'var(--muted)', color: 'var(--fg)' }}
                   aria-live="polite"
                 >
                   {FONT_LABELS[fontLevel]}
@@ -196,7 +196,7 @@ const AccessibilityWidget: React.FC = () => {
                   type="button"
                   onClick={() => patch({ fontLevel: Math.min(3, fontLevel + 1) as AccessibilitySettings['fontLevel'] })}
                   disabled={fontLevel === 3}
-                  className="btn btn-glass p-2! min-w-0! disabled:opacity-40"
+                  className="btn btn-outline w-9 px-0! disabled:opacity-40"
                   aria-label="Increase text size"
                 >
                   <Plus className="w-4 h-4" />
@@ -238,17 +238,17 @@ const AccessibilityWidget: React.FC = () => {
             />
           </div>
 
-          <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
+          <div className="px-3 pb-3 pt-2 border-t" style={{ borderColor: 'var(--border)', background: 'var(--muted)' }}>
             <button
               type="button"
               onClick={handleReset}
-              className="w-full flex items-center justify-center gap-2 text-sm font-medium py-2.5 rounded-xl transition-colors hover:bg-emerald-500/8"
-              style={{ color: 'var(--kw-green, #2B5748)' }}
+              className="btn btn-outline w-full"
+
             >
               <RotateCcw className="w-4 h-4" aria-hidden />
               Reset accessibility settings
             </button>
-            <p className="text-xs text-center mt-2 px-2 leading-snug" style={{ color: 'var(--fg-subtle)' }}>
+            <p className="text-xs text-center mt-2 px-2 leading-snug" style={{ color: 'var(--fg-muted)' }}>
               Settings are saved in your browser for this device.
             </p>
           </div>
@@ -259,18 +259,19 @@ const AccessibilityWidget: React.FC = () => {
         ref={toggleRef}
         type="button"
         onClick={() => setIsOpen((o) => !o)}
-        className="a11y-widget-toggle w-11 h-11 sm:w-14 sm:h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        className="a11y-widget-toggle w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-transform active:scale-95"
         style={{
-          background: 'var(--kw-green, #2B5748)',
-          color: '#fff',
-          boxShadow: '0 8px 24px rgba(43,87,72,0.35)',
+          background: 'var(--card)',
+          color: 'var(--fg)',
+          borderColor: 'var(--border)',
+          boxShadow: 'var(--shadow-md)',
         }}
         aria-expanded={isOpen}
         aria-controls="a11y-widget-panel"
         aria-label={isOpen ? 'Close accessibility options' : 'Open accessibility options'}
         title="Accessibility options"
       >
-        {isOpen ? <X className="w-6 h-6" /> : <Accessibility className="w-6 h-6" />}
+        {isOpen ? <X className="w-5 h-5" /> : <Accessibility className="w-5 h-5" />}
       </button>
     </div>
   );

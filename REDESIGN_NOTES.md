@@ -60,16 +60,16 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] `styles/accessibility.css` (high-contrast etc. still work with new tokens)
 
 ### App shell
-- [ ] Sidebar (desktop) with business header, menu groups, quota card, account button
-- [ ] Top bar (sidebar toggle, breadcrumb, search, bell, theme state)
-- [ ] Phone drawer (replaces bottom tab bar visually; same items)
-- [ ] Expired-channel warning banner
-- [ ] Post search results popover
-- [ ] Notification center
-- [ ] Account menu
-- [ ] Spotlight tour (`tour/*`)
-- [ ] Accessibility widget (floating, public pages) + Settings › Appearance version
-- [ ] Support-role "calendar is for SME accounts" placeholder (App.tsx)
+- [x] Sidebar (desktop) with business header, menu groups, quota card, account button
+- [x] Top bar (sidebar toggle, breadcrumb, search, bell, theme state)
+- [x] Phone drawer (replaces bottom tab bar visually; same items)
+- [x] Expired-channel warning banner
+- [x] Post search results popover
+- [x] Notification center
+- [x] Account menu
+- [x] Spotlight tour (`tour/*`)
+- [x] Accessibility widget (floating, public pages) + Settings › Appearance version
+- [x] Support-role "calendar is for SME accounts" placeholder (App.tsx)
 - [ ] Generic top nav for non-dashboard signed-in views (App.tsx)
 
 ### Owner screens
@@ -172,3 +172,12 @@ new bamboo logo, reshaped `.btn/.input/.badge/.card`, ui/* (button, switch, tabs
 popover, dropdown, toast pill, stepper), OrganicDialog with muted footer, new hydration loader.
 Check: any screen in light/dark — colours should already be neutral with green only on main buttons.
 Left: per-screen layout work (steps 2–9).
+
+**Step 2 — app shell.** `DashboardLayout` is now the mockup's sidebar-inset layout: grey sidebar
+(business, Workspace/Account groups, Ask AI/Help with ⌘K, quota + engine card, account button that
+opens upward), page in a rounded bordered panel with a top bar (sidebar toggle, breadcrumb, post
+search, Create post, bell, theme toggle). Phones: the bottom tab bar is replaced by a slide-in
+drawer (same items, focus-trapped, Esc/scrim to close). Notification center, account menu, tour
+and accessibility widget restyled. The theme toggle calls the same `updateTheme` as Settings.
+Check: collapse/expand sidebar, drawer on a phone, ⌘K help, bell, account menu, Reconnect banner.
+Left: tour cutout no longer animates its position (only opacity/transform are animated now).

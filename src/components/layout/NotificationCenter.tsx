@@ -22,10 +22,10 @@ interface Entry {
 }
 
 const TONE: Record<Tone, string> = {
-  security: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
-  warning: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-  critical: 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300',
-  success: 'bg-badge text-badge-text',
+  security: 'bg-(--muted) text-(--fg)',
+  warning: 'bg-(--amber-soft) text-(--amber)',
+  critical: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-(--danger)',
+  success: 'bg-(--green-soft) text-(--green-ink)',
 };
 
 /** When this browser's session began: the stored token's issue time. */
@@ -45,31 +45,31 @@ const device = () => {
 };
 
 const Row: React.FC<{ entry: Entry; fresh?: boolean }> = ({ entry: e, fresh }) => (
-  <li className="flex items-start gap-3 rounded-xl px-3 py-2.5 hover:bg-(--bg-alt)">
-    <span className={clsx('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full', TONE[e.tone])}>
+  <li className="flex items-start gap-3 border-b border-(--border) px-3.5 py-3 last:border-b-0 hover:bg-(--muted)">
+    <span className={clsx('grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg', TONE[e.tone])}>
       <e.Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
     </span>
     <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-1.5 text-ui font-semibold text-(--fg)">
+      <p className="flex items-center gap-1.5 text-ui font-medium text-(--fg)">
         {e.title}
-        {fresh && <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-label="New" />}
+        {fresh && <span className="h-[7px] w-[7px] rounded-full bg-(--green)" aria-label="New" />}
       </p>
       <p className="truncate text-xs text-(--fg-muted)">{e.body}</p>
       <div className="mt-1 flex items-center gap-2">
-        {e.time && <span className="text-xs text-(--fg-subtle)">{timeAgo(e.time)}</span>}
+        {e.time && <span className="mono text-xs text-(--fg-muted)">{timeAgo(e.time)}</span>}
         {e.action && (
-          <button type="button" onClick={e.action.onClick} className="text-xs font-bold text-(--primary) hover:underline">
+          <button type="button" onClick={e.action.onClick} className="text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
             {e.action.label}
           </button>
         )}
       </div>
     </div>
-    {e.thumb && <img src={e.thumb} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />}
+    {e.thumb && <img src={e.thumb} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-(--border) object-cover" />}
   </li>
 );
 
 const TAB =
-  'relative z-1 flex h-10 items-center gap-1.5 px-2 text-ui font-semibold text-(--fg-muted) outline-hidden hover:text-(--fg) focus-visible:text-(--fg) data-active:text-(--fg)';
+  'relative z-1 flex h-10 items-center gap-1.5 px-2 text-ui font-medium text-(--fg-muted) outline-hidden hover:text-(--fg) focus-visible:text-(--fg) data-active:text-(--fg)';
 
 /** Bell + popover: system alerts (security, channel access, failed posts) and a publishing history. */
 const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpenPost: (postId: string) => void }> = ({ userId, feed, onOpenPost }) => {
@@ -150,21 +150,21 @@ const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpen
       <PopoverTrigger
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
         data-tour="notifications"
-        className="relative grid h-9 w-9 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg) data-popup-open:bg-(--bg-alt) data-popup-open:text-(--fg)"
+        className="relative grid h-9 w-9 place-items-center rounded-lg text-(--fg) transition-colors hover:bg-(--muted) data-popup-open:bg-(--muted)"
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-xs font-bold text-on-brand ring-2 ring-(--bg)">
+          <span className="mono absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-(--green) px-1 text-2xs font-medium text-(--green-fg) ring-2 ring-(--bg)">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="w-[min(92vw,384px)] gap-0 rounded-2xl p-0">
-        <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
-          <PopoverTitle className="font-sans text-sm font-bold">Notifications</PopoverTitle>
+      <PopoverContent align="end" sideOffset={8} className="w-[min(92vw,380px)] gap-0 overflow-hidden rounded-xl p-0">
+        <div className="flex items-center justify-between px-3.5 pb-1 pt-3">
+          <PopoverTitle className="font-sans text-[15px] font-semibold tracking-tight">Notifications</PopoverTitle>
           {issues === 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-badge-text">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden /> All systems healthy
+            <span className="badge badge-green">
+              <span className="h-1.5 w-1.5 rounded-full bg-(--green)" aria-hidden /> All systems healthy
             </span>
           )}
         </div>
@@ -172,15 +172,15 @@ const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpen
           <Tabs.List className="relative flex gap-2 border-b border-(--border) px-3">
             <Tabs.Tab value="alerts" className={TAB}>
               System alerts
-              {issues > 0 && <span className="rounded-full bg-red-500/15 px-1.5 text-xs font-bold text-red-600 dark:text-red-300">{issues}</span>}
+              {issues > 0 && <span className="mono rounded-full bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-1.5 text-2xs font-medium text-(--danger)">{issues}</span>}
             </Tabs.Tab>
             <Tabs.Tab value="history" className={TAB}>History log</Tabs.Tab>
-            <Tabs.Indicator className="absolute -bottom-px left-(--active-tab-left) h-0.5 w-(--active-tab-width) rounded-full bg-brand transition-[left,width] duration-200 ease-out" />
+            <Tabs.Indicator className="absolute -bottom-px left-0 h-0.5 w-(--active-tab-width) translate-x-(--active-tab-left) rounded-full bg-(--fg) transition-transform duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]" />
           </Tabs.List>
-          <Tabs.Panel value="alerts" className="max-h-[min(60vh,420px)] overflow-y-auto p-1.5 outline-hidden">
+          <Tabs.Panel value="alerts" className="max-h-[min(60vh,420px)] overflow-y-auto outline-hidden">
             <ul>{alerts.map((e) => <Row key={e.key} entry={e} />)}</ul>
           </Tabs.Panel>
-          <Tabs.Panel value="history" className="max-h-[min(60vh,420px)] overflow-y-auto p-1.5 outline-hidden">
+          <Tabs.Panel value="history" className="max-h-[min(60vh,420px)] overflow-y-auto outline-hidden">
             {history.length ? (
               <ul>{history.map((e) => <Row key={e.key} entry={e} fresh={(e.time ?? 0) > seenAt} />)}</ul>
             ) : (

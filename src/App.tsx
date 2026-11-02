@@ -613,10 +613,10 @@ const App: React.FC = () => {
               if (user?.role === 'support') {
                 return (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-10 animate-fade-in">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2" style={{ background: 'rgba(43,87,72,0.1)' }}>
-                      <MessageSquare className="w-7 h-7 text-emerald-500" />
+                    <div className="w-12 h-12 rounded-xl border flex items-center justify-center mb-2" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                      <MessageSquare className="w-5 h-5" style={{ color: 'var(--green-ink)' }} />
                     </div>
-                    <h2 className="text-xl font-bold" style={{ color: 'var(--fg)' }}>Support Dashboard</h2>
+                    <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--fg)' }}>Support Dashboard</h2>
                     <p className="text-sm max-w-sm" style={{ color: 'var(--fg-muted)' }}>
                       The content calendar is for SME accounts. Open your Support Dashboard to manage tickets and calls.
                     </p>
@@ -687,6 +687,8 @@ const App: React.FC = () => {
           onHome={() => goTo(getHomeViewForRole(user.role))}
           onCreatePost={() => requestCalendar({ type: 'compose' })}
           onOpenPost={(postId, date) => requestCalendar({ type: 'open', postId, date })}
+          darkMode={darkMode}
+          onToggleTheme={() => updateTheme(!darkMode)}
         >
           <div className={pageClass}>{page}</div>
         </DashboardLayout>
@@ -735,7 +737,7 @@ const App: React.FC = () => {
                         href="#features"
                         className="px-3 py-2 rounded-xl text-sm font-semibold transition"
                         style={{ color: 'var(--fg-muted)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
                       >
                         Features
@@ -744,7 +746,7 @@ const App: React.FC = () => {
                         href="#pricing"
                         className="px-3 py-2 rounded-xl text-sm font-semibold transition"
                         style={{ color: 'var(--fg-muted)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
                       >
                         Pricing
@@ -754,7 +756,7 @@ const App: React.FC = () => {
                       onClick={() => navigateView(ViewState.LOGIN)}
                       className="px-4 py-2 rounded-xl text-sm font-semibold transition"
                       style={{ color: 'var(--fg-muted)' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
                     >
                       Sign In

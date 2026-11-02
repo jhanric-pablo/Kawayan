@@ -80,7 +80,7 @@
 @media (prefers-reduced-motion: reduce) { .sp-pulse, .sp-typing i { animation: none; } }
 
 /* Support inbox fills the screen under the top bar; on phones it also clears the tab bar. */
-body.has-tabbar .sp-inbox { height: calc(100dvh - 3.5rem - 68px - env(safe-area-inset-bottom)); min-height: 0; }
+
 
 /* Help panel (owner side): cards, rows, the question box and assistant answers. */
 .sp-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--fg); transition: border-color 0.15s; }

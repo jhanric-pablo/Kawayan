@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, ChevronDown, CreditCard, LifeBuoy, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, ChevronsUpDown, CreditCard, LifeBuoy, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { User } from '../types';
 import { paymentService } from '../services/paymentService';
 import { HELP_EVENT } from '../utils/usePhone';
@@ -16,10 +16,13 @@ interface Props {
   showHelp?: boolean;
   /** The plan when the caller already knows it; otherwise it's fetched on open. */
   plan?: string | null;
+  /** 'sidebar': full-width row at the foot of the sidebar, menu opens upward. */
+  placement?: 'header' | 'sidebar';
 }
 
 /** Avatar + name button → who you're signed in as, your plan, Switch account, Settings, Help and Sign out. */
-const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSettings, onBilling, showHelp, plan: knownPlan }) => {
+const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSettings, onBilling, showHelp, plan: knownPlan, placement = 'header' }) => {
+  const inSidebar = placement === 'sidebar';
   const [open, setOpen] = useState(false);
   const [fetchedPlan, setPlan] = useState<string | null>(null);
   const plan = knownPlan ?? fetchedPlan;
@@ -64,7 +67,7 @@ const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSett
   };
 
   return (
-    <div className="am" ref={rootRef}>
+    <div className={inSidebar ? 'am am--side' : 'am'} ref={rootRef}>
       <button
         ref={buttonRef}
         type="button"
@@ -75,11 +78,11 @@ const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSett
         onClick={() => setOpen((o) => !o)}
       >
         <span className="am__avatar" aria-hidden>{name[0]?.toUpperCase()}</span>
-        <span className="hidden min-w-0 text-left leading-tight sm:block" aria-hidden>
-          <b className="block max-w-[150px] truncate text-xs font-semibold text-(--fg)">{name}</b>
-          <span className="block text-xs text-(--fg-muted)">{roleLabel}</span>
+        <span className={inSidebar ? 'am__text min-w-0 flex-1 text-left leading-tight' : 'hidden min-w-0 text-left leading-tight sm:block'} aria-hidden>
+          <b className="block max-w-[150px] truncate text-sm font-semibold text-(--fg)">{name}</b>
+          <span className="block truncate text-xs text-(--fg-muted)">{roleLabel}</span>
         </span>
-        <ChevronDown className="am__chev" aria-hidden />
+        {inSidebar ? <ChevronsUpDown className="am__chev" aria-hidden /> : <ChevronDown className="am__chev" aria-hidden />}
       </button>
 
       {open && (
