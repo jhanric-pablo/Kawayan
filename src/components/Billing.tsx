@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Check, Download, Loader2, Plus, Wallet as WalletIcon } from 'lucide-react';
+import UniversalDatabaseService from '../services/universalDatabaseService';
+import { readCachedUser } from '../utils/authSession';
+import { countPostsInMonth } from '../utils/tierLimits';
 import { paymentService, Wallet, Transaction } from '../services/paymentService';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
@@ -26,13 +29,29 @@ const STATUS_LABEL: Record<Transaction['status'], { text: string; color: string 
   CANCELLED: { text: 'Cancelled', color: 'var(--fg-subtle)' },
 };
 
-const Billing: React.FC = () => {
+interface Props {
+  /** "Buy 1 extra post": opens the Post studio's new-post flow, where the extra post is paid when it's written. */
+  onBuyExtra?: () => void;
+  /** Enterprise "Talk to us": opens the Help desk. */
+  onTalkToUs?: () => void;
+}
+
+const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [amount, setAmount] = useState('500');
   const [busy, setBusy] = useState<'topup' | 'plan' | 'cancel' | null>(null);
+  // This month's posts, for the usage bar (same count as the sidebar quota).
+  const [postsUsed, setPostsUsed] = useState<number | null>(null);
+  useEffect(() => {
+    const userId = readCachedUser()?.id;
+    if (!userId) return;
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    new UniversalDatabaseService().getUserPosts(userId, key).then((p) => setPostsUsed(countPostsInMonth(p, now))).catch(() => undefined);
+  }, []);
 
   const refresh = async (returnedFrom?: 'success' | 'cancelled') => {
     let result: Awaited<ReturnType<typeof paymentService.verifyTopUp>> | null = null;
@@ -141,12 +160,40 @@ const Billing: React.FC = () => {
   const pending = wallet.transactions.find((t) => t.status === 'PENDING');
   const labelStyle = { color: 'var(--fg-muted)' };
 
+  const monthName = new Date().toLocaleDateString('en-PH', { month: 'long' });
+  const limit = isPro ? PRO_POST_LIMIT : TRIAL_POST_LIMIT;
+  const resets = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  const method = (t: Transaction) => {
+    const { ref } = describe(t);
+    if (ref?.startsWith('cs_')) return 'PayMongo';
+    if (ref?.startsWith('invoice_') || /^Xendit/.test(t.description)) return 'Xendit';
+    return t.type === 'DEBIT' ? 'Wallet' : '—';
+  };
+  const statusBadge = (t: Transaction) =>
+    t.status === 'COMPLETED' ? <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Paid</span>
+    : t.status === 'PENDING' ? <span className="badge badge-amber"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Pending</span>
+    : t.status === 'FAILED' ? <span className="badge badge-red"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Failed</span>
+    : <span className="badge badge-sage">Cancelled</span>;
+  const copyRef = async (ref: string) => {
+    try {
+      await navigator.clipboard.writeText(ref);
+      toast.success('Payment reference copied');
+    } catch {
+      toast.error(`Reference: ${ref}`);
+    }
+  };
+  const PLANS = [
+    { id: 'FREE', name: 'Free Trial', price: '₱0', items: [`${TRIAL_POST_LIMIT} posts a month`, 'Captions and images', 'Content calendar'] },
+    { id: 'PRO', name: 'Pro', price: `₱${PRO_PRICE_PHP}`, items: [`${PRO_POST_LIMIT} posts a month`, 'Insights and comparison', `Extra posts ₱${ADDON_POST_PRICE_PHP} each`] },
+    { id: 'ENTERPRISE', name: 'Enterprise', price: 'Custom', items: ['For chains and franchises', 'Talk to us about volume'] },
+  ] as const;
+
   return (
-    <div className="max-w-4xl space-y-6 animate-fade-in">
-      <div className="page-head">
+    <div className="max-w-5xl space-y-5 animate-fade-in">
+      <div className="kw-page-h">
         <div>
-          <h1 className="page-head__title">Billing</h1>
-          <p className="page-head__sub">Your plan, wallet balance and payment history.</p>
+          <h1>Plan and billing</h1>
+          <p>Your plan, wallet balance and payment history.</p>
         </div>
       </div>
 
@@ -185,64 +232,45 @@ const Billing: React.FC = () => {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Plan */}
-        <section className="surface p-6 flex flex-col">
-          <p className="text-ui font-medium" style={labelStyle}>Current plan</p>
-          <h2 className="text-2xl font-semibold tracking-tight mt-1" style={{ color: 'var(--fg)' }}>{isPro ? 'Pro' : 'Free'}</h2>
-          <p className="text-sm mt-1" style={labelStyle}>
-            {isPro ? `${PRO_POST_LIMIT} posts a month · ${peso(PRO_PRICE_PHP)}/month` : `${TRIAL_POST_LIMIT} posts a month · ₱0`}
+      <div className="grid gap-5 md:grid-cols-2">
+        {/* Current plan (mockup .plan-hero) */}
+        <section className="surface flex flex-col gap-3.5 p-5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-ui font-medium" style={labelStyle}>Current plan</p>
+            <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Active</span>
+          </div>
+          <p className="text-[34px] font-semibold leading-none tracking-tight tabular-nums" style={{ color: 'var(--fg)' }}>
+            {isPro ? `Pro · ${peso(PRO_PRICE_PHP).replace('.00', '')}` : 'Free · ₱0'} <small className="text-sm font-normal tracking-normal" style={labelStyle}>/ month</small>
           </p>
-
-          <div className="mt-6 pt-5 flex-1 flex flex-col" style={{ borderTop: '1px solid var(--border)' }}>
-            <table className="w-full text-sm tabular-nums">
-              <thead>
-                <tr className="text-ui" style={labelStyle}>
-                  <th className="text-left font-medium pb-2" />
-                  <th className="text-right font-medium pb-2 w-20" style={!isPro ? { color: 'var(--fg)' } : undefined}>Free</th>
-                  <th className="text-right font-medium pb-2 w-24" style={isPro ? { color: 'var(--fg)' } : undefined}>Pro</th>
-                </tr>
-              </thead>
-              <tbody style={{ color: 'var(--fg)' }}>
-                {[
-                  ['Posts each month', String(TRIAL_POST_LIMIT), String(PRO_POST_LIMIT)],
-                  ['Extra posts', `₱${ADDON_POST_PRICE_PHP} each`, `₱${ADDON_POST_PRICE_PHP} each`],
-                  ['Price', '₱0', `₱${PRO_PRICE_PHP}/mo`],
-                ].map(([label, free, pro]) => (
-                  <tr key={label} style={{ borderTop: '1px solid var(--border)' }}>
-                    <td className="py-2" style={labelStyle}>{label}</td>
-                    <td className="py-2 text-right" style={isPro ? labelStyle : undefined}>{free}</td>
-                    <td className="py-2 text-right" style={!isPro ? labelStyle : undefined}>{pro}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="mt-auto pt-5">
-              {isPro ? (
-                <button onClick={handleDowngrade} disabled={busy === 'plan'} className="btn btn-outline btn-sm">
-                  Switch to Free
-                </button>
-              ) : (
-                <>
-                  <button onClick={handleUpgrade} disabled={busy === 'plan' || !!pending} className="btn btn-primary btn-sm">
-                    {busy === 'plan' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    Upgrade to Pro · {peso(PRO_PRICE_PHP)}/month
-                  </button>
-                  <p className="text-xs mt-2" style={{ color: 'var(--fg-subtle)' }}>
-                    {pending ? 'Finish or cancel the payment above first.' : 'Pay with GCash, Maya or card. Your wallet isn’t used.'}
-                  </p>
-                </>
-              )}
+          <div>
+            <div className="mb-1.5 flex justify-between text-ui">
+              <span>{monthName} posts</span>
+              <b className="mono font-medium">{postsUsed == null ? '—' : `${postsUsed} of ${limit}`}</b>
             </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label={`${monthName} posts used`} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={postsUsed ?? 0}>
+              <div className="h-full rounded-full bg-(--green)" style={{ width: `${Math.min(100, ((postsUsed ?? 0) / limit) * 100)}%` }} />
+            </div>
+          </div>
+          <p className="text-xs" style={labelStyle}>Your post count resets {resets}. Extra posts are ₱{ADDON_POST_PRICE_PHP} each, paid from the wallet.</p>
+          <div className="mt-auto flex flex-wrap gap-2">
+            {onBuyExtra && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={onBuyExtra}>Buy 1 extra post · ₱{ADDON_POST_PRICE_PHP}</button>
+            )}
+            {isPro ? (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleDowngrade} disabled={busy === 'plan'} title="Takes effect right away">Switch to Free</button>
+            ) : (
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>
+                {busy === 'plan' && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Upgrade to Pro · {peso(PRO_PRICE_PHP)}/month
+              </button>
+            )}
           </div>
         </section>
 
         {/* Wallet: the mockup's inverted card */}
         <section className="surface kw-wallet p-6">
-          <p className="text-ui font-medium" style={labelStyle}>Wallet balance</p>
+          <div className="flex items-center justify-between gap-2"><p className="flex items-center gap-2 text-ui font-medium" style={labelStyle}><WalletIcon className="h-4 w-4" aria-hidden /> Wallet balance</p><span className="text-xs" style={labelStyle}>PayMongo</span></div>
           <p className="text-[34px] leading-tight font-semibold tracking-tight mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
-          <p className="text-sm mt-1" style={labelStyle}>For extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
+          <p className="text-sm mt-1" style={labelStyle}>Use it for extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
 
           <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
             <label htmlFor="topup-amount" className="text-ui font-medium" style={labelStyle}>Add funds</label>
@@ -292,61 +320,89 @@ const Billing: React.FC = () => {
               title={pending ? 'Finish or cancel the payment in progress first' : undefined}
             >
               {busy === 'topup' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Continue to payment
+              <Plus className="w-3.5 h-3.5" /> Add funds
             </button>
           </div>
         </section>
       </div>
 
-      {/* History */}
+      {/* Plans (mockup .cells .prices) */}
+      <div className="kw-cells kw-cells--3" aria-label="Plans">
+        {PLANS.map((pl) => {
+          const current = pl.id === (wallet.subscription ?? 'FREE');
+          return (
+            <div key={pl.id} className={current ? 'is-hl' : undefined}>
+              <h3 className="flex items-center gap-2 text-base font-semibold">{pl.name}{current && <span className="badge badge-green">Your plan</span>}</h3>
+              <p className="text-[30px] font-semibold leading-none tracking-tight tabular-nums">{pl.price}</p>
+              <ul className="flex flex-col gap-2 text-sm">
+                {pl.items.map((it) => <li key={it} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-(--green-ink)" aria-hidden />{it}</li>)}
+              </ul>
+              <div className="mt-auto">
+                {current ? (
+                  <button type="button" className="btn btn-outline w-full" disabled>Current plan</button>
+                ) : pl.id === 'FREE' ? (
+                  <button type="button" className="btn btn-outline w-full" onClick={handleDowngrade} disabled={busy === 'plan'}>Switch to Free</button>
+                ) : pl.id === 'PRO' ? (
+                  <button type="button" className="btn btn-primary w-full" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Upgrade to Pro</button>
+                ) : (
+                  <button type="button" className="btn btn-outline w-full" onClick={onTalkToUs} disabled={!onTalkToUs}>Talk to us</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {!isPro && <p className="kw-hint -mt-2">Pay with GCash, Maya or card. Your wallet isn’t used for the plan.</p>}
+
+      {/* History (mockup .tbl) */}
       <section className="surface overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>Payment history</h2>
+        <div className="kw-card-h">
+          <h3>Payment history</h3>
           <button onClick={exportCsv} disabled={wallet.transactions.length === 0} className="btn btn-ghost btn-sm disabled:opacity-40">
-            <Download className="w-3.5 h-3.5" /> Export CSV
+            <Download className="w-3.5 h-3.5" /> Download all
           </button>
         </div>
         {wallet.transactions.length === 0 ? (
-          <p className="px-6 py-10 text-sm text-center" style={{ color: 'var(--fg-subtle)' }}>
-            No payments yet.
-          </p>
+          <p className="px-6 py-10 text-sm text-center" style={{ color: 'var(--fg-muted)' }}>No payments yet.</p>
         ) : (
-          <ul>
-            {wallet.transactions.map((t, i) => {
-              const { title, ref } = describe(t);
-              const status = STATUS_LABEL[t.status];
-              const credit = t.type === 'CREDIT';
-              return (
-                <li
-                  key={t.id}
-                  className="flex items-start justify-between gap-4 px-6 py-3.5"
-                  style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: status ? 'var(--fg-muted)' : 'var(--fg)' }}>{title}</p>
-                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--fg-subtle)' }}>
-                      <span className="mono">{new Date(t.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                      {ref && <> · <span className="mono">{ref.length > 18 ? `${ref.slice(0, 18)}…` : ref}</span></>}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p
-                      className={`mono text-sm font-medium tabular-nums ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}
-                      style={{ color: status ? 'var(--fg-subtle)' : credit ? 'var(--primary)' : 'var(--fg)' }}
-                    >
-                      {credit ? '+' : '−'}{peso(t.amount)}
-                    </p>
-                    {status && (
-                      <p className="text-xs mt-0.5 flex items-center justify-end gap-1.5" style={{ color: 'var(--fg-muted)' }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: status.color }} aria-hidden />
-                        {status.text}
-                      </p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="scroll-x">
+            <table className="kw-tbl kw-tbl--static">
+              <thead>
+                <tr><th>Date</th><th>Description</th><th>Method</th><th className="text-right">Amount</th><th>Status</th><th>Receipt</th></tr>
+              </thead>
+              <tbody>
+                {wallet.transactions.map((t) => {
+                  const { title, ref } = describe(t);
+                  const credit = t.type === 'CREDIT';
+                  return (
+                    <tr key={t.id}>
+                      <td className="mono whitespace-nowrap" style={labelStyle}>{new Date(t.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                      <td>{title}</td>
+                      <td style={labelStyle}>{method(t)}</td>
+                      <td className={`mono text-right whitespace-nowrap ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}>{credit ? '+' : '−'}{peso(t.amount)}</td>
+                      <td>{statusBadge(t)}</td>
+                      <td>
+                        {t.status === 'COMPLETED' && ref ? (
+                          <button type="button" className="text-xs underline underline-offset-2" style={labelStyle} onClick={() => copyRef(ref)} title={ref}>Copy ref</button>
+                        ) : t.status === 'PENDING' ? (
+                          <span className="flex gap-1.5">
+                            {checkoutUrl && <a href={checkoutUrl} className="btn btn-outline btn-sm">Continue</a>}
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleCancelPending(t)} disabled={busy === 'cancel'}>Cancel</button>
+                          </span>
+                        ) : t.status === 'FAILED' && credit ? (
+                          <button type="button" className="btn btn-outline btn-sm" onClick={() => startTopUp(t.amount)} disabled={busy === 'topup' || !!pending}>Retry</button>
+                        ) : t.status === 'FAILED' && /^Pro plan/.test(t.description) ? (
+                          <button type="button" className="btn btn-outline btn-sm" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Retry</button>
+                        ) : (
+                          <span style={labelStyle}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

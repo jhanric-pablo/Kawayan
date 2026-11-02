@@ -665,3 +665,10 @@ input:focus, textarea:focus, select:focus {
 .kw-switch[aria-checked='true']::after { transform: translateX(16px); }
 /* a 44px tap area around the small switch */
 .kw-switch::before { content: ""; position: absolute; inset: -12px -4px; }
+
+/* Equal-height cells with hairline dividers (mockup .cells / .prices) */
+.kw-cells { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-lg, 12px); overflow: hidden; }
+.kw-cells > * { background: var(--card); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.kw-cells > .is-hl { background: color-mix(in srgb, var(--green) 5%, var(--card)); }
+@media (min-width: 768px) { .kw-cells--3 { grid-template-columns: repeat(3, 1fr); } }
+.kw-tbl--static tbody tr { cursor: default; }

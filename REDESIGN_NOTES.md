@@ -361,10 +361,10 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Composer modal everywhere it opens today — **have**
 
 ## F1. Plan and billing
-- [ ] Current plan card: price, Active badge, usage bar, reset line, "Buy 1 extra post", "Cancel at the end of the month" — **FE** (extra post opens the studio's paid-extra flow; the wallet is charged only when the post is written, as today)
+- [x] Current plan card: price, Active badge, usage bar, reset line, "Buy 1 extra post", "Cancel at the end of the month" — **FE** (cancel stays "Switch to Free", which takes effect right away: the backend has no end-of-month cancel; that would need a `cancel_at` column plus a monthly job — not built) (extra post opens the studio's paid-extra flow; the wallet is charged only when the post is written, as today)
 - [x] Dark wallet card — **have**; "Add funds" control — **have**
-- [ ] 3-column plan comparison (Free / Pro / Enterprise) — **FE**
-- [ ] Payment history table: date, description, method, amount, status badge, receipt / Retry — **FE** (method = "Wallet" / "PayMongo" from the transaction type; receipt = the PayMongo reference; Retry re-opens checkout for a failed top-up)
+- [x] 3-column plan comparison (Free / Pro / Enterprise) — **FE** (Enterprise "Talk to us" opens the Help desk once it exists)
+- [x] Payment history table: date, description, method, amount, status badge, receipt / Retry — **FE** (method = "Wallet" / "PayMongo" from the transaction type; receipt = the PayMongo reference; Retry re-opens checkout for a failed top-up)
 
 ## F2. Settings
 - [ ] Left section menu: Business, Voice & audience, Channels, Appearance, Login & security, Payments & plans, Accessibility — **FE**
@@ -470,3 +470,11 @@ badge for pages that lost access) and the phone preview with Facebook / Instagra
 title, status line, Save draft, green "Approve and schedule" (or "Post now"). Changing the date
 moves the draft with the calendar's own move (confirm, one post per day). The dialog still opens
 from the calendar, search, notifications and "Create post" exactly as before.
+
+**F1 — Plan and billing.** Mockup layout: current-plan card (price, Active, this month's posts
+used of the limit with a bar, reset date, "Buy 1 extra post · ₱150" → opens the Post studio's new
+post where the paid extra flow already runs, Switch to Free / Upgrade), the dark wallet card with
+Add funds, a Free / Pro / Enterprise comparison and a payment-history table (date, description,
+method from the reference — PayMongo / Xendit / Wallet, amount, status badge, Copy ref / Continue /
+Cancel / Retry). Test-mode and pending banners and CSV export are unchanged. End-of-month cancel
+isn't available in the backend, so the button keeps its honest "Switch to Free" (immediate) label.

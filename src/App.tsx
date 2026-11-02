@@ -698,7 +698,14 @@ const App: React.FC = () => {
             case ViewState.SOCIAL:
               return <SocialAccounts />;
             case ViewState.BILLING:
-              return <Billing />;
+              return (
+                <Billing
+                  onBuyExtra={() => {
+                    setCalendarIntent({ type: 'compose' });
+                    goTo(ViewState.STUDIO);
+                  }}
+                />
+              );
             case ViewState.SUPPORT_DASHBOARD:
               return <SupportDashboard />;
             case ViewState.ADMIN_DASHBOARD:
