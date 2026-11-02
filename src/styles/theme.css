@@ -643,3 +643,25 @@ input:focus, textarea:focus, select:focus {
 @keyframes kw-rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes kw-pulse { 50% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .kw-gen, .kw-gen--sk { animation: none; } }
+
+/* Post studio page (mockup .studio / .vers / .slots / .switch-ui) */
+.kw-studio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 300px; gap: 20px; align-items: start; }
+.kw-studio--new { grid-template-columns: minmax(0, 1fr) 300px; }
+@media (max-width: 1180px) { .kw-studio, .kw-studio--new { grid-template-columns: 1fr; } }
+.kw-vers { display: flex; gap: 6px; }
+.kw-vers button { flex: 1; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: var(--text-xs); text-align: left; color: var(--fg); cursor: pointer; }
+.kw-vers button small { display: block; color: var(--fg-muted); }
+.kw-vers button[aria-pressed='true'] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.kw-vers button:disabled { opacity: 0.5; cursor: not-allowed; }
+.kw-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.kw-slots button { padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: var(--text-xs); text-align: left; color: var(--fg-muted); cursor: pointer; }
+.kw-slots button b { display: block; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
+.kw-slots button[aria-pressed='true'] { background: var(--green-soft); border-color: transparent; color: var(--green-ink); }
+.kw-slots button[aria-pressed='true'] b { color: var(--green-ink); }
+.kw-slots button:disabled { opacity: 0.45; cursor: not-allowed; }
+.kw-switch { position: relative; width: 36px; height: 20px; flex: none; border-radius: 99px; background: color-mix(in srgb, var(--fg) 15%, transparent); cursor: pointer; }
+.kw-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 0.15s var(--ease); }
+.kw-switch[aria-checked='true'] { background: var(--green); }
+.kw-switch[aria-checked='true']::after { transform: translateX(16px); }
+/* a 44px tap area around the small switch */
+.kw-switch::before { content: ""; position: absolute; inset: -12px -4px; }

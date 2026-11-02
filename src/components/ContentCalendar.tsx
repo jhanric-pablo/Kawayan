@@ -469,20 +469,20 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 
   /** Drafts only: scheduled posts are already queued on Facebook/Instagram with their time. */
-  const movePost = async (post: GeneratedPost, date: string, isUndo = false) => {
-    if (date === post.date) return;
+  const movePost = async (post: GeneratedPost, date: string, isUndo = false): Promise<boolean> => {
+    if (date === post.date) return false;
     if (post.status !== 'Draft') {
       toast.error(post.status === 'Scheduled'
         ? 'Scheduled posts are already queued on your pages, so they keep their time.'
         : 'Published posts stay on the day they went out.');
-      return;
+      return false;
     }
-    if (!isUndo && date < ymd(new Date())) { toast.error('Pick today or a later day.'); return; }
+    if (!isUndo && date < ymd(new Date())) { toast.error('Pick today or a later day.'); return false; }
     // One post per day: check the target month (it may not be the one on screen).
     const sameMonth = date.slice(0, 7) === monthKey;
     const pool = sameMonth ? posts : await dbService.getUserPosts(userId, date.slice(0, 7));
     const clash = pool.find((p) => p.id !== post.id && p.date === date);
-    if (clash) { toast.error(`${dayLabel(date)} already has a post (“${clash.topic}”). Pick another day.`); return; }
+    if (clash) { toast.error(`${dayLabel(date)} already has a post (“${clash.topic}”). Pick another day.`); return false; }
     if (
       !isUndo &&
       !(await dialog.confirm({
@@ -491,7 +491,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         confirmLabel: 'Move post',
       }))
     ) {
-      return;
+      return false;
     }
 
     const moved = { ...post, date };
@@ -499,7 +499,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       await dbService.savePost(moved);
     } catch (e: any) {
       toast.error(/already has a post/.test(e?.message) ? e.message : 'Could not move the post. Please try again.');
-      return;
+      return false;
     }
     if (sameMonth) mergePostIntoState(moved);
     else {
@@ -508,6 +508,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
     announceFeedChange();
     if (!isUndo) toast.toast(`Moved to ${dayLabel(date)}`, { variant: 'success', action: { label: 'Undo', onClick: () => movePost(moved, post.date, true) } });
+    return true;
   };
 
   const moveIdea = (index: number, day: number) => {
@@ -1088,6 +1089,34 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, plannerMonth]);
 
+  // Post studio page: every draft (any month), so the list isn't limited to the month on screen.
+  const [allPosts, setAllPosts] = useState<GeneratedPost[]>([]);
+  useEffect(() => {
+    if (page !== 'studio') return;
+    let live = true;
+    dbService.getUserPosts(userId).then((p) => live && setAllPosts(p)).catch(() => undefined);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, posts, selectedDay]);
+  const todayIso = ymd(new Date());
+  const studioGroups = [
+    {
+      title: 'Drafts to approve',
+      empty: 'No drafts waiting. Plan the month or start a new post.',
+      posts: allPosts.filter((p) => p.status === 'Draft' && !failedIds.includes(p.id) && p.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date)),
+    },
+    {
+      title: 'Didn’t go out',
+      empty: 'Nothing failed. Posts that don’t publish come back here.',
+      posts: allPosts.filter((p) => p.status === 'Draft' && failedIds.includes(p.id)).sort((a, b) => a.date.localeCompare(b.date)),
+    },
+    {
+      title: 'Scheduled',
+      empty: 'Nothing scheduled yet.',
+      posts: allPosts.filter((p) => p.status === 'Scheduled').sort((a, b) => a.date.localeCompare(b.date)),
+    },
+  ].filter((g, i) => i === 0 || g.posts.length);
+
   // ── Header stats (mockup .stats): this month, compared with last month's posts ──
   const [prevMonthPosts, setPrevMonthPosts] = useState<GeneratedPost[] | null>(null);
   useEffect(() => {
@@ -1476,6 +1505,83 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           onOpenBilling={onOpenBilling}
         />
       )}
+      {page === 'studio' && (selectedDay !== null ? (
+        <PostComposer
+          variant="page"
+        open
+        selectedDay={selectedDay}
+        currentDate={currentDate}
+        profile={profile}
+        posts={posts}
+        ideas={ideas}
+        generatedContent={generatedContent}
+        setGeneratedContent={setGeneratedContent}
+        generatingPost={generatingPost}
+        loadingImage={loadingImage}
+        addOnPrice={ADDON_POST_PRICE_PHP}
+        limitReached={trialLimitReached}
+        planPostCount={batchPostCount}
+        walletBalance={walletBalance}
+        onOpenBilling={onOpenBilling}
+        onClose={handleClosePanel}
+        onGeneratePost={handleGeneratePost}
+        onAddOn={handleAddOn}
+        onGenerateImage={handleGenerateImage}
+        onPhotoFile={handlePhotoFile}
+        onRewriteCaption={handleRewriteCaption}
+        onAutosave={handleAutosave}
+        accounts={socialAccounts}
+        accountsError={socialError}
+        publishing={publishing}
+        onPublish={handlePublish}
+        onOpenSocial={onOpenSocial}
+              onMoveDate={async (p, d) => {
+            if (await movePost(p, d)) openPost({ ...p, date: d });
+          }}
+          onReconnect={reconnectPlatform}
+        />
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div className="kw-page-h">
+            <div>
+              <h1>Post studio</h1>
+              <p>Pick a draft to finish and approve, or start a new post.</p>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={composeNext}>
+              <Plus className="h-4 w-4" aria-hidden /> New post
+            </button>
+          </div>
+          {studioGroups.map((g) => (
+            <section key={g.title} className="card overflow-hidden" aria-label={g.title}>
+              <div className="kw-card-h"><h3>{g.title}</h3><span className="badge badge-sage mono">{g.posts.length}</span></div>
+              {g.posts.length ? (
+                <div className="scroll-x">
+                  <table className="kw-tbl">
+                    <thead><tr><th>Post</th><th>Date</th><th>Status</th><th className="text-right">Reach</th></tr></thead>
+                    <tbody>
+                      {g.posts.map((p) => (
+                        <tr key={p.id} onClick={() => openPost(p)}>
+                          <td>
+                            <button type="button" className="flex min-h-9 items-center gap-2.5 text-left" onClick={(e) => { e.stopPropagation(); openPost(p); }}>
+                              {p.imageUrl ? <img src={p.imageUrl} alt="" className="h-[30px] w-[30px] shrink-0 rounded-md object-cover" /> : <span className="h-[30px] w-[30px] shrink-0 rounded-md bg-(--muted)" />}
+                              <span className="font-medium">{p.topic}</span>
+                            </button>
+                          </td>
+                          <td className="mono whitespace-nowrap text-(--fg-muted)">{shortDay(p.date)}</td>
+                          <td><StatusBadge status={failedIds.includes(p.id) && p.status === 'Draft' ? 'failed' : p.status === 'Scheduled' ? 'scheduled' : p.status === 'Published' ? 'published' : 'draft'} /></td>
+                          <td className="mono text-right">{p.viralityScore ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="px-4 py-6 text-center text-ui text-(--fg-muted)">{g.empty}</p>
+              )}
+            </section>
+          ))}
+        </div>
+      ))}
       {/* ── AI content-planning dialog (opened from the toolbar) ── */}
       <PlanningModal
         open={planningOpen}
@@ -1514,7 +1620,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
       {/* ── Post creation studio ── */}
       <PostComposer
-        open={selectedDay !== null}
+        open={selectedDay !== null && page !== 'studio'}
         selectedDay={selectedDay}
         currentDate={currentDate}
         profile={profile}

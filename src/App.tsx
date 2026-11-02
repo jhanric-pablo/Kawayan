@@ -525,6 +525,7 @@ const App: React.FC = () => {
     { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'], group: 'Plan', tour: 'nav-support' },
     { id: ViewState.CALENDAR, label: 'Calendar', icon: ChartGantt, roles: ['user'], group: 'Plan', tour: 'nav-timeline' },
     { id: ViewState.PLANNER, label: 'Month planner', icon: Sparkles, roles: ['user'], group: 'Plan', tour: 'nav-planner' },
+    { id: ViewState.STUDIO, label: 'Post studio', icon: PencilLine, roles: ['user'], group: 'Plan', tour: 'nav-studio' },
     { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'], group: 'Plan', tour: 'nav-insights' },
     { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
     { id: ViewState.SOCIAL, label: 'Channels', icon: Share2, roles: ['user'], group: 'Account', tour: 'nav-social' },
@@ -688,6 +689,8 @@ const App: React.FC = () => {
               return calendarPage('calendar');
             case ViewState.PLANNER:
               return calendarPage('planner');
+            case ViewState.STUDIO:
+              return calendarPage('studio');
             case ViewState.SETTINGS:
               return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:

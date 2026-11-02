@@ -310,7 +310,7 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 
 ## A. App shell
 - [x] Sidebar header: business avatar (initials), name, "<Plan> plan" — **FE**; "· city" — **MIG** (`brand_profiles.city`, hidden until it exists)
-- [ ] Group "Plan": Calendar, Month planner (new page) ✓, Post studio (new page) + drafts badge, Insights — **FE**
+- [x] Group "Plan": Calendar, Month planner (new page), Post studio (new page) + drafts badge, Insights — **FE**
 - [x] Group "Account": Settings + red channel-problem badge, Plan and billing, Help desk (new page) — **FE**
 - [x] Social accounts stay reachable (Settings › Channels links to it; `/social` still works) — **have**
 - [x] Quota card "<Month> posts X / limit", bar, "Resets <1st>." — **FE**. It says "Drafts count too." instead of the mockup's "Drafts don't count": the app (and the server's TIER_LIMIT check) counts every saved post, drafts included, and that rule was not changed.
@@ -353,10 +353,10 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] "Demo data, generated for each account" note — **have**
 
 ## E. Post studio page
-- [ ] New sidebar page (`/studio`) with the composer's logic; no post chosen → drafts list to pick from + New post — **FE**
-- [ ] Header: title, status line, Save draft, green "Approve and schedule" — **FE**
-- [ ] Image card: image, "Image made by Kawayan AI" (or "Your photo"), New image, Upload my own photo — **FE**
-- [ ] Caption card: version picker 1–3 (used-up disabled), textarea + counter, quick tweaks (Shorter, More Taglish, More playful, More polished, Fresh hashtags, Add a call to action), hashtags, reach score, date + time, slots (Lunch break / After work / Prime time), "Post to" switches with Reconnect badge — **FE**
+- [x] New sidebar page (`/studio`) with the composer's logic; no post chosen → drafts list to pick from + New post — **FE**
+- [x] Header: title, status line, Save draft, green "Approve and schedule" — **FE**
+- [x] Image card: image, "Image made by Kawayan AI" (or "Your photo"), New image, Upload my own photo — **FE**
+- [x] Caption card: version picker 1–3 (used-up disabled), textarea + counter, quick tweaks (Shorter, More Taglish, More playful, More polished, Fresh hashtags, Add a call to action), hashtags, reach score, date + time, slots (Lunch break / After work / Prime time), "Post to" switches with Reconnect badge — **FE**
 - [ ] Phone preview with Facebook / Instagram tabs — **have** (PhonePreview)
 - [x] Composer modal everywhere it opens today — **have**
 
@@ -457,3 +457,16 @@ behind a plain message until 3+ such posts exist. Table: Post, Posted, Reach, In
 clicks (wide screens), Eng. rate, Score badge (green at 75+), checkboxes, "Pick 2 to compare" and a
 Compare button in the card header (the compare tray stays). The engagement-rate KPI card moved out
 of the KPI row; the rate stays in the table, compare view and exports.
+
+**E — Post studio page.** New `/studio` page (sidebar "Post studio" with a badge for upcoming
+drafts). With no post open it lists Drafts to approve, Didn't go out and Scheduled (all months),
+plus New post. With a post open it is the mockup's three columns, built from the same
+PostComposer logic (its pieces are now shared by the dialog and the page): image card (New image,
+Upload my own photo, Describe the image), caption card (Version 1–3 picker: earlier versions swap
+in, the next slot writes a new version while rewrites are left, the rest are disabled; caption +
+counter; the six quick tweaks; ask box; hashtags; reach score; When date + time + Lunch break /
+After work / Prime time slots and "Post right away instead"; Post to switches with a Reconnect
+badge for pages that lost access) and the phone preview with Facebook / Instagram tabs. Header:
+title, status line, Save draft, green "Approve and schedule" (or "Post now"). Changing the date
+moves the draft with the calendar's own move (confirm, one post per day). The dialog still opens
+from the calendar, search, notifications and "Create post" exactly as before.

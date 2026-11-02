@@ -184,6 +184,12 @@ interface Props {
   onPhotoFile: (file: File) => void;
   onPublish: (accountIds: string[], scheduledFor?: string) => Promise<void>;
   onOpenSocial: () => void;
+  /** 'page': the Post studio page (inline, three columns) instead of the dialog. Same logic. */
+  variant?: 'modal' | 'page';
+  /** Page: move a draft to another date (one post per day, as on the calendar). */
+  onMoveDate?: (post: GeneratedPost, date: string) => void;
+  /** Page: a page that lost access (Reconnect badge). */
+  onReconnect?: (platform: string) => void;
 }
 
 const PostComposer: React.FC<Props> = ({
@@ -214,7 +220,11 @@ const PostComposer: React.FC<Props> = ({
   onPublish,
   onOpenSocial,
   onOpenBilling,
+  variant = 'modal',
+  onMoveDate,
+  onReconnect,
 }) => {
+  const isPage = variant === 'page';
   const [aiBusy, setAiBusy] = useState<string | null>(null);
   const [ask, setAsk] = useState('');
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
@@ -283,11 +293,11 @@ const PostComposer: React.FC<Props> = ({
     latest.current.onClose();
   };
 
-  useFocusTrap(dialogRef, open);
+  useFocusTrap(dialogRef, open && !isPage);
 
   // Esc closes the open popover first, then the studio; background scroll is locked while open.
   useEffect(() => {
-    if (!open) return;
+    if (!open || isPage) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // A confirm or menu stacked on top handles its own Escape.
@@ -497,72 +507,9 @@ const PostComposer: React.FC<Props> = ({
     </span>
   );
 
-  return (
-    <div className="fixed inset-0 z-90 flex items-center justify-center sm:p-6" role="presentation">
-      <div className="absolute inset-0 bg-black/45 animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
-
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Compose post for ${dateLabel}`}
-        tabIndex={-1}
-        className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border sm:border-(--border) sm:shadow-lg"
-      >
-        {/* ── Header ── */}
-        <header className="flex items-start gap-3 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold leading-snug" title={heading}>{heading}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--fg-muted)">
-              {post ? (
-                <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
-              ) : (
-                <span className="badge badge-dashed">New</span>
-              )}
-              <span className="font-semibold text-(--fg)">{dateLabel}</span>
-              {currentIdea && !post && <span>From your {monthName} plan</span>}
-              {post?.format && <span>{normalizeFormat(post.format)} post</span>}
-              {profile.brandVoice && (
-                <span className="inline-flex items-center gap-1" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
-                  <AudioLines className="h-3.5 w-3.5 text-(--primary)" aria-hidden />
-                  Tuned to: <b className="font-semibold text-(--fg)">{profile.brandVoice}</b>
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close composer"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </header>
-
-        {/* ── Body: three steps | phone ── */}
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-h-0 space-y-3 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
-            {isPublished && post && (
-              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-(--green) bg-(--green-soft) px-4 py-2.5 text-ui text-(--fg)">
-                <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
-                {post.externalLink && (
-                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
-                    View post <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </p>
-            )}
-            {isScheduled && post && (
-              <p className="flex items-center gap-2 rounded-lg border border-transparent bg-(--amber-soft) px-4 py-2.5 text-ui text-(--amber)">
-                <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
-              </p>
-            )}
-
-            {/* 1 · Idea */}
-            {!post ? (
-              <Step n={1} title={limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'} state="active">
-                <form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy}>
+  /* ── Pieces shared by the dialog and the Post studio page ── */
+  const briefForm = (
+<form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy}>
                   {limitReached && <p className="mb-3 text-sm text-(--fg-muted)">Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>}
                   <div className={clsx(FIELD, 'p-3.5')}>
                     <TextareaAutosize
@@ -619,50 +566,10 @@ const PostComposer: React.FC<Props> = ({
                     </p>
                   )}
                 </form>
-              </Step>
-            ) : (
-              <Step
-                n={1}
-                title="Idea"
-                state="done"
-                summary={`${post.topic}${post.format ? ` · ${normalizeFormat(post.format)}` : ''}`}
-                action={
-                  !isPublished && (
-                    <button
-                      type="button"
-                      className={CHIP}
-                      onClick={() => {
-                        setRedoing(true);
-                        runGenerate();
-                      }}
-                      disabled={generatingPost || rewritesLeft === 0}
-                      title="New caption, score and image from the same idea"
-                    >
-                      {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
-                      {rewritesLeft === 0 ? 'No rewrites left' : `Start over · ${rewritesLeft} left`}
-                    </button>
-                  )
-                }
-              />
-            )}
-
-            {/* 2 · Caption */}
-            {!post ? (
-              <Step n={2} title="Caption" state="locked" summary="Kawayan writes this from your idea." />
-            ) : (
-              <Step
-                n={2}
-                title="Caption"
-                state="done"
-                action={
-                  counts && (
-                    <span className={clsx('text-xs tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-subtle)')}>
-                      {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
-                    </span>
-                  )
-                }
-              >
-                <div className={clsx(FIELD, 'relative')}>
+  );
+  const captionEditor = post ? (
+    <>
+<div className={clsx(FIELD, 'relative')}>
                   <textarea
                     id="ps-caption-text"
                     rows={6}
@@ -723,8 +630,10 @@ const PostComposer: React.FC<Props> = ({
                     </form>
                   </div>
                 )}
-
-                <div className="mt-3 flex items-start gap-3 rounded-lg bg-(--bg-alt) px-3 py-2.5">
+    </>
+  ) : null;
+  const scoreBox = post ? (
+<div className="mt-3 flex items-start gap-3 rounded-lg bg-(--bg-alt) px-3 py-2.5">
                   <b className="text-xl tabular-nums leading-none">{score}</b>
                   <div className="min-w-0 flex-1">
                     <p className="flex justify-between text-xs font-semibold">
@@ -736,34 +645,10 @@ const PostComposer: React.FC<Props> = ({
                     {post.viralityReason && <p className="mt-1.5 text-xs leading-relaxed text-(--fg-muted)">{post.viralityReason}</p>}
                   </div>
                 </div>
-
-                {post.history?.length > 0 && (
-                  <details className="mt-3 text-ui">
-                    <summary className="cursor-pointer text-xs font-semibold text-(--fg-muted) hover:text-(--fg)">Earlier versions ({post.history.length})</summary>
-                    <div className="mt-2 space-y-2">
-                      {post.history.map((v, i) => (
-                        <div key={`${v.createdAt}-${i}`} className="rounded-lg border border-(--border) p-3">
-                          <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
-                          <div className="mt-2 flex items-center justify-between">
-                            {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
-                            {!isPublished && (
-                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">Use this</button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </Step>
-            )}
-
-            {/* 3 · Image */}
-            {!post ? (
-              <Step n={3} title="Image" state="locked" summary="Made to match the caption, or upload your own photo." />
-            ) : (
-              <Step n={3} title="Image" state={post.imageUrl ? 'done' : 'active'}>
-                <div className="flex flex-wrap items-start gap-4">
+  ) : null;
+  const imageTools = post ? (
+    <>
+<div className="flex flex-wrap items-start gap-4">
                   <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-(--border) bg-(--bg-alt)">
                     {post.imageUrl ? (
                       <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
@@ -818,83 +703,11 @@ const PostComposer: React.FC<Props> = ({
                     e.target.value = '';
                   }}
                 />
-              </Step>
-            )}
-
-            <details className="rounded-xl border border-(--border) bg-(--card) p-4 lg:hidden">
-              <summary className="cursor-pointer text-ui font-semibold">Preview on Facebook and Instagram</summary>
-              <div className="mt-4 flex justify-center">{preview}</div>
-            </details>
-          </div>
-
-          <aside className="hidden min-h-0 flex-col items-center overflow-y-auto border-l border-(--border) bg-(--bg-alt) px-5 py-5 lg:flex">
-            {preview}
-            <p className="mt-3 text-center text-xs text-(--fg-subtle)">Preview only. Reactions show up after it posts.</p>
-          </aside>
-        </div>
-
-        {/* ── Where + when, paired with publish ── */}
-        <footer className="flex flex-wrap items-center gap-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
-          <p className="text-xs text-(--fg-muted)">
-            {post ? saveIndicator : 'Draft the post first, then pick where and when it goes out.'}
-          </p>
-          {isPublished ? (
-            <div className="ml-auto flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-(--primary)"><Check className="h-4 w-4" /> Published</span>
-              {post?.externalLink && (
-                <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
-                  View post <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-            </div>
-          ) : isScheduled ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-(--amber)">
-              <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
-            </span>
-          ) : accounts && accounts.length === 0 ? (
-            <div className="ml-auto flex flex-wrap items-center gap-3">
-              <span className="text-xs text-(--fg-muted)">{post ? 'Connect a page to publish. Your draft is saved.' : 'Connect a page to publish.'}</span>
-              <button type="button" className="btn btn-glass btn-sm" onClick={onOpenSocial}>Connect a page</button>
-            </div>
-          ) : !post ? null : (
-            <div className="relative ml-auto flex items-stretch" ref={planRef}>
-              <button
-                type="button"
-                onClick={() => setPlanOpen((v) => !v)}
-                disabled={!post}
-                aria-expanded={planOpen}
-                aria-haspopup="dialog"
-                className="flex items-center gap-2.5 rounded-l-lg border border-r-0 border-(--border-strong) bg-(--bg-alt) py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-(--card-hover) disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex -space-x-1" aria-hidden>
-                  {chosenAccounts.length > 0
-                    ? chosenAccounts.map((a) => (
-                        <span key={a.id} className="grid h-6 w-6 place-items-center rounded-full bg-(--card) ring-2 ring-(--bg-alt)">
-                          <PlatformIcon platform={a.platform} />
-                        </span>
-                      ))
-                    : <span className="grid h-6 w-6 place-items-center rounded-full bg-(--card)"><Globe className="h-3.5 w-3.5 text-(--fg-muted)" /></span>}
-                </span>
-                <span className="min-w-0">
-                  <b className="block max-w-[180px] truncate text-ui font-semibold">{whereLabel}</b>
-                  <small className="block text-xs text-(--fg-muted)">{whenLabel}</small>
-                </span>
-                <ChevronDown className={clsx('h-4 w-4 text-(--fg-muted) transition-transform', planOpen && 'rotate-180')} />
-              </button>
-
-              <button type="button" className={clsx(PRIMARY_BTN, 'rounded-l-none')} onClick={publish} disabled={ctaDisabled}>
-                {publishing ? <Loader2 className="animate-spin" /> : mode === 'now' ? <Send /> : <CalendarClock />}
-                {publishing ? 'Sending…' : ctaLabel}
-                {!publishing && mode === 'schedule' && accounts?.length !== 0 && <ArrowUpRight />}
-              </button>
-
-              {planOpen && post && (
-                <div
-                  role="dialog"
-                  aria-label="Where and when to post"
-                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-xl border border-(--border) bg-(--card) p-4 shadow-lg"
-                >
-                  <div className="grid grid-cols-2 gap-1 rounded-full bg-(--bg-alt) p-1" role="radiogroup" aria-label="When">
+    </>
+  ) : null;
+  const whereWhen = post ? (
+    <>
+<div className="grid grid-cols-2 gap-1 rounded-full bg-(--bg-alt) p-1" role="radiogroup" aria-label="When">
                     {([
                       ['schedule', CalendarClock, 'Schedule', !canSchedule],
                       ['now', Send, 'Post now', false],
@@ -997,6 +810,434 @@ const PostComposer: React.FC<Props> = ({
                     <p className="text-xs text-(--fg-muted)">Goes out as soon as you press Post now.</p>
                   )}
                   {!canSchedule && <p className="text-xs text-(--fg-muted)">This day has passed, so the post can only go out now.</p>}
+    </>
+  ) : null;
+
+  /* ── Post studio page (mockup APP.composer): image | caption | phone ── */
+  if (isPage) {
+    const versions = post ? [...(post.history || []), null] : [];
+    const tags = post ? [...new Set(post.caption.match(/#[\p{L}\p{N}_]+/gu) || [])] : [];
+    const statusLine = post
+      ? [isPublished ? 'Posted' : isScheduled ? 'Scheduled' : 'Draft', longDate(post.date), !isPublished && mode === 'schedule' ? to12h(time) : null, chosenAccounts.length ? [...new Set(chosenAccounts.map((a) => (a.platform === 'facebook' ? 'Facebook' : 'Instagram')))].join(' and ') : null]
+          .filter(Boolean)
+          .join(' · ')
+      : `New post · ${dateLabel}`;
+    return (
+      <div className="flex flex-col gap-5" ref={dialogRef}>
+        <div className="kw-page-h">
+          <div className="min-w-0">
+            <button type="button" className="btn btn-ghost btn-sm -ml-2.5 mb-1" onClick={close}>← All drafts</button>
+            <h1 className="truncate">{heading}</h1>
+            <p>{statusLine}</p>
+          </div>
+          {post && !isPublished && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-(--fg-muted)">{saveIndicator}</span>
+              <button type="button" className="btn btn-outline" onClick={save} disabled={saveState === 'saving'}>Save draft</button>
+              {!isScheduled && (
+                accounts && accounts.length === 0 ? (
+                  <button type="button" className="btn btn-primary" onClick={onOpenSocial}>Connect a page</button>
+                ) : (
+                  <button type="button" className="btn btn-primary" onClick={publish} disabled={ctaDisabled}>
+                    {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'now' ? <Send className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                    {publishing ? 'Sending…' : mode === 'now' ? 'Post now' : 'Approve and schedule'}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+          {isPublished && post?.externalLink && (
+            <a className="btn btn-outline" href={post.externalLink} target="_blank" rel="noreferrer">View post <ExternalLink className="h-3.5 w-3.5" /></a>
+          )}
+        </div>
+
+        {isScheduled && post && (
+          <p className="kw-alert kw-alert--warn"><Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.</p>
+        )}
+
+        {!post ? (
+          <div className="kw-studio kw-studio--new">
+            <section className="card">
+              <div className="kw-card-h"><h3>{limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'}</h3></div>
+              <div className="p-4">{briefForm}</div>
+            </section>
+            <div className="flex flex-col items-center gap-3">{preview}<p className="kw-hint text-center">Preview only. The real post may crop slightly.</p></div>
+          </div>
+        ) : (
+          <div className="kw-studio">
+            {/* Image */}
+            <section className="card overflow-hidden" aria-label="Image">
+              <div className="relative aspect-square bg-(--muted)">
+                {post.imageUrl ? <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" /> : <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-(--fg-muted)" aria-hidden />}
+                {loadingImage && (
+                  <span className="absolute inset-0 grid place-items-center bg-black/45 text-white"><Loader2 className="h-6 w-6 animate-spin" aria-label="Creating a new image" /></span>
+                )}
+              </div>
+              <div className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="kw-hint">{post.imageUrl?.startsWith('data:') || post.imageUrl?.includes('/api/images') ? 'Image made by Kawayan AI or your photo' : 'Image made by Kawayan AI'}</span>
+                  {post.history?.length > 0 && <span className="badge badge-sage mono">{post.history.length + 1} versions</span>}
+                </div>
+                {!isPublished && (
+                  <>
+                    <div className="flex gap-2">
+                      <button type="button" className="btn btn-outline btn-sm flex-1" onClick={onGenerateImage} disabled={loadingImage}><RefreshCcw className="h-4 w-4" /> New image</button>
+                      <button type="button" className="btn btn-outline btn-sm flex-1" onClick={() => photoInputRef.current?.click()}><Upload className="h-4 w-4" /> Upload my own photo</button>
+                    </div>
+                    <button type="button" className="btn btn-ghost btn-sm self-start" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
+                      <PencilLine className="h-4 w-4" /> Describe the image <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showPrompt && 'rotate-180')} />
+                    </button>
+                    {showPrompt && (
+                      <div className={FIELD}>
+                        <textarea rows={3} value={post.imagePrompt} onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })} aria-label="Image description" className="block w-full resize-y bg-transparent p-3 text-ui outline-hidden" />
+                      </div>
+                    )}
+                  </>
+                )}
+                <input ref={photoInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onPhotoFile(file); e.target.value = ''; }} />
+              </div>
+            </section>
+
+            {/* Caption, score, when, where */}
+            <section className="card" aria-label="Caption">
+              <div className="kw-card-h">
+                <h3>Caption</h3>
+                {counts && <span className={clsx('mono text-xs', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-muted)')}>{counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()}</span>}
+              </div>
+              <div className="flex flex-col gap-4 p-4">
+                <div className="kw-vers" role="group" aria-label="Versions">
+                  {Array.from({ length: MAX_REWRITES + 1 }, (_, i) => {
+                    const isCurrent = i === versions.length - 1;
+                    const isEarlier = i < versions.length - 1;
+                    const isNext = i === versions.length;
+                    const label = `Version ${i + 1}`;
+                    if (isCurrent) return <button key={i} type="button" aria-pressed="true">{label}<small>{i === 0 ? 'Original' : 'Current'}</small></button>;
+                    if (isEarlier) return <button key={i} type="button" aria-pressed="false" disabled={isPublished} onClick={() => restoreVersion(i)}>{label}<small>Earlier · use it</small></button>;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-pressed="false"
+                        disabled={!isNext || isPublished || rewritesLeft === 0 || generatingPost}
+                        onClick={() => { setRedoing(true); runGenerate(); }}
+                        title="A new caption, score and image from the same idea"
+                      >
+                        {label}<small>{redoing && generatingPost && isNext ? 'Writing…' : isNext ? `${rewritesLeft} left` : 'Not used'}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                {captionEditor}
+                {tags.length > 0 && (
+                  <div className="kw-field">
+                    <span className="kw-label">Hashtags</span>
+                    <div className="flex flex-wrap gap-1.5">{tags.map((t) => <span key={t} className="badge badge-sage">{t}</span>)}</div>
+                  </div>
+                )}
+                {scoreBox}
+                {!isPublished && !isScheduled && (
+                  <>
+                    <hr className="border-(--border)" />
+                    <div className="kw-field">
+                      <span className="kw-label" id="ps-when">When</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          className="input"
+                          aria-label="Date"
+                          value={post.date}
+                          min={isoToday()}
+                          disabled={!onMoveDate}
+                          onChange={(e) => e.target.value && e.target.value >= isoToday() && e.target.value !== post.date && onMoveDate?.(post, e.target.value)}
+                        />
+                        <input type="time" className="input" aria-label="Time" value={time} disabled={mode === 'now'} onChange={(e) => e.target.value && setTime(e.target.value)} />
+                      </div>
+                      <div className="kw-slots" role="group" aria-labelledby="ps-when">
+                        {SUGGESTED_TIMES.map((sl) => {
+                          const past = isPast(post.date, sl.time);
+                          return (
+                            <button key={sl.time} type="button" aria-pressed={mode === 'schedule' && time === sl.time} disabled={past} onClick={() => { setMode('schedule'); setTime(sl.time); }}>
+                              <b>{sl.label}</b>{past ? 'Passed' : to12h(sl.time)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <label className="kw-check text-ui">
+                        <input type="checkbox" checked={mode === 'now'} onChange={(e) => setMode(e.target.checked ? 'now' : 'schedule')} />
+                        <span>Post right away instead</span>
+                      </label>
+                      {!timeOk && <p className="text-xs font-medium text-(--danger)">That time has passed. Pick a later one.</p>}
+                      {!canSchedule && <p className="kw-hint">This day has passed, so the post can only go out now.</p>}
+                    </div>
+                    <div className="kw-field">
+                      <span className="kw-label">Post to</span>
+                      {accounts === null ? (
+                        <span className="kw-hint">Loading your pages…</span>
+                      ) : accounts.length === 0 ? (
+                        <div className="flex flex-wrap items-center gap-2 text-ui text-(--fg-muted)">
+                          {accountsError || 'Connect your Facebook Page or Instagram account first.'}
+                          <button type="button" className="btn btn-outline btn-sm" onClick={onOpenSocial}>Connect a page</button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {accounts.map((a) => {
+                            const on = chosen.includes(a.id);
+                            return (
+                              <div key={a.id} className="flex items-center justify-between gap-2">
+                                <span className="flex min-w-0 items-center gap-2 text-ui">
+                                  <PlatformIcon platform={a.platform} className="h-4 w-4" />
+                                  <span className="truncate">{a.platform === 'facebook' ? a.displayName || `@${a.username}` : `@${a.username}`}</span>
+                                  {!a.isActive && (
+                                    <button type="button" className="badge badge-red" onClick={() => onReconnect?.(a.platform)}>Reconnect</button>
+                                  )}
+                                </span>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={on}
+                                  aria-label={`Post to ${a.platform === 'facebook' ? 'Facebook' : 'Instagram'} @${a.username}`}
+                                  className="kw-switch"
+                                  onClick={() => setChosen((ids) => (on ? ids.filter((id) => id !== a.id) : [...ids, a.id]))}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* Phone */}
+            <div className="flex flex-col items-center gap-3">
+              {preview}
+              <p className="kw-hint text-center">Preview only. The real post may crop slightly.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-90 flex items-center justify-center sm:p-6" role="presentation">
+      <div className="absolute inset-0 bg-black/45 animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
+
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Compose post for ${dateLabel}`}
+        tabIndex={-1}
+        className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border sm:border-(--border) sm:shadow-lg"
+      >
+        {/* ── Header ── */}
+        <header className="flex items-start gap-3 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-semibold leading-snug" title={heading}>{heading}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--fg-muted)">
+              {post ? (
+                <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
+              ) : (
+                <span className="badge badge-dashed">New</span>
+              )}
+              <span className="font-semibold text-(--fg)">{dateLabel}</span>
+              {currentIdea && !post && <span>From your {monthName} plan</span>}
+              {post?.format && <span>{normalizeFormat(post.format)} post</span>}
+              {profile.brandVoice && (
+                <span className="inline-flex items-center gap-1" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
+                  <AudioLines className="h-3.5 w-3.5 text-(--primary)" aria-hidden />
+                  Tuned to: <b className="font-semibold text-(--fg)">{profile.brandVoice}</b>
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Close composer"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+
+        {/* ── Body: three steps | phone ── */}
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-h-0 space-y-3 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
+            {isPublished && post && (
+              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-(--green) bg-(--green-soft) px-4 py-2.5 text-ui text-(--fg)">
+                <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
+                {post.externalLink && (
+                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
+                    View post <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </p>
+            )}
+            {isScheduled && post && (
+              <p className="flex items-center gap-2 rounded-lg border border-transparent bg-(--amber-soft) px-4 py-2.5 text-ui text-(--amber)">
+                <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
+              </p>
+            )}
+
+            {/* 1 · Idea */}
+            {!post ? (
+              <Step n={1} title={limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'} state="active">
+                {briefForm}
+              </Step>
+            ) : (
+              <Step
+                n={1}
+                title="Idea"
+                state="done"
+                summary={`${post.topic}${post.format ? ` · ${normalizeFormat(post.format)}` : ''}`}
+                action={
+                  !isPublished && (
+                    <button
+                      type="button"
+                      className={CHIP}
+                      onClick={() => {
+                        setRedoing(true);
+                        runGenerate();
+                      }}
+                      disabled={generatingPost || rewritesLeft === 0}
+                      title="New caption, score and image from the same idea"
+                    >
+                      {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
+                      {rewritesLeft === 0 ? 'No rewrites left' : `Start over · ${rewritesLeft} left`}
+                    </button>
+                  )
+                }
+              />
+            )}
+
+            {/* 2 · Caption */}
+            {!post ? (
+              <Step n={2} title="Caption" state="locked" summary="Kawayan writes this from your idea." />
+            ) : (
+              <Step
+                n={2}
+                title="Caption"
+                state="done"
+                action={
+                  counts && (
+                    <span className={clsx('text-xs tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-subtle)')}>
+                      {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
+                    </span>
+                  )
+                }
+              >
+                {captionEditor}
+
+                {scoreBox}
+
+                {post.history?.length > 0 && (
+                  <details className="mt-3 text-ui">
+                    <summary className="cursor-pointer text-xs font-semibold text-(--fg-muted) hover:text-(--fg)">Earlier versions ({post.history.length})</summary>
+                    <div className="mt-2 space-y-2">
+                      {post.history.map((v, i) => (
+                        <div key={`${v.createdAt}-${i}`} className="rounded-lg border border-(--border) p-3">
+                          <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
+                          <div className="mt-2 flex items-center justify-between">
+                            {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
+                            {!isPublished && (
+                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">Use this</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </Step>
+            )}
+
+            {/* 3 · Image */}
+            {!post ? (
+              <Step n={3} title="Image" state="locked" summary="Made to match the caption, or upload your own photo." />
+            ) : (
+              <Step n={3} title="Image" state={post.imageUrl ? 'done' : 'active'}>
+                {imageTools}
+              </Step>
+            )}
+
+            <details className="rounded-xl border border-(--border) bg-(--card) p-4 lg:hidden">
+              <summary className="cursor-pointer text-ui font-semibold">Preview on Facebook and Instagram</summary>
+              <div className="mt-4 flex justify-center">{preview}</div>
+            </details>
+          </div>
+
+          <aside className="hidden min-h-0 flex-col items-center overflow-y-auto border-l border-(--border) bg-(--bg-alt) px-5 py-5 lg:flex">
+            {preview}
+            <p className="mt-3 text-center text-xs text-(--fg-subtle)">Preview only. Reactions show up after it posts.</p>
+          </aside>
+        </div>
+
+        {/* ── Where + when, paired with publish ── */}
+        <footer className="flex flex-wrap items-center gap-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
+          <p className="text-xs text-(--fg-muted)">
+            {post ? saveIndicator : 'Draft the post first, then pick where and when it goes out.'}
+          </p>
+          {isPublished ? (
+            <div className="ml-auto flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-(--primary)"><Check className="h-4 w-4" /> Published</span>
+              {post?.externalLink && (
+                <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
+                  View post <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          ) : isScheduled ? (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-(--amber)">
+              <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
+            </span>
+          ) : accounts && accounts.length === 0 ? (
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <span className="text-xs text-(--fg-muted)">{post ? 'Connect a page to publish. Your draft is saved.' : 'Connect a page to publish.'}</span>
+              <button type="button" className="btn btn-glass btn-sm" onClick={onOpenSocial}>Connect a page</button>
+            </div>
+          ) : !post ? null : (
+            <div className="relative ml-auto flex items-stretch" ref={planRef}>
+              <button
+                type="button"
+                onClick={() => setPlanOpen((v) => !v)}
+                disabled={!post}
+                aria-expanded={planOpen}
+                aria-haspopup="dialog"
+                className="flex items-center gap-2.5 rounded-l-lg border border-r-0 border-(--border-strong) bg-(--bg-alt) py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-(--card-hover) disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="flex -space-x-1" aria-hidden>
+                  {chosenAccounts.length > 0
+                    ? chosenAccounts.map((a) => (
+                        <span key={a.id} className="grid h-6 w-6 place-items-center rounded-full bg-(--card) ring-2 ring-(--bg-alt)">
+                          <PlatformIcon platform={a.platform} />
+                        </span>
+                      ))
+                    : <span className="grid h-6 w-6 place-items-center rounded-full bg-(--card)"><Globe className="h-3.5 w-3.5 text-(--fg-muted)" /></span>}
+                </span>
+                <span className="min-w-0">
+                  <b className="block max-w-[180px] truncate text-ui font-semibold">{whereLabel}</b>
+                  <small className="block text-xs text-(--fg-muted)">{whenLabel}</small>
+                </span>
+                <ChevronDown className={clsx('h-4 w-4 text-(--fg-muted) transition-transform', planOpen && 'rotate-180')} />
+              </button>
+
+              <button type="button" className={clsx(PRIMARY_BTN, 'rounded-l-none')} onClick={publish} disabled={ctaDisabled}>
+                {publishing ? <Loader2 className="animate-spin" /> : mode === 'now' ? <Send /> : <CalendarClock />}
+                {publishing ? 'Sending…' : ctaLabel}
+                {!publishing && mode === 'schedule' && accounts?.length !== 0 && <ArrowUpRight />}
+              </button>
+
+              {planOpen && post && (
+                <div
+                  role="dialog"
+                  aria-label="Where and when to post"
+                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-xl border border-(--border) bg-(--card) p-4 shadow-lg"
+                >
+                  {whereWhen}
                 </div>
               )}
             </div>
