@@ -69,6 +69,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
   };
   const [channelFilter, setChannelFilter] = useState<'facebook' | 'instagram' | null>(null);
+  // Layout only: at 1280px and up the post details sit beside the calendar instead of in a sheet.
+  const [wideScreen, setWideScreen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1280px)');
+    const onChange = () => setWideScreen(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const [batchStrategy, setBatchStrategy] = useState('');
   const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -861,6 +869,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   };
 
   const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  // Wide screens show the selected post in a panel beside the calendar; smaller ones use the sheet.
+  const sideDetail = wideScreen && !!sheetPost;
   const onCurrentMonth = currentDate.getFullYear() === new Date().getFullYear() && currentDate.getMonth() === new Date().getMonth();
   const now = new Date();
   const isPastMonth = currentDate.getFullYear() * 12 + currentDate.getMonth() < now.getFullYear() * 12 + now.getMonth();
@@ -870,15 +880,16 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   return (
     <MotionConfig reducedMotion="user">
     <LazyMotion features={domMax}>
-    <div className="relative w-full flex flex-col gap-4 pb-16 font-sans text-(--fg)">
+    <div className="relative w-full flex flex-col gap-5 pb-16 font-sans text-(--fg)">
 
       {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => setPlanningOpen(true)} />}
 
+      <div className={sideDetail ? 'kw-work' : undefined}>
       {/* ─────────────  Channel timeline (primary)  ───────────── */}
-      <section className="w-full overflow-hidden rounded-lg border border-(--border) bg-(--card)">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-(--border) px-3 py-3 sm:px-5">
+      <section className="card w-full min-w-0 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-(--border) px-3 py-3 sm:px-3.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="relative mr-1 grid overflow-hidden font-display text-xl font-bold tracking-tight text-(--fg)">
+            <h1 className="relative mr-1 grid overflow-hidden text-base font-semibold tracking-tight text-(--fg) sm:text-lg">
               <AnimatePresence mode="popLayout" initial={false} custom={slide}>
                 <m.span
                   key={monthLabel}
@@ -891,18 +902,18 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
                   className="col-start-1 row-start-1 whitespace-nowrap"
                 >
                   {monthLabel}
                 </m.span>
               </AnimatePresence>
             </h1>
-            <div className="flex items-center rounded-lg border border-(--border-strong) overflow-hidden" data-tour="month-nav">
+            <div className="flex items-center gap-1.5" data-tour="month-nav">
               <button
                 type="button"
                 aria-label="Previous month"
-                className="p-2 text-(--fg-muted) hover:text-(--primary) hover:bg-(--bg-alt) transition-colors"
+                className="btn btn-outline btn-sm w-8 px-0!"
                 onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -912,9 +923,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                 type="button"
                 disabled={onCurrentMonth}
                 title={onCurrentMonth ? 'You’re on this month' : `Back to ${new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })}`}
-                className={`border-x border-(--border-strong) px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                  onCurrentMonth ? 'cursor-default text-(--fg-subtle)' : 'bg-(--kw-green-pale) text-(--primary) hover:bg-(--bg-alt)'
-                }`}
+                className={`btn btn-outline btn-sm ${onCurrentMonth ? 'cursor-default! text-(--fg-muted)' : ''}`}
                 onClick={() => setCurrentDate(new Date())}
               >
                 {onCurrentMonth ? 'Today' : 'Back to today'}
@@ -922,7 +931,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               <button
                 type="button"
                 aria-label="Next month"
-                className="p-2 text-(--fg-muted) hover:text-(--primary) hover:bg-(--bg-alt) transition-colors"
+                className="btn btn-outline btn-sm w-8 px-0!"
                 onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -937,9 +946,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 placeholder="Jump to…"
                 aria-label="Jump to date"
-                className="text-sm text-(--fg) bg-transparent border border-(--border) rounded-md px-2.5 py-1.5 w-28 outline-hidden focus:ring-2 focus:ring-(--ring) focus:border-(--primary) placeholder:text-(--fg-subtle)"
+                className="h-8 w-28 rounded-lg border border-(--border) bg-(--card) px-2.5 text-ui text-(--fg) shadow-xs outline-hidden placeholder:text-(--fg-muted)"
               />
-              <div className="absolute opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 bg-(--kw-forest) text-white text-xs px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              <div className="absolute opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 bg-(--fg) text-(--bg) text-xs px-2 py-1 rounded-md -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
               </div>
             </div>
@@ -962,13 +971,13 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               type="button"
               data-tour="plan-month"
               onClick={() => setPlanningOpen(true)}
-              className="btn btn-glass"
+              className="btn btn-primary btn-sm"
               aria-label="Plan month"
             >
               <Layers className="w-4 h-4" />
               <span className="hidden sm:inline">Plan month</span>
               {ideas.length > 0 && (
-                <span className="text-xs font-semibold text-(--fg-muted) tabular-nums">
+                <span className="mono text-xs opacity-80">
                   {ideas.length}
                 </span>
               )}
@@ -1001,6 +1010,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               onOpenDay={handleDayClick}
               onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
               onMoveIdea={moveIdea}
+              hideTray={!!sideDetail}
             />
           ) : viewMode === 'timeline' || !dataLoaded ? (
             <ChannelTimelineTrack
@@ -1040,7 +1050,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border) px-3 py-2.5 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border) px-3 py-2.5 sm:px-3.5">
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Status key">
             {(['idea', 'draft', 'scheduled', 'published', 'failed'] as const).map((s) => <StatusBadge key={s} status={s} />)}
           </div>
@@ -1049,6 +1059,27 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           </p>
         </div>
       </section>
+
+      {sideDetail && sheetPost && (
+        <PostDetailSheet
+          inline
+          post={sheetPost}
+          profile={profile}
+          platforms={platformsFor(sheetPost, postChannels, socialAccounts || [])}
+          scheduledAt={postChannels[sheetPost.id]?.at}
+          queuedAt={postChannels[sheetPost.id]?.queuedAt}
+          failed={sheetPost.status === 'Draft' && failedIds.includes(sheetPost.id)}
+          publishing={publishing}
+          onClose={() => setSheetPostId(null)}
+          onEdit={editPost}
+          onRetry={retryPost}
+          onMove={(post, date) => {
+            setSheetPostId(null);
+            movePost(post, date);
+          }}
+        />
+      )}
+      </div>
 
       {/* ── AI content-planning dialog (opened from the toolbar) ── */}
       <PlanningModal
@@ -1119,7 +1150,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
       {/* ── Post details (from a timeline card, search or a notification) ── */}
       <PostDetailSheet
-        post={sheetPost}
+        post={wideScreen ? null : sheetPost}
         profile={profile}
         platforms={sheetPost ? platformsFor(sheetPost, postChannels, socialAccounts || []) : []}
         scheduledAt={sheetPost ? postChannels[sheetPost.id]?.at : undefined}

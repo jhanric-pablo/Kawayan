@@ -73,14 +73,14 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [ ] Generic top nav for non-dashboard signed-in views (App.tsx)
 
 ### Owner screens
-- [ ] Calendar: header, stats/up-next, toolbar, Segmented view switch
-- [ ] Calendar: Month grid (`MonthGrid`)
-- [ ] Calendar: Timeline (`ChannelTimelineTrack`, `TimelinePostCard`)
-- [ ] Calendar: Agenda / list (`AgendaView`)
-- [ ] Calendar: `UpNext`
-- [ ] Calendar: post details (right panel on wide screens, `PostDetailSheet` on small)
-- [ ] Calendar: `PhonePreview`
-- [ ] Calendar: empty / loading / error states, delete & reschedule confirms
+- [x] Calendar: header, stats/up-next, toolbar, Segmented view switch
+- [x] Calendar: Month grid (`MonthGrid`)
+- [x] Calendar: Timeline (`ChannelTimelineTrack`, `TimelinePostCard`)
+- [x] Calendar: Agenda / list (`AgendaView`)
+- [x] Calendar: `UpNext`
+- [x] Calendar: post details (right panel on wide screens, `PostDetailSheet` on small)
+- [x] Calendar: `PhonePreview`
+- [x] Calendar: empty / loading / error states, delete & reschedule confirms
 - [ ] Post studio (`PostComposer`, `FormatPicker`)
 - [ ] Month planner (`PlanningModal`, `PostCountPicker`)
 - [ ] Insights (`InsightsDashboard`, `insights.css`, compare tray)
@@ -181,3 +181,13 @@ drawer (same items, focus-trapped, Esc/scrim to close). Notification center, acc
 and accessibility widget restyled. The theme toggle calls the same `updateTheme` as Settings.
 Check: collapse/expand sidebar, drawer on a phone, ⌘K help, bell, account menu, Reconnect banner.
 Left: tour cutout no longer animates its position (only opacity/transform are animated now).
+
+**Step 3 — calendar.** Calendar card with mockup toolbar (outline month buttons, tabs-style view
+switch, green Plan month), month grid with mono day numbers, green "today", hatched out-of-month
+cells and `.pchip`-style post chips (posted = green tint, draft = dashed, failed = red border, time
+in mono; status kept as screen-reader text and in the legend). Timeline pills/lanes, list view,
+Up next pills, empty-month card and status badges restyled. At ≥1280px the selected post opens in a
+right-side panel (same content and actions as the sheet; Esc or × closes; the "Not sent yet" tray
+hides while it is open to give the grid room). Below 1280px it is still the sheet.
+Check: open a post on a wide and a narrow window, drag a draft to another day, Reschedule, Retry.
+Left: none for the calendar itself.

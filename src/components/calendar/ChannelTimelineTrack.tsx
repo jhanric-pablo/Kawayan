@@ -26,10 +26,10 @@ const MAX_VISIBLE = 3;
 
 /** Compact posts are pills: solid once posted, tinted while queued, dashed as a draft. */
 const PILL: Record<Exclude<CardStatus, 'idea'>, { cls: string; Icon: React.ElementType; label: string }> = {
-  published: { cls: 'border-transparent bg-brand text-on-brand', Icon: Check, label: 'Posted' },
-  scheduled: { cls: 'border-brand/50 bg-brand/15 text-(--primary)', Icon: Clock, label: 'Scheduled' },
-  draft: { cls: 'border-dashed border-(--border-strong) bg-(--bg-alt) text-(--fg-muted)', Icon: PencilLine, label: 'Draft' },
-  failed: { cls: 'border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-300', Icon: CircleX, label: 'Failed' },
+  published: { cls: 'border-transparent bg-(--green-soft) text-(--green-ink)', Icon: Check, label: 'Posted' },
+  scheduled: { cls: 'border-(--border) bg-(--card) text-(--fg)', Icon: Clock, label: 'Scheduled' },
+  draft: { cls: 'border-dashed border-(--border-strong) bg-(--card) text-(--fg)', Icon: PencilLine, label: 'Draft' },
+  failed: { cls: 'border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-(--card) text-(--danger)', Icon: CircleX, label: 'Failed' },
 };
 
 interface Props {
@@ -166,12 +166,12 @@ const ChannelTimelineTrack: React.FC<Props> = ({
       <div className="relative grid w-max" style={{ gridTemplateColumns: `var(--head) repeat(${days}, ${col}px)` }}>
         {/* Corner */}
         <div style={{ gridRow: 1, gridColumn: 1 }} className={clsx('sticky left-0 z-30 flex h-12 items-center justify-between gap-1 border-b border-r border-(--border) bg-(--card)', compact ? 'px-0.5' : 'px-3')}>
-          {!compact && <span className="eyebrow hidden text-(--fg-subtle) sm:inline">Channels</span>}
+          {!compact && <span className="eyebrow hidden text-(--fg-muted) sm:inline">Channels</span>}
           <span className="flex">
-            <button type="button" onClick={() => scrollWeek(-1)} aria-label="Earlier week" className="grid h-7 w-7 place-items-center rounded-md text-(--fg-muted) hover:bg-(--bg-alt) hover:text-(--fg)">
+            <button type="button" onClick={() => scrollWeek(-1)} aria-label="Earlier week" className="grid h-8 w-8 place-items-center rounded-md text-(--fg-muted) hover:bg-(--muted) hover:text-(--fg)">
               <ChevronLeft className="h-4 w-4" strokeWidth={2} />
             </button>
-            <button type="button" onClick={() => scrollWeek(1)} aria-label="Later week" className="grid h-7 w-7 place-items-center rounded-md text-(--fg-muted) hover:bg-(--bg-alt) hover:text-(--fg)">
+            <button type="button" onClick={() => scrollWeek(1)} aria-label="Later week" className="grid h-8 w-8 place-items-center rounded-md text-(--fg-muted) hover:bg-(--muted) hover:text-(--fg)">
               <ChevronRight className="h-4 w-4" strokeWidth={2} />
             </button>
           </span>
@@ -188,12 +188,12 @@ const ChannelTimelineTrack: React.FC<Props> = ({
               className={clsx(
                 'flex h-12 items-center gap-1.5 border-b border-l border-(--border) px-3',
                 date.getDay() === 1 && 'border-l-(--border-strong)',
-                isToday ? 'bg-(--today-highlight) text-(--primary)' : 'text-(--fg-muted)',
+                isToday ? 'bg-(--today-highlight) text-(--green-ink)' : 'text-(--fg-muted)',
               )}
             >
               <span className="eyebrow">{date.toLocaleDateString('en-PH', { weekday: 'short' })}</span>
-              <span className={clsx('text-sm font-bold tabular-nums', !isToday && 'text-(--fg)')}>{i + 1}</span>
-              {isToday && <span className="ml-auto rounded-full bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-1.5 text-xs font-bold">Today</span>}
+              <span className={clsx('mono grid h-6 min-w-6 place-items-center rounded-md px-1 text-xs font-medium', isToday ? 'bg-(--green) text-(--green-fg)' : 'text-(--fg)')}>{i + 1}</span>
+              {isToday && <span className="mono ml-auto text-2xs font-medium uppercase tracking-wider">Today</span>}
             </div>
           );
         })}
@@ -212,32 +212,32 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                 title={compact ? `${lane.name} · ${broken ? 'Needs reconnecting' : meta.sub}` : undefined}
                 className={clsx('sticky left-0 z-30 flex items-center gap-2.5 border-r border-t border-(--border) bg-(--card) py-2', compact ? 'justify-center px-1' : 'px-3')}
               >
-                <span className={clsx('relative h-8 w-8 shrink-0 place-items-center rounded-lg border border-(--border) bg-(--bg-alt)', compact ? 'grid' : 'hidden sm:grid', compact && lane.soon && 'opacity-50')}>
-                  {lane.Glyph ? <lane.Glyph className="h-4 w-4" /> : <Layers className="h-4 w-4 text-(--primary)" strokeWidth={1.75} aria-hidden />}
+                <span className={clsx('relative h-8 w-8 shrink-0 place-items-center rounded-lg border border-(--border) bg-(--card)', compact ? 'grid' : 'hidden sm:grid', compact && lane.soon && 'opacity-50')}>
+                  {lane.Glyph ? <lane.Glyph className="h-4 w-4" /> : <Layers className="h-4 w-4 text-(--fg)" strokeWidth={1.75} aria-hidden />}
                   {meta.linked.length > 0 && (
-                    <span className={clsx('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-(--card)', broken ? 'bg-amber-400' : 'bg-(--success)')} aria-hidden />
+                    <span className={clsx('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-(--card)', broken ? 'bg-(--amber)' : 'bg-(--green)')} aria-hidden />
                   )}
                 </span>
                 {!compact && <div className={clsx('min-w-0 flex-1', lane.soon && 'opacity-60')}>
-                  <p className="truncate text-ui font-semibold text-(--fg)">{lane.name}</p>
-                  <p className={clsx('truncate text-xs', broken ? 'text-amber-600 dark:text-amber-300' : 'text-(--fg-muted)')}>
+                  <p className="truncate text-ui font-medium text-(--fg)">{lane.name}</p>
+                  <p className={clsx('truncate text-xs', broken ? 'text-(--amber)' : 'text-(--fg-muted)')}>
                     {broken ? 'Needs reconnecting' : meta.sub}
                   </p>
                 </div>}
                 {!compact && onConnect && live && accounts !== null && meta.linked.length === 0 && (
-                  <button type="button" onClick={() => onConnect(platform)} className="shrink-0 rounded-full border border-(--border-strong) px-2 py-0.5 text-xs font-semibold text-(--primary) hover:bg-(--bg-alt)">
+                  <button type="button" onClick={() => onConnect(platform)} className="shrink-0 rounded-md border border-(--border) bg-(--card) px-2 py-1 text-xs font-medium text-(--fg) hover:bg-(--muted)">
                     Connect
                   </button>
                 )}
                 {!compact && onConnect && live && meta.linked.length > 0 && (
                   <DropdownMenu>
-                    <DropdownMenuTrigger aria-label={`${lane.name} channel options`} className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-(--fg-subtle) hover:bg-(--bg-alt) hover:text-(--fg) data-popup-open:bg-(--bg-alt)">
+                    <DropdownMenuTrigger aria-label={`${lane.name} channel options`} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-(--fg-muted) hover:bg-(--muted) hover:text-(--fg) data-popup-open:bg-(--muted)">
                       <Ellipsis className="h-4 w-4" strokeWidth={2} />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="min-w-[200px]">
                       {meta.linked.map((a) => (
                         <DropdownMenuGroup key={a.id}>
-                          <DropdownMenuLabel className="text-xs font-semibold">@{a.username}</DropdownMenuLabel>
+                          <DropdownMenuLabel className="text-xs font-medium">@{a.username}</DropdownMenuLabel>
                           {!a.isActive && (
                             <DropdownMenuItem onClick={() => onConnect(platform)}>
                               <RefreshCw className="text-(--fg-muted)" aria-hidden /> Reconnect
@@ -280,13 +280,13 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                     }}
                     className={clsx(
                       'relative flex flex-col gap-1.5 border-l border-t border-(--border) p-1.5 transition-colors',
-                      dragKey && overDay === day && !lane.soon && 'bg-[color-mix(in_srgb,var(--primary)_12%,transparent)]! shadow-[inset_0_0_0_2px_var(--primary)]',
+                      dragKey && overDay === day && !lane.soon && 'bg-(--green-soft)! shadow-[inset_0_0_0_2px_var(--green)]',
                       dragKey && isPast(day) && 'opacity-50',
                       lane.soon ? 'min-h-[52px]' : compact ? 'min-h-[68px]' : 'min-h-[92px]',
                       new Date(year, month, day).getDay() === 1 && 'border-l-(--border-strong)',
                       i === todayIdx
                         ? 'bg-(--today-highlight)'
-                        : weekend && 'bg-[color-mix(in_srgb,var(--bg-alt)_55%,transparent)]',
+                        : weekend && 'bg-[color-mix(in_srgb,var(--muted)_55%,transparent)]',
                     )}
                   >
                     {!lane.soon && (
@@ -297,20 +297,20 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                         onClick={() => onOpenDay(day)}
                         className="group absolute inset-0 z-0 flex items-end justify-center rounded-none pb-2 opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100"
                       >
-                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-(--border-strong) bg-(--card) px-2 py-0.5 text-xs font-semibold text-(--fg-muted)">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-(--border) bg-(--card) px-2 py-0.5 text-xs font-medium text-(--fg)">
                           <Plus className="h-3 w-3" strokeWidth={2.25} aria-hidden /> Add
                         </span>
                       </button>
                     )}
                     {lane.id === 'plan' && dragKey && overDay === day && (
-                      <span className="pointer-events-none relative z-20 self-center rounded-full bg-(--primary) px-2.5 py-0.5 text-xs font-semibold text-(--on-accent)">
+                      <span className="pointer-events-none relative z-20 self-center rounded-full bg-(--fg) px-2.5 py-0.5 text-xs font-medium text-(--bg)">
                         Move here
                       </span>
                     )}
                     {lane.id === 'plan' && ghostDays?.includes(day) && (
                       <span
                         aria-hidden
-                        className="h-[52px] animate-pulse rounded-xl border border-dashed border-brand/40 bg-brand/6 motion-reduce:animate-none"
+                        className="h-[52px] animate-pulse rounded-lg border border-dashed border-(--border-strong) bg-(--muted) motion-reduce:animate-none"
                         style={{ animationDelay: `${(day % 7) * 90}ms` }}
                       />
                     )}
@@ -324,7 +324,7 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                             type="button"
                             onClick={() => onOpenPost(item.post!)}
                             title={`${item.title} · ${item.time ?? pill.label}`}
-                            className={clsx('relative z-10 flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-left text-xs font-semibold transition-[filter] hover:brightness-110', pill.cls)}
+                            className={clsx('relative z-10 flex w-full items-center gap-1.5 rounded-[7px] border px-2 py-1 text-left text-xs font-medium transition-colors hover:bg-(--muted)', pill.cls)}
                           >
                             <pill.Icon className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-label={pill.label} />
                             <span className="truncate">{item.title}</span>
@@ -365,7 +365,7 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                         type="button"
                         onClick={() => toggleCell(cellKey)}
                         aria-expanded={open}
-                        className="relative z-10 rounded-md py-1 text-xs font-semibold text-(--primary) hover:bg-(--bg-alt)"
+                        className="relative z-10 rounded-md py-1 text-xs font-medium text-(--fg) underline-offset-2 hover:bg-(--muted) hover:underline"
                       >
                         {open ? 'Show less' : `+${hidden} more`}
                       </button>
@@ -390,11 +390,11 @@ const ChannelTimelineTrack: React.FC<Props> = ({
         {todayIdx >= 0 && (
           <div
             aria-hidden
-            className="pointer-events-none absolute bottom-0 top-12 z-20 w-0.5 -translate-x-1/2 bg-[color-mix(in_srgb,var(--primary)_80%,transparent)]"
+            className="pointer-events-none absolute bottom-0 top-12 z-20 w-0.5 -translate-x-1/2 bg-(--green)"
             style={{ left: `calc(var(--head) + ${(todayIdx + (now.getHours() * 60 + now.getMinutes()) / 1440) * col}px)` }}
           >
-            <span className="absolute top-[-5px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-(--primary) shadow-[0_0_0_4px_var(--today-highlight)]">
-              <span className="absolute inset-0 animate-ping rounded-full bg-(--primary) opacity-60 motion-reduce:hidden" />
+            <span className="absolute top-[-5px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-(--green) shadow-[0_0_0_4px_var(--green-soft)]">
+              <span className="absolute inset-0 animate-ping rounded-full bg-(--green) opacity-60 motion-reduce:hidden" />
             </span>
           </div>
         )}

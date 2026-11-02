@@ -22,7 +22,7 @@ function Segmented<T extends string | null>({ id, label, value, options, onChang
             {on && (
               <m.span
                 layoutId={`seg-${id}`}
-                className="absolute inset-0 rounded-[var(--radius-sm)] bg-(--card) shadow-[0_0_0_1px_var(--border)]"
+                className="absolute inset-0 rounded-[7px] bg-(--card) shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
                 transition={{ type: 'spring', stiffness: 500, damping: 38 }}
                 aria-hidden
               />

@@ -67,7 +67,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
         <div
           className={clsx(
             'absolute inset-2.5 grid place-content-center justify-items-center gap-1.5 rounded-xl border-2 border-dashed text-center text-[11px] font-medium transition-colors',
-            dragging ? 'border-brand bg-brand/10 text-brand' : 'border-zinc-300 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500',
+            dragging ? 'border-(--green) bg-(--green-soft) text-(--green-ink)' : 'border-zinc-300 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500',
             tiktok && !dragging && 'border-zinc-700 text-zinc-500',
           )}
         >
@@ -76,7 +76,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
         </div>
       )}
       {imageUrl && dragging && (
-        <div className="absolute inset-0 grid place-items-center bg-brand/40 text-xs font-semibold text-white">Drop to replace</div>
+        <div className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-medium text-white">Drop to replace</div>
       )}
       {loadingImage && (
         <div className="absolute inset-0 grid place-items-center bg-black/45">
@@ -89,25 +89,25 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
   return (
     <div className="flex flex-col items-center gap-4">
       <Tabs.Root value={platform} onValueChange={(v) => setPlatform(v as PreviewPlatform)}>
-        <Tabs.List aria-label="Preview platform" className="relative inline-flex rounded-full border border-(--border) bg-(--card) p-1">
+        <Tabs.List aria-label="Preview platform" className="relative inline-flex gap-0.5 rounded-[9px] bg-(--muted) p-[3px]">
           {TABS.filter((t) => !tabs || tabs.includes(t.id)).map(({ id, label, Icon }) => (
             <Tabs.Tab
               key={id}
               value={id}
-              className="relative z-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-(--fg-muted) outline-hidden transition-colors hover:text-(--fg) focus-visible:ring-2 focus-visible:ring-(--ring) data-active:text-(--fg)"
+              className="relative z-1 inline-flex h-7 items-center gap-1.5 rounded-[7px] px-3 text-ui font-medium text-(--fg-muted) outline-hidden transition-colors hover:text-(--fg) focus-visible:ring-2 focus-visible:ring-(--ring) data-active:text-(--fg)"
             >
               <Icon className="h-3.5 w-3.5" /> {label}
             </Tabs.Tab>
           ))}
-          <Tabs.Indicator className="absolute left-(--active-tab-left) top-(--active-tab-top) h-(--active-tab-height) w-(--active-tab-width) rounded-full bg-(--bg-alt) ring-1 ring-(--border-strong) transition-[left,width] duration-200 ease-out motion-reduce:transition-none" />
+          <Tabs.Indicator className="absolute left-0 top-(--active-tab-top) h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) rounded-[7px] bg-(--card) shadow-[0_1px_2px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none" />
         </Tabs.List>
       </Tabs.Root>
 
       {/* Phone */}
-      <div className="w-[264px] shrink-0 rounded-[2.6rem] bg-zinc-900 p-[9px] shadow-[0_28px_70px_-24px_rgba(0,0,0,0.6)] ring-1 ring-zinc-700/70 dark:bg-zinc-950">
+      <div className="w-[264px] shrink-0 rounded-[30px] border border-(--border) bg-(--muted) p-[10px]">
         <div
           className={clsx(
-            'relative aspect-9/19 overflow-hidden rounded-[2.1rem] text-[12px] leading-snug',
+            'relative aspect-9/19 overflow-hidden rounded-[22px] border border-(--border) text-[12px] leading-snug',
             tiktok ? 'bg-black text-white' : 'bg-white text-zinc-900 dark:bg-black dark:text-zinc-100',
           )}
         >
