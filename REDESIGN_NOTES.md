@@ -545,7 +545,7 @@ in Settings once the migration runs (see Migrations). Not added: the mockup's te
 3. Drag a post to another day in the month grid (one post per day still enforced).
 4. Reconnect a channel from a Held post (detail panel → Reconnect, or Settings › Channels).
 5. Insights: tick two posts → Compare; Export CSV from the download menu.
-6. Plan and billing: Buy 1 extra post → the Post studio opens on a new post; with posts left over, the paid-extra flow asks before charging the wallet.
+6. Plan and billing: Buy 1 extra post → the Post studio opens on a new post; once this month's posts are used up, writing it offers the paid extra post (₱150 from the wallet).
 7. Help desk: open a ticket, reply with a screenshot, Mark resolved; from the support inbox, reply and add an internal note.
 8. Admin: Verification → pick a reason + note → Send back; another one → Approve. Overview shows system status.
 9. Settings: Export my data downloads JSON; Delete account needs your email typed (try on a test account).
