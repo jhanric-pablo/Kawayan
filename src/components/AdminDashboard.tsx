@@ -21,6 +21,9 @@ import AdminVerification, { VerifFilter } from './admin/AdminVerification';
 import { parseUtc, timeAgo } from '../utils/adminJobs';
 import './admin/adminConsole.css';
 import { KawayanMark } from './KawayanLogo';
+import { Sidebar, SidebarProvider, useSidebar } from './ui/sidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SideTip, SideToggle, SidebarBridge, useSideOpen } from './layout/shellSidebar';
 import KwSelect from './ui/kw-select';
 
 interface Props {
@@ -281,6 +284,10 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [sideOpen, chooseSideOpen] = useSideOpen();
+  const isMobile = useIsMobile();
+  const narrow = !sideOpen && !isMobile;
+  const sidebarRef = useRef<ReturnType<typeof useSidebar> | null>(null);
 
   // Overview
   const [stats, setStats] = useState<AdminStats>(EMPTY_STATS);
@@ -736,9 +743,16 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const allUp = sysRows.every((r) => r.state === 'up' || r.state === 'test');
 
   return (
-    <div className="adm kw-shell kw-shell--staff text-sm text-(--fg)">
-      {/* ── Sidebar (near-black staff console) ── */}
-      <aside className="kw-side kw-side--staff adm-side">
+    <SidebarProvider
+      open={sideOpen}
+      onOpenChange={chooseSideOpen}
+      className={cx('adm kw-shell kw-shell--staff text-sm text-(--fg)', narrow && 'is-collapsed')}
+      style={{ '--sidebar-width': '248px', '--sidebar-width-icon': '64px' } as React.CSSProperties}
+    >
+      <SidebarBridge sidebarRef={sidebarRef} />
+      {/* ── Sidebar (near-black staff console): shadcn Sidebar, icon rail when collapsed, drawer on phones ── */}
+      <Sidebar collapsible="icon" className="border-r-0!" aria-label="Sidebar">
+      <div className="kw-side kw-side--staff">
         <div className="kw-side__biz cursor-default hover:bg-transparent!">
           <span className="kw-side__logo" aria-hidden><KawayanMark /></span>
           <span className="kw-side__label min-w-0 text-left">
@@ -752,17 +766,19 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
               <p className="kw-side__grp">{group}</p>
               <div className="kw-side__menu">
                 {NAV.filter((item) => item.group === group).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveTab(item.id)}
-                    aria-current={activeTab === item.id ? 'page' : undefined}
-                    className="kw-side__item"
-                  >
-                    <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    {item.count != null && <span className="adm-nav__count">{item.count}</span>}
-                  </button>
+                  <SideTip key={item.id} label={item.count != null ? `${item.label} · ${item.count}` : item.label} show={narrow}>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveTab(item.id); sidebarRef.current?.setOpenMobile(false); }}
+                      aria-current={activeTab === item.id ? 'page' : undefined}
+                      aria-label={item.count != null ? `${item.label}, ${item.count}` : item.label}
+                      className="kw-side__item"
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                      <span className="kw-side__label flex-1 text-left">{item.label}</span>
+                      {item.count != null && <span className="adm-nav__count kw-side__badge" aria-hidden>{item.count}</span>}
+                    </button>
+                  </SideTip>
                 ))}
               </div>
             </div>
@@ -781,12 +797,14 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
         <div className="kw-side__me">
           <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} placement="sidebar" />
         </div>
-      </aside>
+      </div>
+      </Sidebar>
 
       <div className="kw-inset">
         {/* ── Top bar ── */}
         <header className="kw-topbar">
-          <span className="md:hidden"><KawayanMark className="h-6 w-6" /></span>
+          <SideToggle />
+          <span className="kw-vr hidden md:block" aria-hidden />
           <nav aria-label="Breadcrumb" className="kw-crumb hidden shrink-0 lg:flex">
             <span>Admin</span>
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
@@ -1527,7 +1545,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
           </div>
         </AdminModal>
       )}
-    </div>
+    </SidebarProvider>
   );
 };
 

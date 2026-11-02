@@ -267,6 +267,12 @@
   --color-card: var(--card);
   --color-card-foreground: var(--fg);
   --color-popover: var(--card);
+  --color-sidebar: var(--muted);
+  --color-sidebar-foreground: var(--fg);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-accent: color-mix(in srgb, var(--fg) 5%, transparent);
+  --color-sidebar-accent-foreground: var(--fg);
+  --color-sidebar-ring: var(--ring);
   --color-popover-foreground: var(--fg);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--on-accent);

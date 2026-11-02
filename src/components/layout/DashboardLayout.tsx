@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, MessageSquare, Moon, PanelLeft, Plus, Search, Sun, TriangleAlert, X } from 'lucide-react';
+import { ChevronRight, MessageSquare, Moon, Plus, Search, Sun, TriangleAlert, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { GeneratedPost, User, ViewState } from '../../types';
 import UniversalDatabaseService from '../../services/universalDatabaseService';
 import { socialService, SocialAccount } from '../../services/socialService';
 import { paymentService } from '../../services/paymentService';
 import { SubscriptionTier, countPostsInMonth, getBatchLimitForSubscription } from '../../utils/tierLimits';
 import { HELP_EVENT } from '../../utils/usePhone';
+import { Sidebar, SidebarProvider, useSidebar } from '../ui/sidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MOD_KEY, SideTip, SideToggle, SidebarBridge, useSideOpen } from './shellSidebar';
 import {
   FEED_EVENT, PLATFORM_LABEL, PostChannels, WorkspaceFeed, failedPostsKey, postChannelsKey, readStored,
 } from '../../utils/workspaceFeed';
@@ -18,7 +20,6 @@ import AccountMenu from '../AccountMenu';
 import HelpPanel from '../HelpPanel';
 import '../appShell.css';
 import { KawayanMark } from '../KawayanLogo';
-import { useFocusTrap } from '../../utils/useFocusTrap';
 import type { ThemePref } from '../../utils/sessionView';
 import { Transaction } from '../../services/paymentService';
 import { supportService } from '../../services/supportService';
@@ -180,21 +181,9 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
 };
 
 /** Signed-in app frame: grey sidebar (a slide-in drawer on phones), then the page in a rounded inset panel. */
-/**
- * Names an icon-only (collapsed) sidebar item. Expanded sidebars show the text, so the tip stays hidden there.
- * A real tooltip rather than `title`: native ones can stay stuck on screen after a click re-renders the page.
- */
-const SideTip: React.FC<{ label: string; show: boolean; children: React.ReactElement }> = ({ label, show, children }) => (
-  <Tooltip>
-    <TooltipTrigger render={children} />
-    <TooltipContent side="right" sideOffset={10} className={clsx('font-medium', !show && 'hidden')}>{label}</TooltipContent>
-  </Tooltip>
-);
-
 /** Sidebar groups: what you make, then your account. */
 const ACCOUNT_VIEWS = new Set<ViewState>([ViewState.SOCIAL, ViewState.BILLING, ViewState.SETTINGS]);
 
-const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 
 const ENGINE_DOT = { ok: 'bg-(--success)', warn: 'bg-(--amber)', down: 'bg-(--danger)', idle: 'bg-(--fg-subtle)' };
 
@@ -257,22 +246,13 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   const used = countPostsInMonth(feed.posts, new Date());
   const limit = getBatchLimitForSubscription(plan ?? 'FREE');
 
-  // Desktop: the top-bar toggle collapses the sidebar to icons (starts collapsed on narrow tablets).
-  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
-  // Phones: the sidebar is a drawer.
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(drawerRef, phone && drawerOpen);
-  useEffect(() => {
-    if (!phone) setDrawerOpen(false);
-  }, [phone]);
-  useEffect(() => {
-    if (!drawerOpen) return;
-    drawerRef.current?.querySelector<HTMLElement>('[aria-current="page"], button')?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawerOpen]);
+  // Desktop: the top-bar toggle (or ⌘/Ctrl+B) collapses the sidebar to an icon rail; remembered on
+  // this device. Phones (< 768px): the shadcn Sheet drawer.
+  const isMobile = useIsMobile();
+  const [sideOpen, chooseSideOpen] = useSideOpen();
+  // The sidebar context lives inside the provider; this keeps a handle for closing the phone drawer.
+  const sidebarRef = useRef<ReturnType<typeof useSidebar> | null>(null);
+  const setDrawerOpen = (open: boolean) => sidebarRef.current?.setOpenMobile(open);
 
   const reconnect = () => socialService.connect(expired[0].platform).catch((e: any) => toast.error(e.message));
   const navButton = (item: NavItem) => ({
@@ -286,7 +266,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   });
 
   const current = navItems.find((i) => i.id === view) ?? (view === ViewState.SURVEY ? { label: 'Brand DNA' } : undefined);
-  const narrow = collapsed && !phone; // icon-only sidebar
+  const narrow = !sideOpen && !isMobile; // icon-only sidebar
   const groupOf = (i: NavItem) => i.group ?? (ACCOUNT_VIEWS.has(i.id) ? 'Account' : 'Plan');
   const groups = [
     { label: isUser ? 'Plan' : 'Workspace', items: navItems.filter((i) => groupOf(i) !== 'Account') },
@@ -396,32 +376,20 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   );
 
   return (
-    <div className={clsx('kw-shell', narrow && 'is-collapsed', !isUser && 'kw-shell--staff')}>
-      {!phone && <aside className={clsx('kw-side', !isUser && 'kw-side--staff')}>{sidebar}</aside>}
-
-      {phone && drawerOpen && (
-        <div className="kw-drawer" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="kw-drawer__scrim" onClick={() => setDrawerOpen(false)} aria-hidden />
-          <aside className={clsx('kw-side kw-drawer__panel', !isUser && 'kw-side--staff')} ref={drawerRef}>
-            <button type="button" className="kw-drawer__close" onClick={() => setDrawerOpen(false)} aria-label="Close menu">
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-            {sidebar}
-          </aside>
-        </div>
-      )}
+    <SidebarProvider
+      open={sideOpen}
+      onOpenChange={chooseSideOpen}
+      className={clsx('kw-shell', narrow && 'is-collapsed', !isUser && 'kw-shell--staff')}
+      style={{ '--sidebar-width': '248px', '--sidebar-width-icon': '64px' } as React.CSSProperties}
+    >
+      <SidebarBridge sidebarRef={sidebarRef} />
+      <Sidebar collapsible="icon" className="border-r-0!" aria-label="Sidebar">
+        <div className={clsx('kw-side', !isUser && 'kw-side--staff')}>{sidebar}</div>
+      </Sidebar>
 
       <div className="kw-inset">
         <header className="kw-topbar">
-          <button
-            type="button"
-            className="kw-icon-btn"
-            onClick={() => (phone ? setDrawerOpen(true) : setCollapsed((c) => !c))}
-            aria-label={phone ? 'Open menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={phone ? drawerOpen : !collapsed}
-          >
-            <PanelLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </button>
+          <SideToggle />
           <span className="kw-vr" aria-hidden />
           <nav aria-label="Breadcrumb" className="kw-crumb flex min-w-0">
             <span className="hidden truncate sm:inline">{isUser ? bizName : user.role === 'support' ? 'Support' : 'Kawayan'}</span>
@@ -478,7 +446,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
       </div>
 
       {isUser && <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />}
-    </div>
+    </SidebarProvider>
   );
 };
 

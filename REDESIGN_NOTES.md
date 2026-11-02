@@ -578,3 +578,12 @@ only (the server already accepts up to 200 chars, so no server or DB change and 
 is never added to the list, reloads as "Other" + the niche, and the AI prompts get just the niche.
 (The shadcn CLI also added cmdk, date-fns, react-day-picker and bumped recharts 3.5 → 3.8 for the
 calendar / chart / sidebar components used in later items.)
+
+**8 — Collapsible sidebar (shadcn Sidebar).** Owner, support and admin shells now sit in shadcn's
+`SidebarProvider` + `<Sidebar collapsible="icon">` (our item markup inside, so tour anchors and the
+staff colours stay): top-bar toggle and ⌘/Ctrl+B, icon rail with tooltips, badges become dots,
+quota card hidden, account button avatar-only, state remembered per device (`kawayan_sidebar_open`),
+phones (< 768 px) get shadcn's Sheet drawer (the admin's phone tab strip stays too). The width
+animates 200 ms with cubic-bezier(0.2, 0.8, 0.2, 1) (none with reduced motion); the inset is flex-1
+so pages reflow and charts / the calendar resize via their ResizeObservers. Shared glue in
+`layout/shellSidebar.tsx`.
