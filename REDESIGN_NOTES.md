@@ -309,15 +309,15 @@ special holidays, movable ones like Holy Week and National Heroes Day, and payda
 the last day), used by the calendar tags and the Month planner's "Dates Kawayan found".
 
 ## A. App shell
-- [ ] Sidebar header: business avatar (initials), name, "<Plan> plan" — **FE**; "· city" — **MIG** (`brand_profiles.city`, hidden until it exists)
+- [x] Sidebar header: business avatar (initials), name, "<Plan> plan" — **FE**; "· city" — **MIG** (`brand_profiles.city`, hidden until it exists)
 - [ ] Group "Plan": Calendar, Month planner (new page), Post studio (new page) + drafts badge, Insights — **FE**
-- [ ] Group "Account": Settings + red channel-problem badge, Plan and billing, Help desk (new page) — **FE**
-- [ ] Social accounts stay reachable (Settings › Channels links to it; `/social` still works) — **have**
-- [ ] Quota card "<Month> posts X / limit", bar, "Resets <1st>. Drafts don't count." — **FE** (counts from loaded posts, as today)
-- [ ] Account button (avatar, name, email) → menu: Settings, Plan and billing, Help desk, Take the tour, Appearance Light/Dark/System, Log out — **FE** (System = follows the OS; saved on this device, Light/Dark still saved to the account)
+- [x] Group "Account": Settings + red channel-problem badge, Plan and billing, Help desk (new page) — **FE**
+- [x] Social accounts stay reachable (Settings › Channels links to it; `/social` still works) — **have**
+- [x] Quota card "<Month> posts X / limit", bar, "Resets <1st>." — **FE**. It says "Drafts count too." instead of the mockup's "Drafts don't count": the app (and the server's TIER_LIMIT check) counts every saved post, drafts included, and that rule was not changed.
+- [x] Account button (avatar, name, email) → menu: Settings, Plan and billing, Help desk, Take the tour, Appearance Light/Dark/System, Log out — **FE** (System = follows the OS; saved on this device, Light/Dark still saved to the account)
 - [x] Top bar: sidebar toggle, breadcrumb "Business › Page", theme toggle — **have**
-- [ ] Search box with ⌘K focusing it, searches loaded posts by title/caption, opens the post — **FE** (⌘K currently opens Help; it moves to search, Help keeps its sidebar entry and the "?" shortcut)
-- [ ] Bell with unread dot; popover "Needs you / All", one action per item (Fix now, Review, Open ticket), "Mark all as read" — **FE**
+- [x] Search box with ⌘K focusing it, searches loaded posts by title/caption, opens the post — **FE** (⌘K currently opens Help; it moves to search, Help keeps its sidebar entry and the "?" shortcut)
+- [x] Bell with unread dot; popover "Needs you / All", one action per item (Fix now, Review, Open ticket), "Mark all as read" — **FE**
 - [x] Phones: sidebar as a drawer — **have**
 
 ## B. Calendar
@@ -402,3 +402,16 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 
 ## Migrations for me to run
 (filled in as they are written)
+
+### Phase 2 progress log
+
+**A — shell.** Sidebar: business initials avatar, name, "<plan> plan"; groups Plan (Calendar,
+Insights) and Account (Settings with a red badge for expired channels, Channels, Plan and billing,
+Help desk); quota card "<Month> posts X / limit" + bar + reset date + engine line; account button
+with name and email. Account menu: Switch account, Settings, Plan and billing, Help desk, Take the
+tour, Appearance Light / Dark / System, Log out. System follows the device (saved on the device;
+Light/Dark still saved to the account). ⌘K / Ctrl+K now focuses the post search (as the mockup
+shows); Help moved to ⌘/ / Ctrl+/ and stays one click away in the sidebar. Notifications: "Needs
+you" (expired pages with held posts → Fix now, failed posts → Retry, drafts → Review, support
+replies → Open ticket) and "All" (plus posted and payment history), unread dot, Mark all as read.
+Month planner, Post studio and Help desk nav entries arrive with their pages (C, E, F3).

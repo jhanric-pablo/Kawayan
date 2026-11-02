@@ -26,6 +26,9 @@ export const VIEW_PATHS: Record<ViewState, string> = {
   [ViewState.BILLING]: '/billing',
   [ViewState.SUPPORT_DASHBOARD]: '/support',
   [ViewState.ADMIN_DASHBOARD]: '/admin',
+  [ViewState.PLANNER]: '/planner',
+  [ViewState.STUDIO]: '/studio',
+  [ViewState.HELP]: '/help',
 };
 
 /** Screens that read the query string on arrival (payment, social and reset-email returns). */
@@ -104,6 +107,9 @@ const VIEWS_BY_ROLE: Record<string, ViewState[]> = {
   support: [ViewState.SUPPORT_DASHBOARD, ViewState.SETTINGS],
   user: [
     ViewState.CALENDAR,
+    ViewState.PLANNER,
+    ViewState.STUDIO,
+    ViewState.HELP,
     ViewState.INSIGHTS,
     ViewState.SOCIAL,
     ViewState.BILLING,
@@ -129,4 +135,23 @@ export const readThemeFromSession = (): boolean => {
     /* ignore */
   }
   return false;
+};
+
+/** Appearance choice. 'system' is kept on this device; Light and Dark are also saved to the account. */
+export type ThemePref = 'light' | 'dark' | 'system';
+const THEME_PREF_KEY = 'kawayan_theme_pref';
+export const readThemePref = (): ThemePref | null => {
+  try {
+    return localStorage.getItem(THEME_PREF_KEY) === 'system' ? 'system' : null;
+  } catch {
+    return null;
+  }
+};
+export const writeThemePref = (pref: ThemePref): void => {
+  try {
+    if (pref === 'system') localStorage.setItem(THEME_PREF_KEY, 'system');
+    else localStorage.removeItem(THEME_PREF_KEY);
+  } catch {
+    /* private mode */
+  }
 };

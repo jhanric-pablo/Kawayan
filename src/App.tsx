@@ -32,6 +32,9 @@ import {
   writeStoredView,
   clearStoredView,
   readThemeFromSession,
+  readThemePref,
+  writeThemePref,
+  type ThemePref,
   resolveViewForRole,
   getHomeViewForRole,
   VIEW_PATHS,
@@ -64,6 +67,16 @@ const App: React.FC = () => {
   });
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [darkMode, setDarkMode] = useState(() => readThemeFromSession());
+  // Appearance: Light / Dark are saved to the account (as before); System follows the device and is saved on it.
+  const [themePref, setThemePref] = useState<ThemePref>(() => (readThemePref() === 'system' ? 'system' : readThemeFromSession() ? 'dark' : 'light'));
+  useEffect(() => {
+    if (themePref !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const sync = () => setDarkMode(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, [themePref]);
   const [dbService] = useState(() => new UniversalDatabaseService());
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
@@ -137,10 +150,14 @@ const App: React.FC = () => {
       setUser(loggedInUser);
       supportRealtime.connect();
 
-      if (loggedInUser.theme === 'dark') {
+      if (readThemePref() === 'system') {
+        // System appearance: the device decides (see the themePref effect).
+      } else if (loggedInUser.theme === 'dark') {
         setDarkMode(true);
+        setThemePref('dark');
       } else if (loggedInUser.theme === 'light') {
         setDarkMode(false);
+        setThemePref('light');
       }
 
       if (loggedInUser.role === 'admin') {
@@ -315,7 +332,7 @@ const App: React.FC = () => {
     setVerifRejectionReason(undefined);
     clearStoredView();
     navigateView(ViewState.LANDING);
-    setDarkMode(false);
+    if (readThemePref() !== 'system') setDarkMode(false);
   };
 
   // Called when a rejected user resubmits a new document
@@ -475,6 +492,13 @@ const App: React.FC = () => {
     await dialog.alert("Profile updates are currently managed via account settings. Feature coming soon.");
   };
 
+  const chooseTheme = (pref: ThemePref) => {
+    writeThemePref(pref);
+    setThemePref(pref);
+    if (pref !== 'system') updateTheme(pref === 'dark');
+  };
+  const toggleThemePref = () => chooseTheme(darkMode ? 'light' : 'dark');
+
   const updateTheme = async (newDarkMode: boolean) => {
     setDarkMode(newDarkMode);
     if (user) {
@@ -491,13 +515,14 @@ const App: React.FC = () => {
   const isLoggedIn = user !== null;
   const phone = usePhone();
   const showNav = isLoggedIn && user?.role !== 'admin' && !(user?.role === 'user' && verifStatus !== 'verified');
+  // Sidebar: "Plan" (making posts) then "Account". `tour` keeps the walkthrough's anchors stable.
   const navItems = [
-    { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'] },
-    { id: ViewState.CALENDAR, label: 'Timeline', icon: ChartGantt, roles: ['user'] },
-    { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'] },
-    { id: ViewState.SOCIAL, label: 'Social', icon: Share2, roles: ['user'] },
-    { id: ViewState.BILLING, label: 'Billing', icon: CreditCard, roles: ['user'] },
-    { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'] },
+    { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'], group: 'Plan', tour: 'nav-support' },
+    { id: ViewState.CALENDAR, label: 'Calendar', icon: ChartGantt, roles: ['user'], group: 'Plan', tour: 'nav-timeline' },
+    { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'], group: 'Plan', tour: 'nav-insights' },
+    { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
+    { id: ViewState.SOCIAL, label: 'Channels', icon: Share2, roles: ['user'], group: 'Account', tour: 'nav-social' },
+    { id: ViewState.BILLING, label: 'Plan and billing', icon: CreditCard, roles: ['user'], group: 'Account', tour: 'nav-billing' },
   ].filter((item) => item.roles.includes(user?.role || ''));
 
   // A 'user' account that isn't verified yet must stay on the verification
@@ -587,11 +612,11 @@ const App: React.FC = () => {
             case ViewState.LANDING:
               return <LandingPage onNavigate={navigateView} />;
             case ViewState.LOGIN:
-              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} darkMode={darkMode} toggleTheme={() => toggleThemePref()} />;
             case ViewState.SIGNUP:
-              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} initialIsSignUp={true} darkMode={darkMode} toggleTheme={() => toggleThemePref()} />;
             case ViewState.ADMIN_LOGIN:
-              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} />;
+              return <Login onLogin={handleFreshLogin} onNavigate={navigateView} isAdminLogin={true} darkMode={darkMode} toggleTheme={() => toggleThemePref()} />;
             case ViewState.RESET_PASSWORD:
               return <ResetPassword token={resetToken} onNavigate={navigateView} />;
             case ViewState.VERIFICATION:
@@ -638,7 +663,7 @@ const App: React.FC = () => {
                 <AppHydrationLoader />
               );
             case ViewState.SETTINGS:
-              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
+              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:
               return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
             case ViewState.SOCIAL:
@@ -648,7 +673,7 @@ const App: React.FC = () => {
             case ViewState.SUPPORT_DASHBOARD:
               return <SupportDashboard />;
             case ViewState.ADMIN_DASHBOARD:
-              return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => updateTheme(!darkMode)} user={user} {...accountActions} /> : (
+              return (user && user.role === 'admin') ? <AdminDashboard darkMode={darkMode} toggleTheme={() => toggleThemePref()} user={user} {...accountActions} /> : (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <div className="text-center p-10">
                     <p className="font-semibold" style={{ color: 'var(--fg)' }}>Access Denied</p>
@@ -688,7 +713,11 @@ const App: React.FC = () => {
           onCreatePost={() => requestCalendar({ type: 'compose' })}
           onOpenPost={(postId, date) => requestCalendar({ type: 'open', postId, date })}
           darkMode={darkMode}
-          onToggleTheme={() => updateTheme(!darkMode)}
+          onToggleTheme={() => toggleThemePref()}
+          themePref={themePref}
+          onChooseTheme={chooseTheme}
+          onReplayTour={user.role === 'user' ? handleReplayTour : undefined}
+          businessName={brandProfile?.businessName || user.businessName}
         >
           <div className={pageClass}>{page}</div>
         </DashboardLayout>
@@ -699,7 +728,7 @@ const App: React.FC = () => {
         <LandingNav
           onNavigate={navigateView}
           darkMode={darkMode}
-          toggleTheme={() => updateTheme(!darkMode)}
+          toggleTheme={() => toggleThemePref()}
         />
       )}
       {!isAuthView && !adminConsole && !(view === ViewState.LANDING && !isLoggedIn) && (

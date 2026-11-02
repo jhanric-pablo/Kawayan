@@ -19,11 +19,19 @@ import HelpPanel from '../HelpPanel';
 import '../appShell.css';
 import { KawayanMark } from '../KawayanLogo';
 import { useFocusTrap } from '../../utils/useFocusTrap';
+import type { ThemePref } from '../../utils/sessionView';
+import { Transaction } from '../../services/paymentService';
+import { supportService } from '../../services/supportService';
+import type { Ticket } from '../../types';
 
 export interface NavItem {
   id: ViewState;
   label: string;
   icon: LucideIcon;
+  /** Sidebar group: "Plan" (making posts) or "Account". */
+  group?: string;
+  /** Walkthrough anchor (data-tour). */
+  tour?: string;
 }
 
 interface Props {
@@ -41,6 +49,12 @@ interface Props {
   /** Theme toggle in the top bar (same handler as Settings › Appearance). */
   darkMode?: boolean;
   onToggleTheme?: () => void;
+  /** Appearance choice for the account menu (Light / Dark / System). */
+  themePref?: ThemePref;
+  onChooseTheme?: (pref: ThemePref) => void;
+  onReplayTour?: () => void;
+  /** Brand profile name (falls back to the account's business name). */
+  businessName?: string;
   children: React.ReactNode;
 }
 
@@ -110,6 +124,7 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
     <div className="relative w-[200px] lg:w-[240px]" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--fg-muted)" strokeWidth={1.75} aria-hidden />
       <input
+        id="kw-post-search-input"
         type="search"
         value={q}
         placeholder="Search posts…"
@@ -128,8 +143,9 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
           if (e.key === 'Escape') setOpen(false);
           if (e.key === 'Enter' && hits[0]) pick(hits[0]);
         }}
-        className="h-[34px] w-full rounded-lg border border-(--border) bg-(--card) pl-9 pr-3 text-ui text-(--fg) outline-hidden transition-colors placeholder:text-(--fg-muted) hover:border-(--border-strong)"
+        className="h-[34px] w-full rounded-lg border border-(--border) bg-(--card) pl-9 pr-12 text-ui text-(--fg) outline-hidden transition-colors placeholder:text-(--fg-muted) hover:border-(--border-strong)"
       />
+      <kbd className="kw-kbd pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" aria-hidden>{MOD_KEY}K</kbd>
       {open && needle && (
         <div
           id="kw-post-search"
@@ -180,7 +196,7 @@ const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navig
 
 const ENGINE_DOT = { ok: 'bg-(--success)', warn: 'bg-(--amber)', down: 'bg-(--danger)', idle: 'bg-(--fg-subtle)' };
 
-const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account, onNavigate, onHome, onCreatePost, onOpenPost, darkMode, onToggleTheme, children }) => {
+const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account, onNavigate, onHome, onCreatePost, onOpenPost, darkMode, onToggleTheme, themePref, onChooseTheme, onReplayTour, businessName, children }) => {
   const toast = useToast();
   const isUser = user.role === 'user';
   const feed = useWorkspaceFeed(isUser ? user.id : undefined);
@@ -188,18 +204,34 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   const [noticeHidden, setNoticeHidden] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [plan, setPlan] = useState<SubscriptionTier | null>(null);
+  const [payments, setPayments] = useState<Transaction[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const expired = feed.accounts.filter((a) => !a.isActive);
 
   useEffect(() => {
     if (!isUser) return;
-    paymentService.getWalletData().then((w) => setPlan(w.subscription)).catch(() => setPlan('FREE'));
+    paymentService
+      .getWalletData()
+      .then((w) => {
+        setPlan(w.subscription);
+        setPayments(w.transactions || []);
+      })
+      .catch(() => setPlan('FREE'));
+    supportService.getAllTickets().then(setTickets).catch(() => undefined);
   }, [isUser]);
 
-  // Help opens from the sidebar, ⌘K / Ctrl+K anywhere, or the phone account menu (HELP_EVENT).
+  // ⌘K / Ctrl+K focuses post search (as in the mockup); Help opens from the sidebar, ⌘/ / Ctrl+/,
+  // or the phone account menu (HELP_EVENT).
   useEffect(() => {
     if (!isUser) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const box = document.getElementById('kw-post-search-input');
+        if (box) box.focus();
+        else setHelpOpen((o) => !o);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
         setHelpOpen((o) => !o);
       }
@@ -243,7 +275,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   const reconnect = () => socialService.connect(expired[0].platform).catch((e: any) => toast.error(e.message));
   const navButton = (item: NavItem) => ({
     type: 'button' as const,
-    'data-tour': `nav-${item.label.toLowerCase()}`,
+    'data-tour': item.tour ?? `nav-${item.label.toLowerCase()}`,
     'aria-current': view === item.id ? ('page' as const) : undefined,
     onClick: () => {
       setDrawerOpen(false);
@@ -253,19 +285,38 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
 
   const current = navItems.find((i) => i.id === view) ?? (view === ViewState.SURVEY ? { label: 'Brand DNA' } : undefined);
   const narrow = collapsed && !phone; // icon-only sidebar
+  const groupOf = (i: NavItem) => i.group ?? (ACCOUNT_VIEWS.has(i.id) ? 'Account' : 'Plan');
   const groups = [
-    { label: 'Workspace', items: navItems.filter((i) => !ACCOUNT_VIEWS.has(i.id)) },
-    { label: 'Account', items: navItems.filter((i) => ACCOUNT_VIEWS.has(i.id)) },
+    { label: isUser ? 'Plan' : 'Workspace', items: navItems.filter((i) => groupOf(i) !== 'Account') },
+    { label: 'Account', items: navItems.filter((i) => groupOf(i) === 'Account') },
   ].filter((g) => g.items.length);
-  const initial = (user.businessName || user.email)[0]?.toUpperCase();
+  const bizName = businessName || user.businessName || 'Kawayan';
+  const initials = bizName.split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'K';
+  const planLabel = plan === 'PRO' ? 'Pro plan' : plan === 'ENTERPRISE' ? 'Enterprise plan' : plan === 'FREE' ? 'Free plan' : '';
+  // Badges: drafts waiting (Post studio) and channel problems (Settings).
+  const today = new Date().toISOString().slice(0, 10);
+  const draftsWaiting = feed.posts.filter((p) => p.status === 'Draft' && p.date >= today).length;
+  const badgeFor = (id: ViewState): { n: number; danger?: boolean; label: string } | null => {
+    if (!isUser) return null;
+    if (id === ViewState.SETTINGS && expired.length) return { n: expired.length, danger: true, label: `${expired.length} channel problem${expired.length > 1 ? 's' : ''}` };
+    if (id === ViewState.STUDIO && draftsWaiting) return { n: draftsWaiting, label: `${draftsWaiting} draft${draftsWaiting > 1 ? 's' : ''} waiting` };
+    return null;
+  };
+  const now = new Date();
+  const monthName = now.toLocaleDateString('en-PH', { month: 'long' });
+  const resets = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 
   const sidebar = (
     <>
-      <button type="button" onClick={() => { setDrawerOpen(false); onHome(); }} className="kw-side__biz" aria-label="Kawayan home">
-        <span className="kw-side__logo" aria-hidden><KawayanMark /></span>
+      <button type="button" onClick={() => { setDrawerOpen(false); onHome(); }} className="kw-side__biz" aria-label={`${bizName}, home`}>
+        {isUser ? (
+          <span className="kw-side__logo kw-side__logo--biz" aria-hidden>{initials}</span>
+        ) : (
+          <span className="kw-side__logo" aria-hidden><KawayanMark /></span>
+        )}
         <span className="kw-side__label min-w-0 text-left">
-          <b className="block truncate">{user.businessName || 'Kawayan'}</b>
-          <small className="block truncate">{isUser ? 'Kawayan workspace' : user.role === 'support' ? 'Support' : 'Kawayan'}</small>
+          <b className="block truncate">{isUser ? bizName : user.businessName || 'Kawayan'}</b>
+          <small className="block truncate">{isUser ? planLabel || 'Kawayan workspace' : user.role === 'support' ? 'Support' : 'Kawayan'}</small>
         </span>
       </button>
 
@@ -274,27 +325,30 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           <div key={g.label}>
             <p className="kw-side__grp">{g.label}</p>
             <div className="kw-side__menu">
-              {g.items.map((item) => (
-                <SideTip key={item.id} label={item.label} show={narrow}>
-                  <button {...navButton(item)} aria-label={item.label} className="kw-side__item">
-                    <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                    <span className="kw-side__label">{item.label}</span>
-                  </button>
-                </SideTip>
-              ))}
-              {isUser && g.label === 'Account' && (
-                <SideTip label={`Ask AI / Help (${MOD_KEY}K)`} show={narrow}>
+              {g.items.map((item) => {
+                const badge = badgeFor(item.id);
+                return (
+                  <SideTip key={item.id} label={badge ? `${item.label} · ${badge.label}` : item.label} show={narrow}>
+                    <button {...navButton(item)} aria-label={badge ? `${item.label}, ${badge.label}` : item.label} className="kw-side__item">
+                      <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                      <span className="kw-side__label flex-1 text-left">{item.label}</span>
+                      {badge && <span className={clsx('kw-side__badge', badge.danger && 'is-danger')} aria-hidden>{badge.n}</span>}
+                    </button>
+                  </SideTip>
+                );
+              })}
+              {isUser && g.label === 'Account' && !navItems.some((i) => i.id === ViewState.HELP) && (
+                <SideTip label={`Help desk (${MOD_KEY}/)`} show={narrow}>
                   <button
                     type="button"
                     data-tour="help-button"
                     onClick={() => { setDrawerOpen(false); setHelpOpen((o) => !o); }}
                     aria-expanded={helpOpen}
-                    aria-label="Ask AI / Help"
+                    aria-label="Help desk"
                     className="kw-side__item"
                   >
                     <MessageSquare className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                    <span className="kw-side__label flex-1 text-left">Ask AI / Help</span>
-                    <kbd className="kw-side__label kw-kbd">{MOD_KEY}K</kbd>
+                    <span className="kw-side__label flex-1 text-left">Help desk</span>
                   </button>
                 </SideTip>
               )}
@@ -305,28 +359,36 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
 
       {/* Monthly post quota + posting engine */}
       {isUser && (
-        <SideTip label={`${engine.label} · ${used} of ${limit} posts used`} show={narrow}>
+        <SideTip label={`${monthName} posts ${used} / ${limit} · ${engine.label}`} show={narrow}>
           <div className="kw-side__quota card" data-tour="posts-used">
-            <p className="flex items-center gap-2 text-ui font-medium text-(--fg)">
+            <p className="kw-side__label flex items-center justify-between gap-2 text-ui">
+              <b className="font-medium text-(--fg)">{monthName} posts</b>
+              <span className="mono text-(--fg-muted)">{used} / {limit}</span>
+            </p>
+            <div className="kw-side__label h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label="Posts used this month" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used}>
+              <div className="h-full rounded-full bg-(--green)" style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
+            </div>
+            <p className="kw-side__label text-xs text-(--fg-muted)">Resets {resets}. Drafts count too.</p>
+            <p className="flex items-center gap-2 text-xs text-(--fg-muted)">
               <span className={clsx('inline-flex h-2 w-2 shrink-0 rounded-full', ENGINE_DOT[engine.tone])} aria-hidden />
               <span className="kw-side__label truncate">{engine.label}</span>
               <span className="sr-only">{engine.label}</span>
             </p>
-            <div className="kw-side__label">
-              <p className="mb-1.5 flex justify-between text-xs text-(--fg-muted)">
-                <span><b className="mono font-medium text-(--fg)">{used}</b> of <span className="mono">{limit}</span> posts used</span>
-                <span className="mono">{new Date().toLocaleDateString('en-PH', { month: 'short' })}</span>
-              </p>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label="Posts used this month" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used}>
-                <div className="h-full rounded-full bg-(--green)" style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
-              </div>
-            </div>
           </div>
         </SideTip>
       )}
 
       <div className={clsx('kw-side__me', !isUser && 'mt-auto')}>
-        <AccountMenu user={user} plan={plan} {...account} placement="sidebar" />
+        <AccountMenu
+          user={user}
+          plan={plan}
+          {...account}
+          placement="sidebar"
+          onHelpDesk={isUser ? () => (navItems.some((i) => i.id === ViewState.HELP) ? onNavigate(ViewState.HELP) : setHelpOpen(true)) : undefined}
+          onTour={onReplayTour}
+          themePref={themePref}
+          onChooseTheme={onChooseTheme}
+        />
       </div>
     </>
   );
@@ -360,7 +422,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           </button>
           <span className="kw-vr" aria-hidden />
           <nav aria-label="Breadcrumb" className="kw-crumb flex min-w-0">
-            <span className="hidden truncate sm:inline">{isUser ? 'Workspace' : user.role === 'support' ? 'Support' : 'Kawayan'}</span>
+            <span className="hidden truncate sm:inline">{isUser ? bizName : user.role === 'support' ? 'Support' : 'Kawayan'}</span>
             <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 sm:inline" aria-hidden />
             <b className="truncate" aria-current="page">{current?.label}</b>
           </nav>
@@ -375,7 +437,15 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
                   <Plus className="h-4 w-4" strokeWidth={2.25} aria-hidden />
                   <span className="hidden sm:inline">Create post</span>
                 </button>
-                <NotificationCenter userId={user.id} feed={feed} onOpenPost={openPost} />
+                <NotificationCenter
+                  userId={user.id}
+                  feed={feed}
+                  onOpenPost={openPost}
+                  payments={payments}
+                  tickets={tickets}
+                  onOpenTicket={() => (navItems.some((i) => i.id === ViewState.HELP) ? onNavigate(ViewState.HELP) : setHelpOpen(true))}
+                  onOpenSettings={() => onNavigate(ViewState.SETTINGS)}
+                />
               </>
             )}
             {onToggleTheme && (
