@@ -9,6 +9,7 @@ import UniversalDatabaseService from '../services/universalDatabaseService';
 import { GeneratedPost } from '../types';
 import { useToast } from './ui/Toast';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { PostChannels, postChannelsKey, readStored } from '../utils/workspaceFeed';
 import { FacebookGlyph, InstagramGlyph } from './SocialAccounts';
 import {
   COMPARE_METRICS, Day, Platform, PlatformFilter, PLATFORM_NAMES, PostStats,
@@ -16,8 +17,11 @@ import {
 } from '../utils/insightsData';
 import './insights.css';
 
-const RANGES = [7, 30, 90] as const;
+// 'year' = since January 1 (mockup "This year"); the numbers are "last N days".
+const RANGES = [7, 30, 90, 'year'] as const;
 type Range = (typeof RANGES)[number];
+const RANGE_LABEL: Record<string, string> = { 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days', year: 'This year' };
+const dayOfYear = (d: Date) => Math.max(1, Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 864e5) + 1);
 type ChartMetric = 'followers' | 'reach' | 'interactions';
 type SortKey = 'date' | 'reach' | 'interactions' | 'clicks' | 'engagementRate';
 
@@ -60,15 +64,28 @@ const Delta: React.FC<{ change: number; points?: boolean }> = ({ change, points 
 };
 
 const Spark: React.FC<{ values: number[] }> = ({ values }) => {
+  if (values.length < 2) return <svg className="in-spark" viewBox="0 0 100 30" aria-hidden />;
   const min = Math.min(...values);
   const range = Math.max(...values) - min || 1;
-  const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1)) * 100},${27 - ((v - min) / range) * 24}`).join(' ');
+  const pts = values.map((v, i) => [(i / Math.max(values.length - 1, 1)) * 100, 27 - ((v - min) / range) * 24]);
+  const line = pts.map(([x, y]) => `${x},${y}`).join(' ');
   return (
     <svg className="in-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden>
-      <polyline points={points} fill="none" stroke="var(--green)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <polygon points={`0,30 ${line} 100,30`} fill="var(--green-soft)" />
+      <polyline points={line} fill="none" stroke="var(--green)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 };
+
+/** Day parts for "Best time to post". */
+const DAY_PARTS = [
+  { name: 'early morning', range: '5–9 AM', from: 5, to: 9 },
+  { name: 'late morning', range: '9 AM–12 NN', from: 9, to: 12 },
+  { name: 'lunchtime', range: '12–2 PM', from: 12, to: 14 },
+  { name: 'afternoon', range: '2–5 PM', from: 14, to: 17 },
+  { name: 'early evening', range: '5–8 PM', from: 17, to: 20 },
+  { name: 'night', range: '8 PM–12 MN', from: 20, to: 24 },
+];
 
 const Thumb: React.FC<{ post: PostStats; className?: string }> = ({ post, className = 'in-thumb' }) => (
   <span className={className}>{post.imageUrl ? <img src={post.imageUrl} alt="" loading="lazy" /> : <ImageIcon aria-hidden />}</span>
@@ -129,7 +146,7 @@ const DownloadMenu: React.FC<{ caption: string; items: DownloadItem[]; onDone: (
   return (
     <div className="in-dl" ref={wrapRef}>
       <button ref={buttonRef} type="button" className="btn btn-outline btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <Download className="w-3.5 h-3.5" /> Download <ChevronDown className="w-3.5 h-3.5" />
+        <Download className="w-3.5 h-3.5" /> Export CSV <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div className="in-dl__menu" role="menu" aria-label="Download data" onKeyDown={moveFocus}>
@@ -267,9 +284,10 @@ const CompareDialog: React.FC<{ posts: PostStats[]; caption: string; onClose: ()
 const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
   const toast = useToast();
   const [today] = useState(() => new Date());
-  const [days, setDays] = useState<Range>(30);
+  const [range, setRange] = useState<Range>(30);
+  const days = range === 'year' ? dayOfYear(today) : range;
   const [filter, setFilter] = useState<PlatformFilter>('all');
-  const [metric, setMetric] = useState<ChartMetric>('followers');
+  const [metric, setMetric] = useState<ChartMetric>('reach');
   const [posts, setPosts] = useState<GeneratedPost[] | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'date', dir: -1 });
   const [selected, setSelected] = useState<string[]>([]);
@@ -315,6 +333,42 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
     (a, b) => (sort.key === 'date' ? a.date.localeCompare(b.date) : (a[sort.key] as number) - (b[sort.key] as number)) * sort.dir,
   );
   const topId = rows.length > 1 ? comparePosts(rows).winner.id : null;
+
+  // Avg reach score: the AI scores of the owner's real posts in this period vs the period before.
+  const scoreIn = (from: string, to: string) => {
+    const scored = (posts || []).filter((p) => p.date >= from && p.date <= to && typeof p.viralityScore === 'number');
+    return scored;
+  };
+  const curFrom = current[0]?.date ?? '', curTo = current[current.length - 1]?.date ?? '';
+  const prevFrom = previous[0]?.date ?? '', prevTo = previous[previous.length - 1]?.date ?? '';
+  const scoredNow = scoreIn(curFrom, curTo).sort((a, b) => a.date.localeCompare(b.date));
+  const scoredPrev = scoreIn(prevFrom, prevTo);
+  const avg = (list: GeneratedPost[]) => (list.length ? Math.round(list.reduce((sum, p) => sum + (p.viralityScore || 0), 0) / list.length) : null);
+  const avgNow = avg(scoredNow);
+  const avgPrev = avg(scoredPrev);
+
+  // Best time to post: the day part whose posts reached the most people on average.
+  // Uses the time each post went out (or was scheduled for) on this device; needs 3+ such posts.
+  const channels = readStored<PostChannels>(postChannelsKey(userId), {});
+  const timed = rows
+    .filter((r) => !r.example)
+    .map((r) => {
+      const post = (posts || []).find((p) => p.id === r.id);
+      const iso = post?.publishedAt || channels[r.id]?.at;
+      const hour = iso ? new Date(iso).getHours() : null;
+      return hour == null || Number.isNaN(hour) ? null : { hour, reach: r.reach };
+    })
+    .filter((x): x is { hour: number; reach: number } => !!x);
+  const bestPart = (() => {
+    if (timed.length < 3) return null;
+    const scored = DAY_PARTS.map((part) => {
+      const inPart = timed.filter((t) => t.hour >= part.from && t.hour < part.to);
+      return { part, n: inPart.length, avg: inPart.length ? inPart.reduce((s2, t) => s2 + t.reach, 0) / inPart.length : 0 };
+    }).filter((x) => x.n > 0);
+    return scored.sort((a, b) => b.avg - a.avg)[0] ?? null;
+  })();
+  const reachTotals = byPlatform.map(({ platform, reach }) => ({ platform, total: reach.current, change: reach.change }));
+  const reachMax = Math.max(...reachTotals.map((r) => r.total), 1);
   const maxRate = Math.max(...rows.map((r) => r.engagementRate), 1);
 
   // Only posts still on screen count, so switching the period or platform drops the rest.
@@ -395,13 +449,9 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           <p className="page-head__sub">How your pages are growing and which posts work best.</p>
         </div>
         <div className="in-controls">
-          <div className="in-seg" role="group" aria-label="Period">
-            {RANGES.map((r) => (
-              <button key={r} type="button" aria-pressed={days === r} aria-label={`Last ${r} days`} onClick={() => setDays(r)}>
-                {r}D
-              </button>
-            ))}
-          </div>
+          <select className="input h-9! w-auto! min-h-0! py-0" aria-label="Date range" value={String(range)} onChange={(e) => setRange((e.target.value === 'year' ? 'year' : Number(e.target.value)) as Range)}>
+            {RANGES.map((r) => <option key={r} value={String(r)}>{RANGE_LABEL[r]}</option>)}
+          </select>
           <div className="in-seg" role="group" aria-label="Platform">
             <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
             {(['facebook', 'instagram'] as Platform[]).map((p) => {
@@ -413,7 +463,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
               );
             })}
           </div>
-          <DownloadMenu caption={`Last ${days} days · ${scopeName}`} items={downloads} onDone={(name) => toast.success(`Downloaded ${name}`)} />
+          <DownloadMenu caption={`${RANGE_LABEL[range]} · ${scopeName}`} items={downloads} onDone={(name) => toast.success(`Downloaded ${name}`)} />
         </div>
       </div>
 
@@ -424,7 +474,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
       </p>
 
       <div className="in-kpis">
-        {kpis.map((k) => (
+        {kpis.filter((k) => k.key !== 'rate').map((k) => (
           <div key={k.key} className="surface in-kpi">
             <div className="in-kpi__top">
               <span className="in-kpi__label">{k.label}</span>
@@ -437,14 +487,29 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
             <Spark values={current.map((d) => (k.key === 'rate' ? (d.reach ? d.interactions / d.reach : 0) : d[k.key]))} />
           </div>
         ))}
+        <div className="surface in-kpi">
+          <div className="in-kpi__top">
+            <span className="in-kpi__label">Avg reach score</span>
+            {avgNow != null && avgPrev != null && (
+              <span className={`in-delta ${avgNow > avgPrev ? 'is-up' : avgNow < avgPrev ? 'is-down' : 'is-flat'}`}>
+                {avgNow >= avgPrev ? '+' : '−'}{Math.abs(avgNow - avgPrev)}
+              </span>
+            )}
+          </div>
+          <div className="in-kpi__value">{avgNow ?? '—'}</div>
+          <div className="in-kpi__prev">
+            {avgNow == null ? 'No scored posts in this period' : avgPrev != null ? <>Previous<span className="in-hide-sm"> period</span> <b>{avgPrev}</b></> : `From ${scoredNow.length} post${scoredNow.length > 1 ? 's' : ''}`}
+          </div>
+          <Spark values={scoredNow.map((p) => p.viralityScore || 0)} />
+        </div>
       </div>
 
       <div className="in-grid">
         <section className="surface in-card">
           <div className="in-card__head">
             <div>
-              <h2>Growth</h2>
-              <p>The last {days} days against the {days} days before.</p>
+              <h2>Daily {CHART_METRICS.find((m) => m.key === metric)!.label.toLowerCase()}</h2>
+              <p>{RANGE_LABEL[range]} against the {days} days before.</p>
             </div>
             <div className="in-seg" role="group" aria-label="Chart metric">
               {CHART_METRICS.map((m) => (
@@ -482,7 +547,13 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                 strokeWidth={2}
                 fill="var(--green-soft)"
                 fillOpacity={1}
-                dot={false}
+                dot={(props: any) =>
+                  props.index === chartData.length - 1 ? (
+                    <circle key="last" cx={props.cx} cy={props.cy} r={4} fill="var(--green)" stroke="var(--card)" strokeWidth={2} />
+                  ) : (
+                    <g key={props.index} />
+                  )
+                }
                 activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--green)' }}
               />
             </AreaChart>
@@ -493,9 +564,22 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           <div className="in-card__head">
             <div>
               <h2>By platform</h2>
-              <p>Previous → current, last {days} days.</p>
+              <p>Reach, {RANGE_LABEL[range].toLowerCase()}.</p>
             </div>
           </div>
+          <div className="in-hbar">
+            {reachTotals.map(({ platform, total }) => {
+              const Glyph = GLYPHS[platform];
+              return (
+                <div key={platform} className="in-hbar__row">
+                  <span className="in-hbar__name"><Glyph className="w-3.5 h-3.5" /> {PLATFORM_NAMES[platform]}</span>
+                  <span className="in-hbar__track" aria-hidden><i style={{ width: `${(total / reachMax) * 100}%` }} /></span>
+                  <span className="mono text-right">{compact.format(total)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <hr className="my-4 border-(--border)" />
           <div className="in-plat">
             {byPlatform.map(({ platform, followers, reach }) => {
               const Glyph = GLYPHS[platform];
@@ -515,6 +599,15 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
               );
             })}
           </div>
+          <hr className="my-4 border-(--border)" />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-(--fg)">Best time to post</span>
+            <p className="text-sm text-(--fg-muted)">
+              {bestPart
+                ? <>Your posts that went out in the <b className="text-(--fg)">{bestPart.part.name} ({bestPart.part.range})</b> reached the most people, about {num(bestPart.avg)} each.</>
+                : 'Kawayan suggests a time once at least 3 of your posts in this period have gone out.'}
+            </p>
+          </div>
         </section>
       </div>
 
@@ -523,8 +616,14 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           <div>
             <h2>Post performance</h2>
             <p>
-              {posts ? `${rows.length} posts from the last ${days} days.` : 'Loading your posts…'} Tick up to {MAX_COMPARE} to compare them side by side.
+              {posts ? `${rows.length} posts, ${RANGE_LABEL[range].toLowerCase()}.` : 'Loading your posts…'} Tick up to {MAX_COMPARE} to compare them side by side.
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-(--fg-muted)">{selectedPosts.length < 2 ? `Pick ${2 - selectedPosts.length} to compare` : `${selectedPosts.length} picked`}</span>
+            <button type="button" className="btn btn-outline btn-sm" disabled={selectedPosts.length < 2} onClick={() => setComparing(true)}>
+              <GitCompareArrows className="w-3.5 h-3.5" /> Compare
+            </button>
           </div>
         </div>
         <div className="in-table-wrap">
@@ -532,18 +631,20 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
             <thead>
               <tr>
                 <th><span className="sr-only">Compare</span></th>
-                {sortTh('date', 'Post', 'is-left')}
+                <th className="is-left">Post</th>
+                {sortTh('date', 'Posted', 'in-hide-sm')}
                 {sortTh('reach', 'Reach', 'in-hide-sm')}
                 {sortTh('interactions', 'Interactions', 'in-hide-sm')}
-                {sortTh('clicks', 'Link clicks', 'in-hide-sm')}
+                {sortTh('clicks', 'Link clicks', 'in-hide-sm in-hide-md')}
                 {sortTh('engagementRate', 'Eng. rate')}
+                <th>Score</th>
               </tr>
             </thead>
             <tbody>
               {posts === null
                 ? [0, 1, 2].map((i) => (
                     <tr key={i} className="is-locked">
-                      <td colSpan={6}><div className="in-skel" /></td>
+                      <td colSpan={8}><div className="in-skel" /></td>
                     </tr>
                   ))
                 : sorted.map((p) => {
@@ -580,14 +681,18 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                             </div>
                           </div>
                         </td>
+                        <td className="in-hide-sm mono">{shortDate(p.date)}</td>
                         <td className="in-hide-sm">{num(p.reach)}</td>
                         <td className="in-hide-sm">{num(p.interactions)}</td>
-                        <td className="in-hide-sm">{num(p.clicks)}</td>
+                        <td className="in-hide-sm in-hide-md">{num(p.clicks)}</td>
                         <td>
                           <span className="in-rate">
                             <span className="in-rate__bar in-hide-sm"><b style={{ width: `${(p.engagementRate / maxRate) * 100}%` }} /></span>
                             {pct(p.engagementRate)}
                           </span>
+                        </td>
+                        <td>
+                          {p.viralityScore != null ? <span className={`badge mono ${p.viralityScore >= 75 ? 'badge-green' : ''}`}>{p.viralityScore}</span> : <span className="text-(--fg-muted)">—</span>}
                         </td>
                       </tr>
                     );
@@ -617,7 +722,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
       {comparing && selectedPosts.length >= 2 && (
         <CompareDialog
           posts={selectedPosts}
-          caption={`${scopeName}, last ${days} days. Engagement rate decides the most effective post.`}
+          caption={`${scopeName}, ${RANGE_LABEL[range].toLowerCase()}. Engagement rate decides the most effective post.`}
           onClose={closeCompare}
         />
       )}

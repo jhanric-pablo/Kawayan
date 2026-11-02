@@ -256,3 +256,11 @@
   .in-tray, .in-dl__menu, .in-skel { animation: none; }
   .in-cmp__bar b { transition: none; }
 }
+
+/* By platform: horizontal bars (mockup .hbar) */
+.in-hbar { display: flex; flex-direction: column; gap: 12px; }
+.in-hbar__row { display: grid; grid-template-columns: 96px 1fr 52px; gap: 10px; align-items: center; font-size: var(--text-ui); }
+.in-hbar__name { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
+.in-hbar__track { height: 10px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.in-hbar__track i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+@media (max-width: 1279px) { .in-hide-md { display: none; } }

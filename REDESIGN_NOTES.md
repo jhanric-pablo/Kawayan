@@ -344,12 +344,12 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Existing planning modal behaviour (ideas list, edit/delete idea, batch create) — **have** (kept on the page)
 
 ## D. Insights
-- [ ] Header: date range select (Last 7 days / Last 30 days / This year) + Export CSV (existing downloads) — **FE** (90 days stays as an option)
-- [ ] KPI cards with sparkline + change: Followers, Reach, Interactions, Avg reach score — **FE** (Avg reach score from real post scores; the engagement-rate card moves into the table/compare)
-- [ ] "Daily reach" chart: green line + soft area, dashed previous, axis labels, dot on last point, legend — **FE** (recharts; metric switch kept)
-- [ ] "By platform": horizontal bars with totals — **FE**
-- [ ] "Best time to post": one sentence from the posts' day part with the highest average reach — **FE** (only when enough posts have a known time; otherwise hidden)
-- [ ] Post performance table: thumbnail + title, posted, reach, interactions, score badge (green 75+), checkboxes, "Pick 2 to compare", Compare → existing compare view — **FE**
+- [x] Header: date range select (Last 7 days / Last 30 days / This year) + Export CSV (existing downloads) — **FE** (90 days stays as an option)
+- [x] KPI cards with sparkline + change: Followers, Reach, Interactions, Avg reach score — **FE** (Avg reach score from real post scores; the engagement-rate card moves into the table/compare)
+- [x] "Daily reach" chart: green line + soft area, dashed previous, axis labels, dot on last point, legend — **FE** (recharts; metric switch kept)
+- [x] "By platform": horizontal bars with totals — **FE**
+- [x] "Best time to post": one sentence from the posts' day part with the highest average reach — **FE** (only when enough posts have a known time; otherwise hidden)
+- [x] Post performance table: thumbnail + title, posted, reach, interactions, score badge (green 75+), checkboxes, "Pick 2 to compare", Compare → existing compare view — **FE**
 - [x] "Demo data, generated for each account" note — **have**
 
 ## E. Post studio page
@@ -444,3 +444,16 @@ The existing ideas list (edit title, remove, write posts for them) stays on the 
 prompt; the `/api/ai/text` request is unchanged, so older callers work as before. "Plan <next
 month>", the toolbar "Plan month", the empty-month pitch and Up next now open this page; the
 planner dialog component is still there (used if the page isn't wired).
+
+**D — Insights.** Date range select (Last 7 / 30 / 90 days, This year) replaces the 7D/30D/90D
+buttons (platform filter kept); "Export CSV" is the existing download menu (posts CSV, growth CSV,
+full JSON report). KPI cards: Followers, Reach, Interactions (demo history, as before) and a new
+Avg reach score from the owner's real post scores in the period vs the period before (hidden change
+when the earlier period has none); every card has a green sparkline with a soft fill. The chart is
+"Daily reach" by default (metric switch kept), with a dot on the last point. "By platform": reach
+bars with totals, then the existing followers/reach lines. "Best time to post": the day part with
+the highest average reach among posts whose publish/schedule time is known on this device; hidden
+behind a plain message until 3+ such posts exist. Table: Post, Posted, Reach, Interactions, Link
+clicks (wide screens), Eng. rate, Score badge (green at 75+), checkboxes, "Pick 2 to compare" and a
+Compare button in the card header (the compare tray stays). The engagement-rate KPI card moved out
+of the KPI row; the rate stays in the table, compare view and exports.
