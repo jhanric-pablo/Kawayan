@@ -85,7 +85,7 @@ const STRATEGY_PRESETS = [
 
 const LABEL = 'eyebrow text-(--fg-subtle)';
 const INPUT =
-  'w-full rounded-lg border border-(--border) bg-(--bg-alt) px-3 py-2 text-ui text-(--fg) outline-hidden transition-colors focus:border-brand focus:ring-2 focus:ring-(--ring) read-only:opacity-70';
+  'w-full rounded-lg border border-(--border) bg-(--bg-alt) px-3 py-2 text-ui text-(--fg) outline-hidden transition-colors focus:border-(--green) focus:ring-2 focus:ring-(--ring) read-only:opacity-70';
 
 interface CapsuleProps {
   idea: ContentIdea;
@@ -116,8 +116,8 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
           className={clsx(
             'block w-full rounded-xl border border-dashed p-2 pr-7 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-(--ring)',
             chip?.busy
-              ? 'border-brand bg-brand/15 ring-2 ring-brand/40'
-              : 'border-brand/60 bg-brand/[0.07] hover:border-brand hover:bg-brand/12 data-popup-open:border-brand data-popup-open:bg-brand/12',
+              ? 'border-(--green) bg-(--green-soft) ring-2 ring-(--green)'
+              : 'border-(--green) bg-(--green-soft) hover:border-(--green) hover:bg-(--green-soft) data-popup-open:border-(--green) data-popup-open:bg-(--green-soft)',
             locked && !chip?.busy && 'opacity-70',
           )}
         >
@@ -133,7 +133,7 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
           initialFocus={mode === 'move' ? dayRef : titleRef}
           className="w-[min(92vw,320px)] gap-3 rounded-2xl p-4"
         >
-          <PopoverTitle className="font-sans text-sm font-bold">{mode === 'move' ? 'Reschedule idea' : 'Edit idea'}</PopoverTitle>
+          <PopoverTitle className="font-sans text-sm font-semibold">{mode === 'move' ? 'Reschedule idea' : 'Edit idea'}</PopoverTitle>
           {mode !== 'move' && (
             <>
               <label className="block space-y-1">
@@ -157,7 +157,7 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
             </select>
           </label>
           <div className="flex items-center justify-between pt-1">
-            <button type="button" onClick={() => { setMode(null); onWrite(); }} className="inline-flex items-center gap-1 text-ui font-semibold text-(--primary) hover:underline">
+            <button type="button" onClick={() => { setMode(null); onWrite(); }} className="inline-flex items-center gap-1 text-ui font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
               Write now <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
             <PopoverClose className={clsx(PRIMARY_BTN, 'px-4 py-1.5 text-ui')}>Done</PopoverClose>
@@ -335,7 +335,7 @@ const PlanningModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-90 flex items-center justify-center sm:p-6" role="presentation">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in motion-reduce:animate-none" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/45 animate-fade-in motion-reduce:animate-none" onClick={onClose} aria-hidden="true" />
 
       <div
         ref={dialogRef}
@@ -343,16 +343,16 @@ const PlanningModal: React.FC<Props> = ({
         aria-modal="true"
         aria-labelledby="planning-title"
         tabIndex={-1}
-        className="relative flex h-full w-full max-w-[1280px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-[min(92vh,880px)] sm:rounded-2xl sm:border sm:border-(--border-strong) sm:shadow-2xl"
+        className="relative flex h-full w-full max-w-[1280px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-[min(92vh,880px)] sm:rounded-xl sm:border sm:border-(--border) sm:shadow-lg"
       >
         {/* ── Header ── */}
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
-          <h2 id="planning-title" className="font-display text-xl font-bold tracking-tight">Plan your month</h2>
-          <span className="rounded-full border border-badge-border bg-badge px-2.5 py-1 text-xs font-bold text-badge-text">{monthLabel}</span>
+          <h2 id="planning-title" className="text-xl font-semibold tracking-tight">Plan your month</h2>
+          <span className="badge badge-sage mono">{monthLabel}</span>
           <span className="text-xs text-(--fg-muted)">{planLabel} plan</span>
           <div className="ml-auto flex items-center gap-2.5 text-xs text-(--fg-muted)">
-            <span className="h-1.5 w-24 overflow-hidden rounded-full bg-(--border-strong)" aria-hidden>
-              <b className="block h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${usagePct}%` }} />
+            <span className="h-1.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" aria-hidden>
+              <b className="block h-full rounded-full bg-(--green)" style={{ width: `${usagePct}%` }} />
             </span>
             <span className="tabular-nums">{monthlyPostCount} of {batchPostCount} posts used</span>
           </div>
@@ -370,7 +370,7 @@ const PlanningModal: React.FC<Props> = ({
           {/* ── Campaign strategy ── */}
           <aside className="space-y-6 border-b border-(--border) px-5 py-5 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
             {trialLimitReached && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3.5 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300" role="status">
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-transparent bg-(--amber-soft) px-3.5 py-2.5 text-ui text-(--amber)" role="status">
                 <CircleAlert className="h-4 w-4 shrink-0" /> You’ve used all {batchPostCount} posts for {monthName}.
                 {planLabel !== 'Pro' && (
                   <button type="button" className="ml-auto font-semibold underline" onClick={onOpenBilling}>Upgrade to Pro</button>
@@ -379,7 +379,7 @@ const PlanningModal: React.FC<Props> = ({
             )}
 
             {scheduleRange.minDay > 1 && scheduleRange.maxDay - scheduleRange.minDay + 1 <= 5 && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3.5 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300" role="status">
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-transparent bg-(--amber-soft) px-3.5 py-2.5 text-ui text-(--amber)" role="status">
                 <CircleAlert className="h-4 w-4 shrink-0" />
                 Only {scheduleRange.maxDay - scheduleRange.minDay + 1} day{scheduleRange.maxDay - scheduleRange.minDay === 0 ? '' : 's'} left in {monthName}.
                 <button type="button" className="ml-auto font-semibold underline" onClick={onPlanNextMonth} disabled={busy}>
@@ -390,7 +390,7 @@ const PlanningModal: React.FC<Props> = ({
 
             <section className="space-y-2">
               <label className={LABEL} htmlFor="pl-focus">Focus for {monthName}</label>
-              <div className="rounded-xl border border-(--border) bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] p-4 transition-colors focus-within:border-brand focus-within:ring-2 focus-within:ring-(--ring)">
+              <div className="rounded-xl border border-(--border) bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] p-4 transition-colors focus-within:border-(--green) focus-within:ring-2 focus-within:ring-(--ring)">
                 <TextareaAutosize
                   id="pl-focus"
                   minRows={3}
@@ -416,10 +416,10 @@ const PlanningModal: React.FC<Props> = ({
                     disabled={busy}
                     onClick={() => onStrategyChange(focus === s ? '' : s)}
                     className={clsx(
-                      'rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
+                      'h-[30px] rounded-full border px-3 text-ui transition-colors disabled:opacity-50',
                       focus === s
-                        ? 'border-brand/60 bg-brand/10 text-(--primary)'
-                        : 'border-(--border) bg-(--bg-alt) text-(--fg-muted) hover:border-(--border-strong) hover:text-(--fg)',
+                        ? 'border-transparent bg-(--green-soft) font-medium text-(--green-ink)'
+                        : 'border-(--border) bg-(--card) text-(--fg) hover:bg-(--muted)',
                     )}
                   >
                     {s}
@@ -455,10 +455,10 @@ const PlanningModal: React.FC<Props> = ({
                   <li key={step.title} className="flex gap-3">
                     <span
                       className={clsx(
-                        'grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold',
-                        step.state === 'done' && 'border-transparent bg-brand text-on-brand',
-                        step.state === 'busy' && 'border-brand text-(--primary)',
-                        step.state === 'active' && 'border-brand text-(--primary)',
+                        'grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-semibold',
+                        step.state === 'done' && 'border-transparent bg-(--green) text-(--green-fg)',
+                        step.state === 'busy' && 'border-(--green) text-(--primary)',
+                        step.state === 'active' && 'border-(--green) text-(--primary)',
                         step.state === 'todo' && 'border-(--border-strong) text-(--fg-subtle)',
                       )}
                     >
@@ -473,7 +473,7 @@ const PlanningModal: React.FC<Props> = ({
               </ol>
               <div className="rounded-xl border border-(--border) bg-(--card) p-3.5 text-ui leading-relaxed text-(--fg-muted)">
                 <p className="mb-1 flex items-center justify-between font-semibold text-(--fg)">
-                  Target dates <span className="font-display text-(--primary)">{rangeText}</span>
+                  Target dates <span className="mono text-(--fg)">{rangeText}</span>
                 </p>
                 {planCount} idea{planCount === 1 ? '' : 's'} across {openDays.length} open day{openDays.length === 1 ? '' : 's'}, one per day
                 {days.some((d) => postStatusByDay[d]) && ', around the days that already have posts'}. You can edit every idea before any post is made.
@@ -484,7 +484,7 @@ const PlanningModal: React.FC<Props> = ({
           {/* ── Multi-channel batch timeline ── */}
           <main className="flex min-w-0 flex-col lg:min-h-0">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 pt-5 sm:px-6" aria-live="polite">
-              <h3 className="text-sm font-bold">
+              <h3 className="text-sm font-semibold">
                 {planning ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-(--primary)" />
@@ -535,7 +535,7 @@ const PlanningModal: React.FC<Props> = ({
                   <b>Writing post {Math.min(batchProgress!.current + 1, batchProgress!.total)} of {batchProgress!.total}</b> · captions and visuals
                 </span>
                 <span className="h-1.5 w-40 overflow-hidden rounded-full bg-(--border-strong)" aria-hidden>
-                  <b className="block h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${batchProgress!.total ? (batchProgress!.current / batchProgress!.total) * 100 : 0}%` }} />
+                  <b className="block h-full rounded-full bg-(--green)" style={{ width: `${batchProgress!.total ? (batchProgress!.current / batchProgress!.total) * 100 : 0}%` }} />
                 </span>
               </div>
             ) : planning ? (

@@ -49,7 +49,7 @@ const PostCountPicker: React.FC<Props> = ({ value, max, onChange, disabled, open
           <button type="button" onClick={() => set(value - 1)} disabled={disabled || value <= 1} aria-label="One fewer post" className="grid h-9 w-9 place-items-center text-(--fg-muted) hover:text-(--fg) disabled:opacity-40">
             <Minus className="h-4 w-4" aria-hidden />
           </button>
-          <output className="min-w-10 text-center text-lg font-bold tabular-nums" aria-live="polite">{value}</output>
+          <output className="min-w-10 text-center text-lg font-semibold tabular-nums" aria-live="polite">{value}</output>
           <button type="button" onClick={() => set(value + 1)} disabled={disabled || value >= max} aria-label="One more post" className="grid h-9 w-9 place-items-center text-(--fg-muted) hover:text-(--fg) disabled:opacity-40">
             <Plus className="h-4 w-4" aria-hidden />
           </button>
@@ -76,7 +76,7 @@ const PostCountPicker: React.FC<Props> = ({ value, max, onChange, disabled, open
             onClick={() => set(p.n)}
             className={clsx(
               'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
-              value === p.n ? 'border-(--primary) bg-(--kw-green-pale) text-(--primary)' : 'border-(--border) bg-(--card) text-(--fg-muted) hover:text-(--fg)',
+              value === p.n ? 'border-(--primary) bg-(--green-soft) text-(--primary)' : 'border-(--border) bg-(--card) text-(--fg-muted) hover:text-(--fg)',
             )}
           >
             {p.label} <span className="tabular-nums opacity-70">{p.n}</span>
@@ -93,7 +93,7 @@ const PostCountPicker: React.FC<Props> = ({ value, max, onChange, disabled, open
               title={`Day ${d}`}
               className={clsx(
                 'h-3 min-w-0 flex-1 rounded-[3px] transition-colors duration-200',
-                d < minDay ? 'bg-(--border) opacity-40' : takenDays.has(d) ? 'bg-(--fg-subtle)' : picked.has(d) ? 'bg-(--primary)' : 'bg-(--border)',
+                d < minDay ? 'bg-(--border) opacity-40' : takenDays.has(d) ? 'bg-(--fg-subtle)' : picked.has(d) ? 'bg-(--green)' : 'bg-(--border)',
               )}
             />
           ))}

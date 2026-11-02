@@ -20,7 +20,7 @@ import { useFocusTrap } from '../../utils/useFocusTrap';
 
 /** The frameless writing surface: one hairline, emerald when focused. */
 const FIELD =
-  'rounded-xl border border-(--border) bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] transition-colors focus-within:border-brand focus-within:ring-2 focus-within:ring-(--ring)';
+  'rounded-xl border border-(--border) bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] transition-colors focus-within:border-(--green) focus-within:ring-2 focus-within:ring-(--ring)';
 const CHIP =
   'inline-flex items-center gap-1.5 rounded-md border border-(--border) bg-(--card) px-2.5 py-1.5 text-xs font-semibold text-(--fg-muted) transition-colors hover:border-(--border-strong) hover:text-(--fg) disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 export const PRIMARY_BTN =
@@ -53,8 +53,8 @@ const Step: React.FC<{ n: number; title: string; state: StepState; summary?: Rea
     <div className="flex items-center gap-3 px-4 py-3">
       <span
         className={clsx(
-          'grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold',
-          state === 'done' ? 'bg-(--primary) text-(--on-accent)' : state === 'active' ? 'bg-(--kw-green-pale) text-(--primary)' : 'bg-(--bg-alt) text-(--fg-subtle)',
+          'mono grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-medium',
+          state === 'done' ? 'bg-(--green) text-(--green-fg)' : state === 'active' ? 'bg-(--fg) text-(--bg)' : 'bg-(--muted) text-(--fg-muted)',
         )}
       >
         {state === 'done' ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : n}
@@ -66,9 +66,9 @@ const Step: React.FC<{ n: number; title: string; state: StepState; summary?: Rea
     {children && (
       // Unfolds when a step opens (e.g. once the AI has written the caption).
       <m.div
-        initial={{ height: 0, opacity: 0 }}
-        animate={{ height: 'auto', opacity: 1 }}
-        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+        initial={{ y: -4, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
         className="overflow-hidden"
       >
         <div className="border-t border-(--border) px-4 py-4">{children}</div>
@@ -102,7 +102,7 @@ const GeneratingSteps: React.FC = () => {
           <span
             className={clsx(
               'grid h-5 w-5 place-items-center rounded-full border',
-              i < step ? 'border-transparent bg-brand text-on-brand' : i === step ? 'border-(--primary) text-(--primary)' : 'border-(--border-strong)',
+              i < step ? 'border-transparent bg-(--green) text-(--green-fg)' : i === step ? 'border-(--fg) text-(--fg)' : 'border-(--border-strong)',
             )}
           >
             {i < step ? <Check className="h-3 w-3" strokeWidth={3} /> : i === step ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
@@ -487,11 +487,11 @@ const PostComposer: React.FC<Props> = ({
     <span className="inline-flex items-center gap-1 [&_svg]:h-3 [&_svg]:w-3" aria-live="polite">
       {saveState === 'saved' && <><Check /> Saved</>}
       {saveState === 'saving' && <><Loader2 className="animate-spin" /> Saving…</>}
-      {saveState === 'dirty' && <><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes</>}
+      {saveState === 'dirty' && <><span className="h-1.5 w-1.5 rounded-full bg-(--amber)" /> Unsaved changes</>}
       {saveState === 'error' && (
         <span className="inline-flex items-center gap-1 text-(--danger)">
           <CircleAlert /> Couldn’t save
-          <button type="button" onClick={save} className="font-bold underline">Retry</button>
+          <button type="button" onClick={save} className="font-semibold underline">Retry</button>
         </span>
       )}
     </span>
@@ -499,7 +499,7 @@ const PostComposer: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-90 flex items-center justify-center sm:p-6" role="presentation">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/45 animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
 
       <div
         ref={dialogRef}
@@ -507,17 +507,17 @@ const PostComposer: React.FC<Props> = ({
         aria-modal="true"
         aria-label={`Compose post for ${dateLabel}`}
         tabIndex={-1}
-        className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:border sm:border-(--border-strong) sm:shadow-2xl"
+        className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border sm:border-(--border) sm:shadow-lg"
       >
         {/* ── Header ── */}
         <header className="flex items-start gap-3 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-bold leading-snug" title={heading}>{heading}</h2>
+            <h2 className="truncate text-lg font-semibold leading-snug" title={heading}>{heading}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--fg-muted)">
               {post ? (
                 <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
               ) : (
-                <span className="rounded-full border border-dashed border-(--border-strong) px-1.5 text-xs font-semibold leading-4">New</span>
+                <span className="badge badge-dashed">New</span>
               )}
               <span className="font-semibold text-(--fg)">{dateLabel}</span>
               {currentIdea && !post && <span>From your {monthName} plan</span>}
@@ -544,17 +544,17 @@ const PostComposer: React.FC<Props> = ({
         <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-h-0 space-y-3 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
             {isPublished && post && (
-              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-2.5 text-ui text-(--fg)">
+              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-(--green) bg-(--green-soft) px-4 py-2.5 text-ui text-(--fg)">
                 <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
                 {post.externalLink && (
-                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-(--primary) hover:underline">
+                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
                     View post <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 )}
               </p>
             )}
             {isScheduled && post && (
-              <p className="flex items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-50 px-4 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+              <p className="flex items-center gap-2 rounded-lg border border-transparent bg-(--amber-soft) px-4 py-2.5 text-ui text-(--amber)">
                 <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
               </p>
             )}
@@ -602,7 +602,7 @@ const PostComposer: React.FC<Props> = ({
                   ) : limitReached ? (
                     <p
                       id="ps-brief-msg"
-                      className={clsx('mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui [&_button]:font-semibold [&_button]:text-(--primary) [&_button:hover]:underline', extraError ? 'text-(--danger)' : 'text-(--fg-muted)')}
+                      className={clsx('mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui [&_button]:font-medium [&_button]:text-(--fg) [&_button]:underline [&_button]:underline-offset-2', extraError ? 'text-(--danger)' : 'text-(--fg-muted)')}
                       role={extraError ? 'alert' : undefined}
                     >
                       {extraError || (walletBalance != null ? `Wallet balance: ₱${walletBalance.toLocaleString('en-PH')}.` : 'Paid from your Kawayan wallet.')}
@@ -685,7 +685,7 @@ const PostComposer: React.FC<Props> = ({
                     <Check className="h-3.5 w-3.5 text-(--primary)" />
                     <span>{lastEdit.label}</span>
                     {lastEdit.delta != null && lastEdit.delta !== 0 && (
-                      <span className={clsx('rounded-full px-1.5 font-semibold', lastEdit.delta > 0 ? 'bg-brand/15 text-(--primary)' : 'bg-red-500/10 text-(--danger)')}>
+                      <span className={clsx('rounded-full px-1.5 font-semibold', lastEdit.delta > 0 ? 'bg-(--green-soft) text-(--primary)' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-(--danger)')}>
                         Score {lastEdit.delta > 0 ? '+' : '−'}{Math.abs(lastEdit.delta)}
                       </span>
                     )}
@@ -728,10 +728,10 @@ const PostComposer: React.FC<Props> = ({
                   <b className="text-xl tabular-nums leading-none">{score}</b>
                   <div className="min-w-0 flex-1">
                     <p className="flex justify-between text-xs font-semibold">
-                      Reach score <span className={score >= 75 ? 'text-(--primary)' : score >= 50 ? 'text-amber-600 dark:text-amber-300' : 'text-(--danger)'}>{scoreWord(score)}</span>
+                      Reach score <span className={score >= 75 ? 'text-(--primary)' : score >= 50 ? 'text-(--amber)' : 'text-(--danger)'}>{scoreWord(score)}</span>
                     </p>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--border)">
-                      <div className="h-full rounded-full bg-(--primary) transition-[width] duration-500" style={{ width: `${score}%` }} />
+                      <div className="h-full rounded-full bg-(--green)" style={{ width: `${score}%` }} />
                     </div>
                     {post.viralityReason && <p className="mt-1.5 text-xs leading-relaxed text-(--fg-muted)">{post.viralityReason}</p>}
                   </div>
@@ -747,7 +747,7 @@ const PostComposer: React.FC<Props> = ({
                           <div className="mt-2 flex items-center justify-between">
                             {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
                             {!isPublished && (
-                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-semibold text-(--primary) hover:underline">Use this</button>
+                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">Use this</button>
                             )}
                           </div>
                         </div>
@@ -848,7 +848,7 @@ const PostComposer: React.FC<Props> = ({
               )}
             </div>
           ) : isScheduled ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-(--amber)">
               <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
             </span>
           ) : accounts && accounts.length === 0 ? (
@@ -892,7 +892,7 @@ const PostComposer: React.FC<Props> = ({
                 <div
                   role="dialog"
                   aria-label="Where and when to post"
-                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-2xl border border-(--border-strong) bg-(--card) p-4 shadow-xl"
+                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-xl border border-(--border) bg-(--card) p-4 shadow-lg"
                 >
                   <div className="grid grid-cols-2 gap-1 rounded-full bg-(--bg-alt) p-1" role="radiogroup" aria-label="When">
                     {([
@@ -938,13 +938,13 @@ const PostComposer: React.FC<Props> = ({
                               onClick={() => setChosen((ids) => (on ? ids.filter((id) => id !== a.id) : [...ids, a.id]))}
                               className={clsx(
                                 'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-ui transition-colors',
-                                on ? 'border-brand/50 bg-brand/10' : 'border-(--border) hover:border-(--border-strong)',
+                                on ? 'border-(--green) bg-(--green-soft)' : 'border-(--border) hover:border-(--border-strong)',
                               )}
                             >
                               <PlatformIcon platform={a.platform} className="h-4 w-4" />
                               <span className="flex-1 font-medium">@{a.username}</span>
-                              {!a.isActive && <span className="text-xs font-semibold text-amber-600 dark:text-amber-300">Needs reconnecting</span>}
-                              <span className={clsx('grid h-4 w-4 place-items-center rounded border', on ? 'border-transparent bg-brand text-on-brand' : 'border-(--border-strong)')}>
+                              {!a.isActive && <span className="text-xs font-semibold text-(--amber)">Needs reconnecting</span>}
+                              <span className={clsx('grid h-4 w-4 place-items-center rounded border', on ? 'border-transparent bg-(--green) text-(--green-fg)' : 'border-(--border-strong)')}>
                                 {on && <Check className="h-3 w-3" strokeWidth={3} />}
                               </span>
                             </button>
@@ -969,13 +969,13 @@ const PostComposer: React.FC<Props> = ({
                               onClick={() => setTime(s.time)}
                               className={clsx(
                                 'relative rounded-xl border p-2 text-left transition-colors disabled:opacity-40',
-                                time === s.time ? 'border-brand/60 bg-brand/10' : 'border-(--border) hover:border-(--border-strong)',
+                                time === s.time ? 'border-(--green) bg-(--green-soft)' : 'border-(--border) hover:border-(--border-strong)',
                               )}
                             >
                               <b className="block text-ui font-semibold">{to12h(s.time)}</b>
                               <small className="block text-xs text-(--fg-muted)">{past ? 'Passed' : s.label}</small>
                               {s.best && !past && (
-                                <em className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 text-xs font-bold not-italic text-on-brand">Best</em>
+                                <em className="absolute right-1.5 top-1.5 rounded-full bg-(--green-soft) px-1.5 text-xs font-medium not-italic text-(--green-ink)">Best</em>
                               )}
                             </button>
                           );
@@ -987,7 +987,7 @@ const PostComposer: React.FC<Props> = ({
                           type="time"
                           value={time}
                           onChange={(e) => e.target.value && setTime(e.target.value)}
-                          className="ml-auto rounded-lg border border-(--border) bg-(--bg-alt) px-2 py-1 text-(--fg) outline-hidden focus:border-brand"
+                          className="ml-auto rounded-lg border border-(--border) bg-(--bg-alt) px-2 py-1 text-(--fg) outline-hidden focus:border-(--green)"
                         />
                       </label>
                       {!timeOk && <p className="text-xs font-semibold text-(--danger)">That time has passed. Pick a later one.</p>}

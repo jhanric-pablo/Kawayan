@@ -81,8 +81,8 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Calendar: post details (right panel on wide screens, `PostDetailSheet` on small)
 - [x] Calendar: `PhonePreview`
 - [x] Calendar: empty / loading / error states, delete & reschedule confirms
-- [ ] Post studio (`PostComposer`, `FormatPicker`)
-- [ ] Month planner (`PlanningModal`, `PostCountPicker`)
+- [x] Post studio (`PostComposer`, `FormatPicker`)
+- [x] Month planner (`PlanningModal`, `PostCountPicker`)
 - [ ] Insights (`InsightsDashboard`, `insights.css`, compare tray)
 - [ ] Billing (plans, wallet, top-up, history, payment dialogs)
 - [ ] Settings › Business
@@ -191,3 +191,10 @@ right-side panel (same content and actions as the sheet; Esc or × closes; the "
 hides while it is open to give the grid room). Below 1280px it is still the sheet.
 Check: open a post on a wide and a narrow window, drag a draft to another day, Reschedule, Retry.
 Left: none for the calendar itself.
+
+**Step 4 — post studio and month planner.** Both dialogs use the new tokens with a plain 45% scrim
+(no blur), 12px panel radius, neutral step numbers (active = black/white, done = green), chip-style
+format and strategy pickers (selected = green-soft), green progress bars, links as underlined text.
+The studio's step sections now fade/slide in instead of animating height.
+Check: Create post → Draft with AI → tweak chips → schedule; Plan month → plan ideas → create posts.
+Left: nothing; mockup-only extras (best-time slot buttons) noted as ideas.

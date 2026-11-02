@@ -31,7 +31,7 @@ const FormatPicker: React.FC<Props> = ({ value, onChange, disabled }) => (
       <Radio.Root
         key={key}
         value={key}
-        className="inline-flex items-center gap-1.5 rounded-full border border-(--border) bg-(--bg-alt) px-3 py-1.5 text-xs font-semibold text-(--fg-muted) outline-hidden transition-colors hover:border-(--border-strong) hover:text-(--fg) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-brand/60 data-checked:bg-brand/10 data-checked:text-(--primary) data-disabled:opacity-50"
+        className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-(--border) bg-(--card) px-3 text-ui font-normal text-(--fg) outline-hidden transition-colors hover:bg-(--muted) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-transparent data-checked:bg-(--green-soft) data-checked:font-medium data-checked:text-(--green-ink) data-disabled:opacity-50"
       >
         <Icon className="h-3.5 w-3.5" aria-hidden />
         {key}
