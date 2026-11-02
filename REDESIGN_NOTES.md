@@ -357,7 +357,7 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Header: title, status line, Save draft, green "Approve and schedule" — **FE**
 - [x] Image card: image, "Image made by Kawayan AI" (or "Your photo"), New image, Upload my own photo — **FE**
 - [x] Caption card: version picker 1–3 (used-up disabled), textarea + counter, quick tweaks (Shorter, More Taglish, More playful, More polished, Fresh hashtags, Add a call to action), hashtags, reach score, date + time, slots (Lunch break / After work / Prime time), "Post to" switches with Reconnect badge — **FE**
-- [ ] Phone preview with Facebook / Instagram tabs — **have** (PhonePreview)
+- [x] Phone preview with Facebook / Instagram tabs — **have** (PhonePreview)
 - [x] Composer modal everywhere it opens today — **have**
 
 ## F1. Plan and billing
@@ -532,3 +532,20 @@ button (the same help panel), and Brand DNA shows it above the form. Verificatio
 wait" cards (Brand DNA next, connect pages, Help desk). City ("Where are you?") and Language are
 in Settings once the migration runs (see Migrations). Not added: the mockup's testimonial quote
 (it would be a made-up customer).
+
+### Phase 2: new endpoints (all additive, Zod-validated like the rest)
+- `POST /api/social/unschedule` `{ postId }`: removes the queued Zernio post and sets the post back to Draft (calendar detail panel "Unschedule"). The Zernio `DELETE /posts/:id` call should be checked against Zernio's docs.
+- `DELETE /api/auth/me` `{ confirmEmail }`: owners delete their own account (Settings › Your data). Staff accounts get 403.
+- `GET /api/admin/system-status` (admin only): yes/no flags for the API, database (with latency), AI, Zernio, PayMongo (incl. test mode) and chat. Never returns key values.
+- `GET /api/staff/owners/:userId/summary` (admin + support): the owner's verification status and connected channels for the support rail. Read-only; never creates a Zernio profile.
+
+### Phase 2 hand-test list
+1. Month planner: pick next month, 8 posts, two dates, a note → Generate → watch the cards fill → Add to calendar.
+2. Calendar: open a draft → Approve and schedule in the detail panel → it shows as Scheduled; Unschedule brings it back to Draft.
+3. Drag a post to another day in the month grid (one post per day still enforced).
+4. Reconnect a channel from a Held post (detail panel → Reconnect, or Settings › Channels).
+5. Insights: tick two posts → Compare; Export CSV from the download menu.
+6. Plan and billing: Buy 1 extra post → the Post studio opens on a new post; with posts left over, the paid-extra flow asks before charging the wallet.
+7. Help desk: open a ticket, reply with a screenshot, Mark resolved; from the support inbox, reply and add an internal note.
+8. Admin: Verification → pick a reason + note → Send back; another one → Approve. Overview shows system status.
+9. Settings: Export my data downloads JSON; Delete account needs your email typed (try on a test account).
