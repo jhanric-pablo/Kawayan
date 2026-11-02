@@ -1382,13 +1382,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             <MonthGrid
               currentDate={currentDate}
               byDay={monthData.byDay}
-              unsent={monthData.unsent}
-              postsLimitText={<><b className="font-semibold text-(--fg) tabular-nums">{monthlyPostCount}</b> of {batchPostCount} posts this month</>}
               onOpenPost={(post) => setSheetPostId(post.id)}
               onOpenDay={handleDayClick}
               onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
               onMoveIdea={moveIdea}
-              hideTray={!!sideDetail}
               tags={tags}
               selectedPostId={sheetPostId}
             />

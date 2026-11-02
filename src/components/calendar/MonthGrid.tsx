@@ -3,25 +3,20 @@ import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor,
   useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { ChevronDown, GripVertical, Plus, Sparkles } from 'lucide-react';
+import { GripVertical, Plus, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { AnimatePresence, m } from 'motion/react';
 import type { GeneratedPost } from '../../types';
-import { StatusBadge } from './TimelinePostCard';
 import type { TimelineCardItem } from './mapCalendarEvents';
 
 interface Props {
   currentDate: Date;
   byDay: Map<number, TimelineCardItem[]>;
-  unsent: TimelineCardItem[];
-  postsLimitText?: React.ReactNode;
   onOpenPost: (post: GeneratedPost) => void;
   /** Empty day or idea: open the studio for that day. */
   onOpenDay: (day: number) => void;
   onMovePost: (post: GeneratedPost, day: number) => void;
   onMoveIdea: (index: number, day: number) => void;
-  /** Hide the "Not sent yet" tray (while post details sit beside the calendar). */
-  hideTray?: boolean;
   /** PH holidays and paydays by day, shown as small tags. */
   tags?: Map<number, string>;
   /** The post open in the details panel gets an outline. */
@@ -97,7 +92,6 @@ const KeyHandle: React.FC<{ title: string; attributes: ReturnType<typeof useDrag
 
 const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selected?: boolean; onOpen: () => void }> = ({ item, compact, selected, onOpen }) => {
   const can = movable(item);
-  // The tray shows unsent items too, so grid copies get their own drag id.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `grid:${dragId(item)}`, data: { item }, disabled: !can });
   const drag = dragProps(listeners);
   return (
@@ -109,65 +103,6 @@ const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selec
     </div>
   );
 };
-
-/** One line in the tray: small picture, title, date. Grab the handle (or the picture) to drag it onto a day. */
-const TrayRow: React.FC<{ item: TimelineCardItem; date: string; onOpen: () => void }> = ({ item, date, onOpen }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `tray:${dragId(item)}`, data: { item } });
-  const drag = dragProps(listeners);
-  const failed = item.status === 'failed';
-  return (
-    <div
-      ref={setNodeRef}
-      {...drag.card}
-      className={clsx('group/row relative flex w-full min-w-0 cursor-grab items-center rounded-md hover:bg-(--muted) active:cursor-grabbing', isDragging && 'opacity-30')}
-    >
-      <KeyHandle title={item.title} attributes={attributes} onKeyDown={drag.keys.onKeyDown} />
-      <span className="relative ml-1 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded" aria-hidden>
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <span className="grid h-full w-full place-items-center border border-dashed border-(--border-strong) text-(--fg-muted)">
-            <Sparkles className="h-3 w-3" aria-hidden />
-          </span>
-        )}
-      </span>
-      <button type="button" onClick={onOpen} title={item.title} className="flex min-w-0 flex-1 cursor-grab items-center gap-2 px-2 py-1.5 text-left active:cursor-grabbing">
-        <span className={clsx('min-w-0 flex-1 truncate text-xs', item.status === 'idea' ? 'text-(--fg-muted)' : 'font-medium text-(--fg)')}>{item.title}</span>
-        <span className={clsx('mono shrink-0 text-2xs', failed ? 'text-(--danger)' : 'text-(--fg-muted)')}>{failed ? 'Failed' : date}</span>
-      </button>
-    </div>
-  );
-};
-
-const TrayGroup: React.FC<{ title: string; hint?: string; tone?: 'danger'; items: TimelineCardItem[]; open: boolean; onToggle: () => void; children: React.ReactNode }> = ({
-  title, hint, tone, items, open, onToggle, children,
-}) =>
-  items.length === 0 ? null : (
-    <section className="min-w-0">
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-8 w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-left hover:bg-(--muted)">
-        <ChevronDown className={clsx('h-3.5 w-3.5 text-(--fg-muted) transition-transform duration-200', !open && '-rotate-90')} aria-hidden />
-        <span className={clsx('text-xs font-medium', tone === 'danger' ? 'text-(--danger)' : 'text-(--fg)')}>{title}</span>
-        <span className="mono ml-auto rounded-full bg-(--muted) px-1.5 text-2xs font-medium text-(--fg-muted)">{items.length}</span>
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <m.div
-            key="rows"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="mt-0.5 grid min-w-0 grid-cols-1 gap-px">
-              {hint && <p className="px-2 pb-1 text-2xs text-(--fg-muted)">{hint}</p>}
-              <AnimatePresence initial={false}>{children}</AnimatePresence>
-            </div>
-          </m.div>
-        )}
-      </AnimatePresence>
-    </section>
-  );
 
 const DayCell: React.FC<{
   day: number | null;
@@ -242,10 +177,11 @@ const DayCell: React.FC<{
 };
 
 /**
- * The month at a glance: each post as a picture tile in its day, and a tray of what hasn't gone out yet.
+ * The month at a glance: each post as a picture tile in its day. Unsent drafts and ideas show in
+ * their day, in List view, in the Post studio and in the stat cards.
  * Drafts and ideas drag onto another day (mouse, touch or keyboard); past days don't take drops.
  */
-const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText, onOpenPost, onOpenDay, onMovePost, onMoveIdea, hideTray, tags, selectedPostId }) => {
+const MonthGrid: React.FC<Props> = ({ currentDate, byDay, onOpenPost, onOpenDay, onMovePost, onMoveIdea, tags, selectedPostId }) => {
   const [dragging, setDragging] = useState<TimelineCardItem | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -263,35 +199,6 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText
   const cells: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
 
-  // Overdue first (it needs action), then the coming week; everything else stays folded.
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const daysFromToday = (d: number) => Math.round((new Date(year, month, d).getTime() - midnight) / 864e5);
-  const groups = {
-    overdue: unsent.filter((i) => i.status === 'failed' || (i.status !== 'idea' && daysFromToday(i.day) < 0)),
-    week: unsent.filter((i) => i.status !== 'failed' && daysFromToday(i.day) >= 0 && daysFromToday(i.day) < 7),
-    later: unsent.filter((i) => i.status !== 'failed' && (daysFromToday(i.day) >= 7 || (i.status === 'idea' && daysFromToday(i.day) < 0))),
-  };
-  const [open, setOpen] = useState<Record<keyof typeof groups, boolean | undefined>>({ overdue: undefined, week: undefined, later: undefined });
-  const isOpen = (g: keyof typeof groups) => open[g] ?? (g !== 'later' || (!groups.overdue.length && !groups.week.length));
-  const toggle = (g: keyof typeof groups) => setOpen((o) => ({ ...o, [g]: !isOpen(g) }));
-  const rows = (list: TimelineCardItem[]) =>
-    list.map((item) => (
-      <m.div
-        key={`tray-${item.key}`}
-        layout="position"
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 24, height: 0, transition: { duration: 0.2 } }}
-        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-      >
-        <TrayRow
-          item={item}
-          date={new Date(year, month, item.day).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-          onOpen={() => (item.post ? onOpenPost(item.post) : onOpenDay(item.day))}
-        />
-      </m.div>
-    ));
-
   const onDragStart = (e: DragStartEvent) => setDragging((e.active.data.current?.item as TimelineCardItem) ?? null);
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null);
@@ -304,33 +211,7 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
-      <div className={clsx('grid', !hideTray && 'lg:grid-cols-[15rem_minmax(0,1fr)]')}>
-        <aside className={clsx('hidden min-w-0 flex-col border-r border-(--border) bg-(--card)', !hideTray && 'lg:flex')} aria-label="Not sent yet" data-tour="unsent-tray">
-          <p className="eyebrow flex items-center justify-between px-3 pb-1 pt-3 text-(--fg-muted)">
-            Not sent yet <span>{unsent.length}</span>
-          </p>
-          <div className="flex max-h-[42rem] min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-            {unsent.length === 0 ? (
-              <p className="m-1 rounded-md border border-dashed border-(--border) p-3 text-xs text-(--fg-muted)">
-                Everything this month is scheduled or posted.
-              </p>
-            ) : (
-              <>
-                <TrayGroup title="Overdue" tone="danger" hint="Their day passed. Drag them to a new day." items={groups.overdue} open={isOpen('overdue')} onToggle={() => toggle('overdue')}>
-                  {rows(groups.overdue)}
-                </TrayGroup>
-                <TrayGroup title="This week" items={groups.week} open={isOpen('week')} onToggle={() => toggle('week')}>
-                  {rows(groups.week)}
-                </TrayGroup>
-                <TrayGroup title="Later" items={groups.later} open={isOpen('later')} onToggle={() => toggle('later')}>
-                  {rows(groups.later)}
-                </TrayGroup>
-              </>
-            )}
-          </div>
-          {postsLimitText && <div className="border-t border-(--border) px-3 py-2.5 text-xs text-(--fg-muted)">{postsLimitText}</div>}
-        </aside>
-
+      <div>
         <div className="min-w-0">
           <div className="grid grid-cols-7 border-b border-(--border)">
             {WEEKDAYS.map((d) => (

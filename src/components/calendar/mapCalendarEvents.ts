@@ -179,7 +179,7 @@ export function bucketByLane(
 
 /**
  * One entry per post (not per channel) plus the plan's ideas, keyed by day, for the month grid.
- * `unsent` is everything that hasn't gone out yet (drafts, failed posts, ideas), for the side tray.
+ * `unsent` is everything that hasn't gone out yet (drafts, failed posts, ideas).
  * With a channel filter, scheduled and published posts for other pages are left out; unsent items always show.
  */
 export function monthItems(

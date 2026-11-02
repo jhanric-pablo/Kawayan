@@ -60,15 +60,6 @@ export const TOUR_STEPS: TourStep[] = [
     icon: ArrowLeftRight,
   },
   {
-    anchor: 'unsent-tray',
-    chapter: 'Your calendar',
-    title: 'Not sent yet',
-    body: 'Drafts and ideas that haven’t gone out, sorted by what needs you: Overdue first, then This week, then Later.',
-    points: ['Drag any card onto a day to move it', 'Kawayan asks before moving, and you can undo', 'Scheduled and posted items stay put'],
-    tip: 'On a phone or tablet, press and hold a card to drag it.',
-    icon: Inbox,
-  },
-  {
     anchor: 'up-next',
     chapter: 'Your calendar',
     title: 'What needs you next',

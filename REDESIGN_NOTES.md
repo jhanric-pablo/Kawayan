@@ -562,3 +562,8 @@ the panel's ancestors' computed styles; server routes, Stream token, ticket fetc
 have no verification gate and returned fine.) Fix: `HelpPanel` renders through `createPortal` to
 `document.body`, so it is viewport-fixed from any parent (verification bar, owner app, Brand DNA).
 Tested with a pending account: Home, Messages (own tickets only) and Assistant all open full height.
+
+**1 — "Not sent yet" tray removed.** MonthGrid no longer has the left "Not sent yet · Overdue / This
+week / Later" panel; the 7-day grid takes the full card width (the timeline's "Not sent yet" lane is
+a row, not a panel, and stays). Those posts are still in their day tile (drag still works), the List
+view, Post studio's draft groups and the stat cards; the tour step pointing at the tray is gone.
