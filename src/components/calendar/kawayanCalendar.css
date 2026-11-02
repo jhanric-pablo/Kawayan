@@ -211,6 +211,8 @@
   position: sticky; top: 72px; overflow: hidden; display: flex; flex-direction: column;
   max-height: calc(100vh - 88px); animation: kw-detail-in 0.28s var(--ease) both;
 }
-.kw-detail > div:nth-of-type(2) { flex: 1; min-height: 0; overflow-y: auto; }
+.kw-detail > div { flex: 1; min-height: 0; overflow-y: auto; }
 @keyframes kw-detail-in { from { opacity: 0; transform: translateX(8px); } }
 @media (prefers-reduced-motion: reduce) { .kw-detail { animation: none; } }
+/* PH holiday / payday tag in a day cell (mockup .tag) */
+.kw-daytag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10px var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--green-ink); }

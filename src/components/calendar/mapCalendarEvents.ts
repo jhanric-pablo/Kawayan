@@ -121,6 +121,14 @@ export interface TimelineCardItem {
   ideaIndex?: number;
   /** Pages a scheduled or published post went to (month view's channel filter). */
   platforms?: LaneId[];
+  /** A scheduled post going to a page that lost access: it won't go out until reconnected. */
+  held?: boolean;
+}
+
+/** Pages of a scheduled post that lost access (empty when the post can go out). */
+export function heldPlatforms(post: GeneratedPost, channels: PostChannels, accounts: SocialAccount[]): string[] {
+  if (post.status !== 'Scheduled') return [];
+  return platformsFor(post, channels, accounts).filter((pl) => accounts.some((a) => a.platform === pl && !a.isActive));
 }
 
 /**
@@ -207,6 +215,7 @@ export function monthItems(
       time: status === 'scheduled' ? clockTime(channels[post.id]?.at) : undefined,
       post,
       platforms,
+      held: heldPlatforms(post, channels, accounts).length > 0,
     });
   });
   buildCalendarItems(posts, ideas, month).forEach((i) => {

@@ -656,7 +656,7 @@ const App: React.FC = () => {
                 );
               }
               return (user && brandProfile) ? (
-                <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} intent={calendarIntent} onIntentDone={() => setCalendarIntent(null)} />
+                <ContentCalendar profile={brandProfile} userId={user.id} onOpenSocial={() => navigateView(ViewState.SOCIAL)} onOpenBilling={() => navigateView(ViewState.BILLING)} intent={calendarIntent} onIntentDone={() => setCalendarIntent(null)} onOpenInsights={() => goTo(ViewState.INSIGHTS)} onOpenChannels={() => goTo(ViewState.SOCIAL)} />
               ) : user ? (
                 <AppHydrationLoader />
               ) : (

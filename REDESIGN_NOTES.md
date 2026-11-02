@@ -321,19 +321,19 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Phones: sidebar as a drawer — **have**
 
 ## B. Calendar
-- [ ] Header "<Month YYYY>", drafts line, "New post", green "Plan <next month>" → Month planner page — **FE**
-- [ ] 4 stat cards: posts X/limit + left on plan; drafts to approve + next due; needs attention (held/failed) + reason; avg reach score + change vs last month (hidden when last month has none) — **FE** (last month's posts fetched with the existing month query)
-- [ ] Amber banner for held/failed posts: post name, date, Reconnect → Settings › Channels — **FE**
+- [x] Header "<Month YYYY>", drafts line, "New post", green "Plan <next month>" → Month planner page — **FE**
+- [x] 4 stat cards: posts X/limit + left on plan; drafts to approve + next due; needs attention (held/failed) + reason; avg reach score + change vs last month (hidden when last month has none) — **FE** (last month's posts fetched with the existing month query)
+- [x] Amber banner for held/failed posts: post name, date, Reconnect → Settings › Channels — **FE**
 - [x] Toolbar: month title, prev / Today / next, channel filter, Month / Timeline / List — **have**
 - [x] Month view: weekday header, hatched out-of-month, green today, chip styles, drag-and-drop — **have**
-- [ ] PH holiday and payday tags in day cells — **FE** (new `phCalendar.ts`)
-- [ ] Selected chip outline — **FE**
-- [ ] Held = scheduled post whose page lost access → red-border chip — **FE**
+- [x] PH holiday and payday tags in day cells — **FE** (new `phCalendar.ts`)
+- [x] Selected chip outline — **FE**
+- [x] Held = scheduled post whose page lost access → red-border chip — **FE**
 - [x] Timeline view by channel — **have** (lanes per channel, days across)
-- [ ] List view as a table: post, when, channels, status, reach — **FE** (replaces the agenda list layout; same data and click-through)
+- [x] List view as a table: post, when, channels, status, reach — **FE** (replaces the agenda list layout; same data and click-through)
 - [x] Legend — **have** (mono tag sample added) 
-- [ ] Detail panel: image, title, date/time, status, held alert, channel badges, caption + "Version X of 3", reach bar + reason — **FE**
-- [ ] Panel actions by status, wired to existing handlers: draft Approve and schedule / Edit / Regenerate; held Reconnect / Move date / Retry; posted View on Facebook / Insights / Duplicate; scheduled Edit post / Move date / Unschedule — **FE** + Duplicate (new handler through the existing save-post call) + Unschedule — **API** (`POST /api/social/unschedule`)
+- [x] Detail panel: image, title, date/time, status, held alert, channel badges, caption + "Version X of 3", reach bar + reason — **FE**
+- [x] Panel actions by status, wired to existing handlers: draft Approve and schedule / Edit / Regenerate; held Reconnect / Move date / Retry; posted View on Facebook / Insights / Duplicate; scheduled Edit post / Move date / Unschedule — **FE** + Duplicate (new handler through the existing save-post call) + Unschedule — **API** (`POST /api/social/unschedule`)
 - [x] UpNext, tour targets, empty-month pitch, idea editing — **have**
 
 ## C. Month planner page
@@ -415,3 +415,18 @@ shows); Help moved to ⌘/ / Ctrl+/ and stays one click away in the sidebar. Not
 you" (expired pages with held posts → Fix now, failed posts → Retry, drafts → Review, support
 replies → Open ticket) and "All" (plus posted and payment history), unread dot, Mark all as read.
 Month planner, Post studio and Help desk nav entries arrive with their pages (C, E, F3).
+
+**B — calendar.** Header with "<Month YYYY>", the drafts line, New post and a green "Plan <next
+month>"; 4 stat cards (posts X / limit + left on plan, drafts to approve + next due, needs attention
++ reason, avg reach score + change vs last month, hidden when last month has no scored posts);
+amber banner for held / failed posts or a page that lost access (Reconnect); PH holiday and payday
+tags (new `src/utils/phCalendar.ts`); held chips (scheduled to a page that lost access) in red;
+selected chip outline; List view is now the mockup's table (post, when, channels, status, reach).
+Detail panel: image, title, date/time, status (or Held), held/failed alert, channel badges, caption
+with "Version X of 3", reach bar + reason, and actions by status — draft: Approve and schedule
+(schedules to every connected page at the studio's suggested time, after a confirm) / Edit /
+Regenerate (+ Move date); held: Reconnect / Unschedule / Edit; failed: Retry / Move date / Edit;
+posted: View on Facebook / Insights / Duplicate; scheduled: Edit post / Move date / Unschedule.
+New: Duplicate (draft copy on the next free day via the existing save-post call), Unschedule
+(new additive endpoint `POST /api/social/unschedule`). The toolbar "Plan month" stays (secondary)
+for the month on screen; the shell's lost-access banner is hidden on the calendar, which shows its own.

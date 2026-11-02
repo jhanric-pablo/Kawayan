@@ -150,6 +150,30 @@ router.post('/api/social/publish', authenticateToken, validate(publishSchema), a
   }
 });
 
+const unscheduleSchema = z.object({ postId: id });
+
+// Takes a scheduled post off the pages' queue (deletes the queued Zernio post) and returns it to Draft.
+// Additive: the calendar's "Unschedule" and "Move date" for scheduled posts. Published posts are left alone.
+router.post('/api/social/unschedule', authenticateToken, validate(unscheduleSchema), async (req, res) => {
+  const { postId } = req.body;
+  try {
+    const post = (await dbService.getUserPosts(req.user.userId)).find((p) => p.id === postId);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+    if (post.status !== 'Scheduled') return res.status(400).json({ error: 'Only scheduled posts can be unscheduled.' });
+    const profileId = await getZernioProfileId(req.user.userId);
+    const { posts: zPosts = [] } = await zernio(`/posts?profileId=${profileId}&limit=500`);
+    const queued = zPosts.filter((zp) => zp.title === post.id && zp.status !== 'published' && zp.status !== 'partial');
+    for (const z of queued) await zernio(`/posts/${z._id}`, { method: 'DELETE' });
+    const updated = { ...post, status: 'Draft' };
+    await dbService.savePost(updated);
+    const who = await dbService.describeUser(req.user.userId);
+    await dbService.logAudit(req.user.userId, 'unschedule_post', `${who} unscheduled "${post.topic}" (post:${post.id})`);
+    res.json(updated);
+  } catch (error) {
+    sendUpstreamError(res, error, 'Failed to unschedule post');
+  }
+});
+
 // Pull back publish results for scheduled posts (matched by Zernio post title = Kawayan post id).
 router.post('/api/social/sync', authenticateToken, async (req, res) => {
   try {

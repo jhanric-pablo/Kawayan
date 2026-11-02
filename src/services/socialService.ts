@@ -49,5 +49,8 @@ export const socialService = {
       }),
     }),
 
+  /** Takes a scheduled post off the queue; it comes back as a Draft. */
+  unschedule: (postId: string) => request<GeneratedPost>('/api/social/unschedule', { method: 'POST', body: JSON.stringify({ postId }) }),
+
   sync: () => request<{ published: number; failed: number; failedIds: string[] }>('/api/social/sync', { method: 'POST' }),
 };

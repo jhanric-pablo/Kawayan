@@ -5,16 +5,17 @@ import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
 import { socialService, SocialAccount, SocialPlatform } from '../services/socialService';
 import {
-  ChevronLeft, ChevronRight, Layers, ArrowRight
+  ChevronLeft, ChevronRight, Layers, ArrowRight, Plus, Sparkles, CalendarDays, PencilLine, TriangleAlert, BarChart3,
 } from 'lucide-react';
 import ChannelTimelineTrack from './calendar/ChannelTimelineTrack';
-import AgendaView from './calendar/AgendaView';
 import MonthGrid from './calendar/MonthGrid';
 import Segmented from './calendar/Segmented';
 import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
 import PostDetailSheet from './calendar/PostDetailSheet';
 import { StatusBadge } from './calendar/TimelinePostCard';
-import { buildCalendarItems, monthItems } from './calendar/mapCalendarEvents';
+import { buildCalendarItems, heldPlatforms, monthItems } from './calendar/mapCalendarEvents';
+import PostTable from './calendar/PostTable';
+import { dayTags } from '../utils/phCalendar';
 import PostComposer from './calendar/PostComposer';
 import PlanningModal from './calendar/PlanningModal';
 import UpNext from './calendar/UpNext';
@@ -42,6 +43,12 @@ interface Props {
   /** A request from the app shell (Create post, a search hit, a notification), run once data is loaded. */
   intent?: CalendarIntent | null;
   onIntentDone?: () => void;
+  /** Opens Insights (from a posted post's details). */
+  onOpenInsights?: () => void;
+  /** Opens Settings › Channels (Reconnect). Falls back to the Social page. */
+  onOpenChannels?: () => void;
+  /** Opens the Month planner page for a month (YYYY-MM). Without it, the planner dialog opens. */
+  onOpenPlanner?: (month: string) => void;
 }
 
 /** `date` (YYYY-MM-DD) lets the calendar switch to the post's month first; it only loads one month at a time. */
@@ -52,7 +59,7 @@ const announceFeedChange = () => window.dispatchEvent(new Event(FEED_EVENT));
 type CalendarView = 'month' | 'timeline' | 'list';
 const VIEW_KEY = 'kawayan_calendar_view';
 
-const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone }) => {
+const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone, onOpenInsights, onOpenChannels, onOpenPlanner }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   // Month grid first; the choice is remembered on this device.
@@ -769,6 +776,135 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
+  // ── Detail-panel actions (Approve, Regenerate, Duplicate, Unschedule, Reconnect) ──
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const reconnectPlatform = (platform: string) => {
+    if (onOpenChannels) onOpenChannels();
+    else socialService.connect(platform as SocialPlatform).catch((e: any) => toast.error(e.message));
+  };
+  const to12h = (hhmm: string) => {
+    const [h, mm] = hhmm.split(':').map(Number);
+    return `${((h + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+  };
+  /** The studio's suggested times (Prime time first), skipping ones already past. */
+  const quickSlot = (date: string) => ['20:00', '18:00', '12:00'].find((t) => new Date(`${date}T${t}:00`).getTime() > Date.now() + 5 * 60_000);
+
+  const approvePost = async (post: GeneratedPost) => {
+    const active = (socialAccounts || []).filter((a) => a.isActive);
+    if (!active.length) {
+      toast.error('Connect a Facebook Page or Instagram account first.');
+      (onOpenChannels ?? onOpenSocial)();
+      return;
+    }
+    const slot = post.date >= ymd(new Date()) ? quickSlot(post.date) : undefined;
+    if (!slot) {
+      toast.info('That day’s posting times have passed. Pick a new date, or post it now from the studio.');
+      editPost(post);
+      return;
+    }
+    const where = [...new Set(active.map((a) => (a.platform === 'facebook' ? 'Facebook' : 'Instagram')))].join(' and ');
+    const ok = await dialog.confirm({
+      title: 'Approve and schedule?',
+      message: `“${post.topic}” goes out ${dayLabel(post.date)} at ${to12h(slot)} on ${where}. To pick another time or page, use Edit.`,
+      confirmLabel: 'Schedule',
+    });
+    if (!ok) return;
+    await publishPost(post, active.map((a) => a.id), `${post.date}T${slot}:00`);
+  };
+
+  const regeneratePost = async (post: GeneratedPost) => {
+    if (post.regenCount >= 2) {
+      toast.info('This post has used both of its rewrites. You can still edit it by hand.');
+      return;
+    }
+    setRegeneratingId(post.id);
+    try {
+      const result = await generatePostCaptionAndImagePrompt(profile, post.topic);
+      const imageUrl = await generateImageFromPrompt(result.imagePrompt + IMAGE_PROMPT_SUFFIX);
+      const updated: GeneratedPost = {
+        ...post,
+        caption: result.caption,
+        imagePrompt: result.imagePrompt,
+        imageUrl: imageUrl || post.imageUrl,
+        viralityScore: result.viralityScore,
+        viralityReason: result.viralityReason,
+        regenCount: post.regenCount + 1,
+        history: [...(post.history || []), { caption: post.caption, imagePrompt: post.imagePrompt, viralityScore: post.viralityScore, viralityReason: post.viralityReason, createdAt: new Date().toISOString() }],
+      };
+      await persistPost(updated);
+      toast.success('New version ready.');
+    } catch (e: any) {
+      toast.error(e.message?.includes('quota') ? "Kawayan's AI has used up today's free allowance. Please try again later." : 'Could not write a new version. Please try again.');
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
+  /** A draft copy on the next free day (this month, from today), saved through the usual post save. */
+  const duplicatePost = async (post: GeneratedPost) => {
+    const now = new Date();
+    const viewingPast = currentDate.getFullYear() * 12 + currentDate.getMonth() < now.getFullYear() * 12 + now.getMonth();
+    const target = viewingPast ? new Date(now.getFullYear(), now.getMonth(), 1) : currentDate;
+    const key = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
+    const pool = key === monthKey ? posts : await dbService.getUserPosts(userId, key).catch(() => [] as GeneratedPost[]);
+    if (isAtTierLimit(subscription, countPostsInMonth(pool, target))) {
+      await showTierLimitDialog();
+      return;
+    }
+    const taken = new Set(pool.filter((p) => p.date.startsWith(`${key}-`)).map((p) => Number(p.date.slice(8, 10))));
+    const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const start = key === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` ? now.getDate() : 1;
+    let day = start;
+    while (day <= last && taken.has(day)) day++;
+    if (day > last) {
+      toast.error('Every day left this month already has a post.');
+      return;
+    }
+    const copy: GeneratedPost = {
+      ...post,
+      id: `dup-${Date.now()}`,
+      date: `${key}-${String(day).padStart(2, '0')}`,
+      status: 'Draft',
+      externalLink: undefined,
+      publishedAt: undefined,
+      regenCount: 0,
+      history: [],
+    };
+    try {
+      await dbService.savePost(copy);
+    } catch (e: any) {
+      if (String(e?.message).includes('TIER_LIMIT')) await showTierLimitDialog();
+      else toast.error('Could not duplicate the post. Please try again.');
+      return;
+    }
+    if (key === monthKey) mergePostIntoState(copy);
+    announceFeedChange();
+    toast.toast(`Copied as a draft on ${dayLabel(copy.date)}`, {
+      variant: 'success',
+      action: key === monthKey ? { label: 'Open', onClick: () => setSheetPostId(copy.id) } : undefined,
+    });
+  };
+
+  const unschedulePost = async (post: GeneratedPost) => {
+    const ok = await dialog.confirm({
+      title: 'Unschedule this post?',
+      message: `“${post.topic}” comes off your pages’ queue and goes back to drafts. You can then move it or schedule it again.`,
+      confirmLabel: 'Unschedule',
+    });
+    if (!ok) return;
+    setPublishing(true);
+    try {
+      const updated = await socialService.unschedule(post.id);
+      mergePostIntoState(updated);
+      announceFeedChange();
+      toast.success('Back in drafts. Drag it to a new day or use Move date.');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not unschedule the post.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // Details sheet → studio.
   const editPost = (post: GeneratedPost) => {
     setSheetPostId(null);
@@ -817,6 +953,31 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts.length]);
 
+  /** Opens the studio on the next free day from today (this month must be the one loaded). */
+  const composeNext = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    if (y !== currentDate.getFullYear() || m !== currentDate.getMonth()) {
+      setCurrentDate(new Date(y, m, 1));
+      setPendingCompose(true);
+      return;
+    }
+    const taken = new Set(posts.filter((p) => p.date.startsWith(`${y}-${String(m + 1).padStart(2, '0')}-`)).map((p) => Number(p.date.slice(8, 10))));
+    let day = today.getDate();
+    while (taken.has(day) && day < new Date(y, m + 1, 0).getDate()) day++;
+    if (taken.has(day)) day = today.getDate();
+    setGeneratedContent(posts.find((p) => p.date === `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ?? null);
+    setSelectedDay(day);
+  };
+  const [pendingCompose, setPendingCompose] = useState(false);
+  useEffect(() => {
+    if (!pendingCompose || loadedMonth !== monthKey) return;
+    setPendingCompose(false);
+    composeNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCompose, loadedMonth]);
+
   // Shell requests: "Create post" opens the next free day from today; search and notifications open a post.
   useEffect(() => {
     if (!intent || !loadedMonth) return;
@@ -830,15 +991,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       return;
     }
     if (intent.type === 'compose') {
-      const today = now;
-      const y = today.getFullYear();
-      const m = today.getMonth();
-      const taken = new Set(posts.filter((p) => p.date.startsWith(`${y}-${String(m + 1).padStart(2, '0')}-`)).map((p) => Number(p.date.slice(8, 10))));
-      let day = today.getDate();
-      while (taken.has(day) && day < new Date(y, m + 1, 0).getDate()) day++;
-      if (taken.has(day)) day = today.getDate();
-      setGeneratedContent(posts.find((p) => p.date === `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ?? null);
-      setSelectedDay(day);
+      composeNext();
     } else {
       setSheetPostId(intent.postId);
     }
@@ -846,7 +999,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent, loadedMonth]);
 
-  const agendaItems = useMemo(() => buildCalendarItems(posts, ideas, currentDate), [posts, ideas, currentDate, calendarDataVersion]);
   const monthData = useMemo(
     () => monthItems(posts, ideas, currentDate, postChannels, socialAccounts || [], failedIds, channelFilter),
     [posts, ideas, currentDate, postChannels, socialAccounts, failedIds, channelFilter, calendarDataVersion],
@@ -869,6 +1021,52 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   };
 
   const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  // ── Header stats (mockup .stats): this month, compared with last month's posts ──
+  const [prevMonthPosts, setPrevMonthPosts] = useState<GeneratedPost[] | null>(null);
+  useEffect(() => {
+    const prev = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+    let live = true;
+    setPrevMonthPosts(null);
+    dbService.getUserPosts(userId, key).then((p) => live && setPrevMonthPosts(p.filter((x) => x.date.startsWith(`${key}-`)))).catch(() => live && setPrevMonthPosts([]));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]);
+  const todayKey = ymd(new Date());
+  const monthPosts = posts.filter((p) => p.date.startsWith(`${monthKey}-`));
+  const draftsToApprove = monthPosts.filter((p) => p.status === 'Draft' && !failedIds.includes(p.id) && p.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date));
+  const heldPosts = monthPosts.filter((p) => heldPlatforms(p, postChannels, socialAccounts || []).length > 0);
+  const failedPosts = monthPosts.filter((p) => p.status === 'Draft' && failedIds.includes(p.id));
+  const attention = [...heldPosts, ...failedPosts].sort((a, b) => a.date.localeCompare(b.date));
+  const expiredAccounts = (socialAccounts || []).filter((a) => !a.isActive);
+  const platformName = (pl: string) => (pl === 'instagram' ? 'Instagram' : pl === 'facebook' ? 'Facebook' : pl);
+  const attentionReason = heldPosts.length
+    ? `${platformName(heldPlatforms(heldPosts[0], postChannels, socialAccounts || [])[0])} access expired`
+    : failedPosts.length ? 'Didn’t go out, back in drafts' : 'Nothing held or failed';
+  const avgScore = (list: GeneratedPost[]) => {
+    const scored = list.filter((p) => typeof p.viralityScore === 'number');
+    return scored.length ? Math.round(scored.reduce((sum, p) => sum + (p.viralityScore || 0), 0) / scored.length) : null;
+  };
+  const avgNow = avgScore(monthPosts);
+  const avgPrev = prevMonthPosts ? avgScore(prevMonthPosts) : null;
+  const prevMonthName = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1).toLocaleDateString('en-PH', { month: 'long' });
+  const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+  const nextMonthName = nextMonth.toLocaleDateString('en-PH', { month: 'long' });
+  const planLabelText = subscription === 'PRO' ? 'Pro' : subscription === 'ENTERPRISE' ? 'Enterprise' : 'Free';
+  const shortDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  const openPlannerFor = (month: Date) => {
+    const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
+    if (onOpenPlanner) onOpenPlanner(key);
+    else {
+      setCurrentDate(month);
+      setPlanningOpen(true);
+    }
+  };
+  const tags = useMemo(() => dayTags(currentDate.getFullYear(), currentDate.getMonth()), [monthKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listItems = useMemo(
+    () => [...monthData.byDay.values()].flat().sort((a, b) => a.day - b.day || (a.post ? 0 : 1) - (b.post ? 0 : 1)),
+    [monthData],
+  );
   // Wide screens show the selected post in a panel beside the calendar; smaller ones use the sheet.
   const sideDetail = wideScreen && !!sheetPost;
   const onCurrentMonth = currentDate.getFullYear() === new Date().getFullYear() && currentDate.getMonth() === new Date().getMonth();
@@ -881,6 +1079,89 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     <MotionConfig reducedMotion="user">
     <LazyMotion features={domMax}>
     <div className="relative w-full flex flex-col gap-5 pb-16 font-sans text-(--fg)">
+
+      {/* ── Header (mockup .page-h) ── */}
+      <div className="kw-page-h">
+        <div>
+          <h1>{monthLabel}</h1>
+          <p>
+            {!dataLoaded
+              ? 'Loading your month…'
+              : draftsToApprove.length
+                ? `${draftsToApprove.length} draft${draftsToApprove.length > 1 ? 's need' : ' needs'} your approval before ${draftsToApprove.length > 1 ? 'they' : 'it'} can post.`
+                : monthPosts.length
+                  ? 'Nothing waiting on you. Every post this month is scheduled or posted.'
+                  : isPastMonth ? 'No posts this month.' : 'Nothing planned yet. Plan the month or write a post.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn btn-outline" onClick={composeNext}>
+            <Plus className="h-4 w-4" aria-hidden /> New post
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => openPlannerFor(nextMonth)}>
+            <Sparkles className="h-4 w-4" aria-hidden /> Plan {nextMonthName}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats (mockup .stats) ── */}
+      <div className="kw-stats" aria-label="This month at a glance">
+        <div className="card kw-stat">
+          <div className="kw-stat__h">Posts this month <CalendarDays aria-hidden /></div>
+          <b>{monthlyPostCount} <span className="text-base font-medium text-(--fg-muted)">/ {batchPostCount}</span></b>
+          <small>{Math.max(0, batchPostCount - monthlyPostCount)} left on {planLabelText}</small>
+        </div>
+        <div className="card kw-stat">
+          <div className="kw-stat__h">Drafts to approve <PencilLine aria-hidden /></div>
+          <b>{draftsToApprove.length}</b>
+          <small>{draftsToApprove.length ? `Next one due ${shortDay(draftsToApprove[0].date)}` : 'All caught up'}</small>
+        </div>
+        <div className="card kw-stat">
+          <div className="kw-stat__h">Needs attention <TriangleAlert aria-hidden /></div>
+          <b className={attention.length ? 'text-(--danger)!' : undefined}>{attention.length}</b>
+          <small className="truncate">{attentionReason}</small>
+        </div>
+        <div className="card kw-stat">
+          <div className="kw-stat__h">Avg reach score <BarChart3 aria-hidden /></div>
+          <b>{avgNow ?? '—'}</b>
+          <small>
+            {avgNow != null && avgPrev != null ? (
+              <>
+                <span className={avgNow - avgPrev >= 0 ? 'kw-up' : 'kw-down'}>{avgNow - avgPrev >= 0 ? '+' : '−'}{Math.abs(avgNow - avgPrev)}</span> from {prevMonthName}
+              </>
+            ) : avgNow != null ? 'From this month’s posts' : 'No scored posts yet'}
+          </small>
+        </div>
+      </div>
+
+      {/* ── Held / failed posts, or a page that lost access ── */}
+      {dataLoaded && (attention.length > 0 || expiredAccounts.length > 0) && (
+        <div className="kw-alert kw-alert--warn" role="alert">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 leading-snug">
+            {heldPosts.length ? (
+              <>
+                {platformName(heldPlatforms(heldPosts[0], postChannels, socialAccounts || [])[0])} access expired, so <b className="font-semibold">{heldPosts[0].topic}</b> on {shortDay(heldPosts[0].date)}
+                {heldPosts.length > 1 ? ` and ${heldPosts.length - 1} more are held` : ' is held'}. Reconnect to send {heldPosts.length > 1 ? 'them' : 'it'}.
+              </>
+            ) : failedPosts.length ? (
+              <>
+                <b className="font-semibold">{failedPosts[0].topic}</b> on {shortDay(failedPosts[0].date)} didn’t go out
+                {failedPosts.length > 1 ? ` (and ${failedPosts.length - 1} more)` : ''}. {expiredAccounts.length ? 'Reconnect, then retry.' : 'Open it to retry.'}
+              </>
+            ) : (
+              <>
+                {expiredAccounts.map((a) => `${platformName(a.platform)} (@${a.username})`).join(' and ')} lost access. Reconnect so scheduled posts can go out.
+              </>
+            )}
+          </span>
+          {(heldPosts.length > 0 || expiredAccounts.length > 0) ? (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => reconnectPlatform(expiredAccounts[0]?.platform ?? 'facebook')}>Reconnect</button>
+          ) : (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setSheetPostId(failedPosts[0].id)}>Open</button>
+          )}
+        </div>
+      )}
 
       {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => setPlanningOpen(true)} />}
 
@@ -971,7 +1252,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               type="button"
               data-tour="plan-month"
               onClick={() => setPlanningOpen(true)}
-              className="btn btn-primary btn-sm"
+              className="btn btn-outline btn-sm"
               aria-label="Plan month"
             >
               <Layers className="w-4 h-4" />
@@ -1011,6 +1292,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
               onMoveIdea={moveIdea}
               hideTray={!!sideDetail}
+              tags={tags}
+              selectedPostId={sheetPostId}
             />
           ) : viewMode === 'timeline' || !dataLoaded ? (
             <ChannelTimelineTrack
@@ -1032,9 +1315,13 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               onMoveIdea={moveIdea}
             />
           ) : (
-            <div className="p-3 sm:p-5">
-              <AgendaView items={agendaItems} currentDate={currentDate} selectedDay={selectedDay} onDayClick={handleDayClick} />
-            </div>
+            <PostTable
+              month={currentDate}
+              items={listItems}
+              selectedPostId={sheetPostId}
+              onOpenPost={(item) => item.post && setSheetPostId(item.post.id)}
+              onOpenIdea={(item) => handleDayClick(item.day)}
+            />
           )}
           </m.div>
           </AnimatePresence>
@@ -1053,6 +1340,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border) px-3 py-2.5 sm:px-3.5">
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Status key">
             {(['idea', 'draft', 'scheduled', 'published', 'failed'] as const).map((s) => <StatusBadge key={s} status={s} />)}
+            <span className="badge badge-red"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Held</span>
+            <span className="kw-daytag ml-1">Payday · Holiday</span>
           </div>
           <p className="text-xs text-(--fg-muted) hidden md:block">
             Click a post for details, or an empty slot to write one.
@@ -1064,6 +1353,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         <PostDetailSheet
           inline
           post={sheetPost}
+          heldPlatforms={heldPlatforms(sheetPost, postChannels, socialAccounts || [])}
+          regenerating={regeneratingId === sheetPost.id}
+          onApprove={approvePost}
+          onRegenerate={regeneratePost}
+          onReconnect={reconnectPlatform}
+          onDuplicate={duplicatePost}
+          onUnschedule={unschedulePost}
+          onOpenInsights={onOpenInsights}
           profile={profile}
           platforms={platformsFor(sheetPost, postChannels, socialAccounts || [])}
           scheduledAt={postChannels[sheetPost.id]?.at}
@@ -1151,6 +1448,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       {/* ── Post details (from a timeline card, search or a notification) ── */}
       <PostDetailSheet
         post={wideScreen ? null : sheetPost}
+        heldPlatforms={sheetPost ? heldPlatforms(sheetPost, postChannels, socialAccounts || []) : []}
+        regenerating={!!sheetPost && regeneratingId === sheetPost.id}
+        onApprove={approvePost}
+        onRegenerate={regeneratePost}
+        onReconnect={reconnectPlatform}
+        onDuplicate={duplicatePost}
+        onUnschedule={unschedulePost}
+        onOpenInsights={onOpenInsights}
         profile={profile}
         platforms={sheetPost ? platformsFor(sheetPost, postChannels, socialAccounts || []) : []}
         scheduledAt={sheetPost ? postChannels[sheetPost.id]?.at : undefined}

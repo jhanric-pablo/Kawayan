@@ -456,7 +456,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           </div>
         </header>
 
-        {isUser && expired.length > 0 && !noticeHidden && view !== ViewState.SOCIAL && (
+        {isUser && expired.length > 0 && !noticeHidden && view !== ViewState.SOCIAL && view !== ViewState.CALENDAR && (
           <div role="alert" className="kw-alert kw-alert--warn mx-3 mt-4 sm:mx-6">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             <p className="min-w-0 flex-1 leading-snug">

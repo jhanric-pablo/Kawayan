@@ -22,6 +22,10 @@ interface Props {
   onMoveIdea: (index: number, day: number) => void;
   /** Hide the "Not sent yet" tray (while post details sit beside the calendar). */
   hideTray?: boolean;
+  /** PH holidays and paydays by day, shown as small tags. */
+  tags?: Map<number, string>;
+  /** The post open in the details panel gets an outline. */
+  selectedPostId?: string | null;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -39,12 +43,14 @@ const CHIP_TONE: Record<TimelineCardItem['status'], string> = {
 const CHIP_LABEL: Record<TimelineCardItem['status'], string> = { idea: 'Idea', draft: 'Draft', scheduled: 'Scheduled', published: 'Posted', failed: 'Failed' };
 
 /** The post chip used in day cells and while dragging (mockup .pchip): thumbnail, title, time or status. */
-const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boolean }> = ({ item, lifted }) => (
+const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boolean; selected?: boolean }> = ({ item, lifted, selected }) => (
   <span
     className={clsx(
       'group/tile flex w-full items-center gap-1.5 rounded-[7px] border py-[3px] pl-[3px] pr-1.5 text-left transition-colors duration-150 hover:bg-(--muted)',
       CHIP_TONE[item.status],
+      item.held && 'border-[color-mix(in_srgb,var(--danger)_45%,transparent)]',
       lifted && 'shadow-lg outline-2 outline-(--fg)',
+      selected && 'outline-2 -outline-offset-1 outline-(--fg)',
     )}
   >
     {item.imageUrl ? (
@@ -59,13 +65,13 @@ const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boole
       <time
         className={clsx(
           'mono shrink-0 text-2xs',
-          item.status === 'published' ? 'text-(--green-ink)' : item.status === 'failed' ? 'text-(--danger)' : 'text-(--fg-muted)',
+          item.status === 'published' ? 'text-(--green-ink)' : item.status === 'failed' || item.held ? 'text-(--danger)' : 'text-(--fg-muted)',
         )}
       >
         {item.time}
       </time>
     ) : null}
-    <span className="sr-only">{CHIP_LABEL[item.status]}</span>
+    <span className="sr-only">{item.held ? 'Held' : CHIP_LABEL[item.status]}</span>
   </span>
 );
 
@@ -89,15 +95,15 @@ const KeyHandle: React.FC<{ title: string; attributes: ReturnType<typeof useDrag
   </span>
 );
 
-const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; onOpen: () => void }> = ({ item, compact, onOpen }) => {
+const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selected?: boolean; onOpen: () => void }> = ({ item, compact, selected, onOpen }) => {
   const can = movable(item);
   // The tray shows unsent items too, so grid copies get their own drag id.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `grid:${dragId(item)}`, data: { item }, disabled: !can });
   const drag = dragProps(listeners);
   return (
     <div ref={setNodeRef} {...(can ? drag.card : {})} className={clsx('relative', can && 'cursor-grab active:cursor-grabbing', isDragging && 'opacity-30')}>
-      <button type="button" onClick={onOpen} className={clsx('block w-full rounded-md', can && 'cursor-grab active:cursor-grabbing')} title={item.title}>
-        <Tile item={item} compact={compact} />
+      <button type="button" onClick={onOpen} aria-pressed={selected || undefined} className={clsx('block w-full rounded-md', can && 'cursor-grab active:cursor-grabbing')} title={item.title}>
+        <Tile item={item} compact={compact} selected={selected} />
       </button>
       {can && <KeyHandle title={item.title} attributes={attributes} onKeyDown={drag.keys.onKeyDown} />}
     </div>
@@ -170,9 +176,11 @@ const DayCell: React.FC<{
   items: TimelineCardItem[];
   /** e.g. "Wed, Nov 4", for screen readers. */
   label: string;
+  tag?: string;
+  selectedPostId?: string | null;
   onOpenPost: Props['onOpenPost'];
   onOpenDay: Props['onOpenDay'];
-}> = ({ day, past, today, items, label, onOpenPost, onOpenDay }) => {
+}> = ({ day, past, today, items, label, tag, selectedPostId, onOpenPost, onOpenDay }) => {
   const { setNodeRef, isOver, active } = useDroppable({ id: `day:${day}`, disabled: day === null || past });
   const dropping = isOver && !!active;
   // The whole box writes a post for that day, unless the day has passed or already has its one post.
@@ -198,6 +206,7 @@ const DayCell: React.FC<{
             >
               {day}
             </span>
+            {tag && <span className="kw-daytag" title={tag}>{tag}</span>}
           </span>
           {canAdd && (
             <button
@@ -222,7 +231,7 @@ const DayCell: React.FC<{
                 animate={{ opacity: 1, y: 0, transition: { duration: 0.2, delay: Math.min(0.2, (day ?? 0) * 0.006), ease: [0.2, 0.8, 0.2, 1] } }}
                 exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.16 } }}
               >
-                <DraggableTile item={item} compact onOpen={() => (item.post ? onOpenPost(item.post) : onOpenDay(item.day))} />
+                <DraggableTile item={item} compact selected={!!item.post && item.post.id === selectedPostId} onOpen={() => (item.post ? onOpenPost(item.post) : onOpenDay(item.day))} />
               </m.div>
             ))}
           </AnimatePresence>
@@ -236,7 +245,7 @@ const DayCell: React.FC<{
  * The month at a glance: each post as a picture tile in its day, and a tray of what hasn't gone out yet.
  * Drafts and ideas drag onto another day (mouse, touch or keyboard); past days don't take drops.
  */
-const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText, onOpenPost, onOpenDay, onMovePost, onMoveIdea, hideTray }) => {
+const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText, onOpenPost, onOpenDay, onMovePost, onMoveIdea, hideTray, tags, selectedPostId }) => {
   const [dragging, setDragging] = useState<TimelineCardItem | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -337,6 +346,8 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, unsent, postsLimitText
                 today={day !== null && keyOf(day) === todayKey}
                 items={day ? byDay.get(day) ?? [] : []}
                 label={day ? new Date(year, month, day).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
+                tag={day ? tags?.get(day) : undefined}
+                selectedPostId={selectedPostId}
                 onOpenPost={onOpenPost}
                 onOpenDay={onOpenDay}
               />
