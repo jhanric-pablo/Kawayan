@@ -18,6 +18,7 @@ import type { TimelineCardItem } from './mapCalendarEvents';
 import type { PostChannels } from '../../utils/workspaceFeed';
 import { PRIMARY_BTN } from './PostComposer';
 import { useFocusTrap } from '../../utils/useFocusTrap';
+import KwSelect from '../ui/kw-select';
 
 /**
  * PlanningModal: the month planner.
@@ -102,7 +103,7 @@ interface CapsuleProps {
 const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptions, onUpdate, onDelete, onWrite }) => {
   const [mode, setMode] = useState<'edit' | 'move' | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const dayRef = useRef<HTMLSelectElement>(null);
+  const dayRef = useRef<HTMLButtonElement>(null);
   const FormatIcon = FORMATS.find((f) => f.key === idea.format)?.Icon ?? ImageIcon;
   // Opened from the menu: wait for the menu to hand focus back before the editor takes it.
   const openAs = (m: 'edit' | 'move') => requestAnimationFrame(() => setMode(m));
@@ -152,9 +153,7 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
           )}
           <label className="block space-y-1">
             <span className={LABEL}>Day</span>
-            <select ref={dayRef} value={idea.day} onChange={(e) => onUpdate('day', Number(e.target.value))} className={INPUT}>
-              {dayOptions.map((o) => <option key={o.day} value={o.day}>{o.label}</option>)}
-            </select>
+            <KwSelect triggerRef={dayRef} aria-label="Day" value={String(idea.day)} onValueChange={(v) => onUpdate('day', Number(v))} options={dayOptions.map((o) => ({ value: String(o.day), label: o.label }))} />
           </label>
           <div className="flex items-center justify-between pt-1">
             <button type="button" onClick={() => { setMode(null); onWrite(); }} className="inline-flex items-center gap-1 text-ui font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">

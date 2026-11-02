@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { BrandProfile } from '../types';
 import { Store, Users, MessageCircle, PenTool, Check, Sparkles, Lock } from 'lucide-react';
-import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import { BRAND_VOICES } from '../constants/brandVoices';
 import Stepper, { Step } from './ui/Stepper';
 import './onboarding.css';
 import OnboardingBar from './onboarding/OnboardingBar';
+import IndustryPicker from './forms/IndustryPicker';
 
 interface Props {
   onComplete: (profile: BrandProfile) => void;
@@ -112,21 +112,7 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
                   </div>
                   <div>
                     <label className="bs-label" htmlFor="bs-industry">Industry / Niche</label>
-                    <select
-                      id="bs-industry"
-                      className="input"
-                      value={profile.industry}
-                      onChange={(e) => handleChange('industry', e.target.value)}
-                      autoFocus
-                    >
-                      <option value="" disabled>Select an industry…</option>
-                      {isLegacyIndustry(profile.industry) && (
-                        <option value={profile.industry}>{profile.industry}</option>
-                      )}
-                      {INDUSTRY_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    <IndustryPicker id="bs-industry" value={profile.industry} onChange={(v) => handleChange('industry', v)} autoFocus />
                   </div>
                 </div>
               </Step>

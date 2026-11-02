@@ -4,7 +4,6 @@ import { Radio } from '@base-ui/react/radio';
 import { AlertTriangle, CreditCard, Download, Eye, Link2, Lock, MapPin, MessageSquare, Moon, PlayCircle, ShieldCheck, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { BrandProfile, User } from '../types';
-import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
 import { BRAND_VOICES, isCustomVoice } from '../constants/brandVoices';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
@@ -20,6 +19,7 @@ import { paymentService, Wallet } from '../services/paymentService';
 import { supportService } from '../services/supportService';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import type { ThemePref } from '../utils/sessionView';
+import IndustryPicker from './forms/IndustryPicker';
 
 interface Props {
   profile?: BrandProfile | null;
@@ -325,11 +325,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
               )}
 
               <SettingRow label="Industry" htmlFor="st-industry" hint="Shapes the topics and examples in your captions.">
-                <select id="st-industry" className="input" value={brand.industry} onChange={(e) => setBrandField('industry', e.target.value)}>
-                  <option value="" disabled>Select an industry…</option>
-                  {isLegacyIndustry(brand.industry) && <option value={brand.industry}>{brand.industry}</option>}
-                  {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <IndustryPicker id="st-industry" value={brand.industry} onChange={(v) => setBrandField('industry', v)} />
               </SettingRow>
 
               {'city' in brand && (

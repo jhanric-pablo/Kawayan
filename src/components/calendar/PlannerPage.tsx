@@ -3,6 +3,7 @@ import { CalendarDays, Image as ImageIcon, Loader2, Sparkles, Trash2, Type, Vide
 import type { ContentIdea, GeneratedPost } from '../../types';
 import { phDatesInMonth } from '../../utils/phCalendar';
 import { normalizeFormat } from '../../services/validationService';
+import KwSelect from '../ui/kw-select';
 
 type Extras = { formats?: string[]; dates?: { day: number; name: string }[]; notes?: string };
 
@@ -113,22 +114,16 @@ const PlannerPage: React.FC<Props> = ({
           <div className="flex flex-col gap-[18px] p-4">
             <div className="kw-field">
               <label className="kw-label" htmlFor="pl-month">Month</label>
-              <select
+              <KwSelect
                 id="pl-month"
-                className="input"
                 value={`${month.getFullYear()}-${month.getMonth()}`}
                 disabled={busy}
-                onChange={(e) => {
-                  const [y, m] = e.target.value.split('-').map(Number);
+                onValueChange={(v) => {
+                  const [y, m] = v.split('-').map(Number);
                   onMonthChange(new Date(y, m, 1));
                 }}
-              >
-                {monthOptions.map((d) => (
-                  <option key={d.toISOString()} value={`${d.getFullYear()}-${d.getMonth()}`}>
-                    {d.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })}
-                  </option>
-                ))}
-              </select>
+                options={monthOptions.map((d) => ({ value: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' }) }))}
+              />
             </div>
 
             <div className="kw-field">

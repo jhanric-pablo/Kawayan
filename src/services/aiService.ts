@@ -3,6 +3,7 @@ import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
 import { normalizeIdeasToBatchCount } from "../utils/tierLimits";
 import { storePostImage } from "../utils/postImage";
+import { industryLabel } from '../constants/industries';
 
 // The AI routes need a login: they spend the app's free AI allowance.
 const authHeaders = (): Record<string, string> => {
@@ -71,7 +72,7 @@ export const generateContentPlan = async (
     const prompt = `
     Analyze the following brand profile:
     - Business Name: ${profile.businessName}
-    - Industry: ${profile.industry}
+    - Industry: ${industryLabel(profile.industry)}
     - Target Audience: ${profile.targetAudience}
     - Brand Voice: ${profile.brandVoice}
     - Key Themes: ${profile.keyThemes}
@@ -114,7 +115,7 @@ export const generateContentPlan = async (
 
 export const generatePostCaptionAndImagePrompt = async (profile: BrandProfile, topic: string): Promise<any> => {
   const prompt = `
-    As an expert social media manager for "${profile.businessName}" (${profile.industry}), generate a post about: "${topic}".
+    As an expert social media manager for "${profile.businessName}" (${industryLabel(profile.industry)}), generate a post about: "${topic}".
 
     Brand Identity:
     - Target Audience: ${profile.targetAudience}
@@ -158,7 +159,7 @@ export interface CaptionRewrite {
 /** One targeted edit of an existing caption ("make it shorter"), re-scored. */
 export const rewriteCaption = async (profile: BrandProfile, caption: string, instruction: string): Promise<CaptionRewrite> => {
   const prompt = `
-    You are the social media manager for "${profile.businessName}" (${profile.industry}).
+    You are the social media manager for "${profile.businessName}" (${industryLabel(profile.industry)}).
     Brand voice: ${profile.brandVoice}. Audience: ${profile.targetAudience}.
 
     Rewrite the caption below. Instruction: ${instruction}

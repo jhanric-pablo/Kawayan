@@ -16,6 +16,7 @@ import {
   combineHistories, comparePosts, dailyHistory, growthCsv, isoDay, periods, postsCsv, postsInPeriod, summarize,
 } from '../utils/insightsData';
 import './insights.css';
+import KwSelect from './ui/kw-select';
 
 // 'year' = since January 1 (mockup "This year"); the numbers are "last N days".
 const RANGES = [7, 30, 90, 'year'] as const;
@@ -449,9 +450,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           <p className="page-head__sub">How your pages are growing and which posts work best.</p>
         </div>
         <div className="in-controls">
-          <select className="input h-9! w-auto! min-h-0! py-0" aria-label="Date range" value={String(range)} onChange={(e) => setRange((e.target.value === 'year' ? 'year' : Number(e.target.value)) as Range)}>
-            {RANGES.map((r) => <option key={r} value={String(r)}>{RANGE_LABEL[r]}</option>)}
-          </select>
+          <KwSelect aria-label="Date range" size="sm" className="h-9! w-auto! min-w-36" value={String(range)} onValueChange={(v) => setRange((v === 'year' ? 'year' : Number(v)) as Range)} options={RANGES.map((r) => ({ value: String(r), label: RANGE_LABEL[r] }))} />
           <div className="in-seg" role="group" aria-label="Platform">
             <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
             {(['facebook', 'instagram'] as Platform[]).map((p) => {

@@ -10,6 +10,7 @@ import { getStoredToken, readCachedUser } from '../utils/authSession';
 import ChatThread, { type CallInfo } from './support/ChatThread';
 import { useToast } from './ui/Toast';
 import './support/support.css';
+import KwSelect from './ui/kw-select';
 
 const CallWindow = lazy(() => import('./support/CallWindow'));
 
@@ -371,9 +372,7 @@ const SupportDashboard: React.FC = () => {
                   <dd className="flex items-center gap-1.5"><i className={clsx('h-1.5 w-1.5 rounded-full', DOT[statusOf(selected)])} aria-hidden />{{ open: 'Open', waiting: 'Waiting on owner', snoozed: 'Snoozed', resolved: 'Resolved' }[statusOf(selected)]}</dd>
                   <dt className="text-(--fg-subtle)"><label htmlFor="sd-priority">Priority</label></dt>
                   <dd>
-                    <select id="sd-priority" value={selected.priority} onChange={(e) => update({ priority: e.target.value })} className="h-7 w-full rounded-md border border-(--border) bg-(--bg) px-1.5 text-[13px]">
-                      {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
-                    </select>
+                    <KwSelect id="sd-priority" size="sm" className="h-7!" value={selected.priority} onValueChange={(v) => update({ priority: v })} options={PRIORITIES.map((p) => ({ value: p, label: p }))} />
                   </dd>
                   <dt className="text-(--fg-subtle)">Assignee</dt>
                   <dd className="flex items-center gap-2">

@@ -567,3 +567,14 @@ Tested with a pending account: Home, Messages (own tickets only) and Assistant a
 week / Later" panel; the 7-day grid takes the full card width (the timeline's "Not sent yet" lane is
 a row, not a panel, and stays). Those posts are still in their day tile (drag still works), the List
 view, Post studio's draft groups and the stat cards; the tour step pointing at the tray is gone.
+
+**5 — No more native dropdowns.** Added shadcn select, command, popover-based `IndustryPicker`
+(searchable, keyboard, check on the chosen item) for Industry in Brand DNA and Settings, and a
+`KwSelect` wrapper (shadcn Select) for every other `<select>`: admin role + plan, Insights range,
+support priority, verification reason, planner month, planning-modal day. Options unchanged.
+"Other" shows "What's your niche?" (max 60). Before, "Other" had no free text; the niche is now
+stored in the existing `brand_profiles.industry` text column as `Other: <niche>` for that profile
+only (the server already accepts up to 200 chars, so no server or DB change and no migration); it
+is never added to the list, reloads as "Other" + the niche, and the AI prompts get just the niche.
+(The shadcn CLI also added cmdk, date-fns, react-day-picker and bumped recharts 3.5 → 3.8 for the
+calendar / chart / sidebar components used in later items.)

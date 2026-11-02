@@ -21,6 +21,7 @@ import AdminVerification, { VerifFilter } from './admin/AdminVerification';
 import { parseUtc, timeAgo } from '../utils/adminJobs';
 import './admin/adminConsole.css';
 import { KawayanMark } from './KawayanLogo';
+import KwSelect from './ui/kw-select';
 
 interface Props {
   darkMode: boolean;
@@ -1125,16 +1126,14 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                         </td>
                         <td>
                           {editingUser === u.id ? (
-                            <select
+                            <KwSelect
                               aria-label="Role"
-                              className="input w-auto! py-1! text-xs!"
+                              size="sm"
+                              className="w-auto! min-w-28"
                               value={editForm.role || u.role}
-                              onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
-                            >
-                              <option value="user">User</option>
-                              <option value="admin">Admin</option>
-                              <option value="support">Support</option>
-                            </select>
+                              onValueChange={(v) => setEditForm({ ...editForm, role: v as any })}
+                              options={[{ value: 'user', label: 'User' }, { value: 'admin', label: 'Admin' }, { value: 'support', label: 'Support' }]}
+                            />
                           ) : (
                             <RoleBadge role={u.role} />
                           )}
@@ -1488,11 +1487,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             <TabsContent value="subscription" className="space-y-4">
               <div>
                 <FieldLabel htmlFor="sub-plan">Plan</FieldLabel>
-                <select id="sub-plan" value={subForm.plan} onChange={(e) => setSubForm({ ...subForm, plan: e.target.value })} className="input">
-                  <option value="FREE">Free</option>
-                  <option value="PRO">Pro</option>
-                  <option value="ENTERPRISE">Enterprise</option>
-                </select>
+                <KwSelect id="sub-plan" value={subForm.plan} onValueChange={(v) => setSubForm({ ...subForm, plan: v })} options={[{ value: 'FREE', label: 'Free' }, { value: 'PRO', label: 'Pro' }, { value: 'ENTERPRISE', label: 'Enterprise' }]} />
               </div>
               <div>
                 <FieldLabel htmlFor="sub-expiry">Expiry date</FieldLabel>

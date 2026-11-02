@@ -22,6 +22,27 @@ export const INDUSTRY_OPTIONS = [
 
 export type IndustryOption = (typeof INDUSTRY_OPTIONS)[number];
 
+/**
+ * "Other" with the owner's own niche is stored in the same industry field as "Other: <niche>".
+ * The niche belongs to that profile only; it never joins INDUSTRY_OPTIONS.
+ */
+export const OTHER_PREFIX = 'Other: ';
+export const NICHE_MAX = 60;
+
+/** Splits a stored industry into the dropdown choice and the typed niche (for "Other"). */
+export const splitIndustry = (value: string): { choice: string; niche: string } =>
+  value.startsWith(OTHER_PREFIX) ? { choice: 'Other', niche: value.slice(OTHER_PREFIX.length) } : { choice: value, niche: '' };
+
+/** The stored value for a choice and niche ("Other" + niche → "Other: niche"). */
+export const joinIndustry = (choice: string, niche: string): string => {
+  // Kept as typed while editing (so spaces between words survive); trimmed for the AI and display.
+  const n = niche.replace(/^\s+/, '').slice(0, NICHE_MAX);
+  return choice === 'Other' && n.trim() ? `${OTHER_PREFIX}${n}` : choice;
+};
+
+/** What the AI and staff read: the niche itself for "Other: niche". */
+export const industryLabel = (value: string): string => splitIndustry(value).niche.trim() || value;
+
 /** True when a stored value predates the dropdown (free text from an older profile). */
 export const isLegacyIndustry = (value: string): boolean =>
-  value.trim().length > 0 && !INDUSTRY_OPTIONS.includes(value as IndustryOption);
+  value.trim().length > 0 && !value.startsWith(OTHER_PREFIX) && !INDUSTRY_OPTIONS.includes(value as IndustryOption);

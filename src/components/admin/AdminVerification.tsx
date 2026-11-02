@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, ExternalLink, FileText, Maximize2, Minimize2, RefreshCw, Search, Undo2 } from 'lucide-react';
 import clsx from 'clsx';
 import { parseUtc, timeAgo } from '../../utils/adminJobs';
+import KwSelect from '../ui/kw-select';
 
 export type VerifFilter = 'all' | 'pending' | 'verified' | 'rejected';
 
@@ -282,10 +283,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
 
               <div className="grid gap-2 border-b border-(--border) px-5 py-4">
                 <label htmlFor="vf-reason" className="text-xs font-medium text-(--fg-muted)">If sending back</label>
-                <select id="vf-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)}>
-                  <option value="">Pick a reason…</option>
-                  {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <KwSelect id="vf-reason" value={reason} onValueChange={setReason} placeholder="Pick a reason…" options={REASONS.map((r) => ({ value: r, label: r }))} />
                 <textarea className="input min-h-16 resize-y" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note to the owner (optional)" aria-label="Note to the owner" maxLength={800} />
                 <p className="text-xs text-(--fg-muted)">The owner sees the reason and note, so say what to fix.</p>
               </div>
