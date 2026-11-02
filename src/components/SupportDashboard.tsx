@@ -65,7 +65,7 @@ const SupportDashboard: React.FC = () => {
   const [chatError, setChatError] = useState('');
   const [notes, setNotes] = useState<TicketNote[]>([]);
   const [canned, setCanned] = useState<CannedReply[]>([]);
-  const [biz, setBiz] = useState<{ profile: any; wallet: any } | null>(null);
+  const [biz, setBiz] = useState<{ profile: any; wallet: any; summary?: { verificationStatus?: string; channels?: { platform: string; username?: string; isActive: boolean }[] | null } | null } | null>(null);
   const [calls, setCalls] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [call, setCall] = useState<(CallInfo & { title: string }) | null>(null);
@@ -106,7 +106,7 @@ const SupportDashboard: React.FC = () => {
       .then(([ch, s]) => { if (!cancelled) { setChannel(ch); setSession(s); } })
       .catch(() => !cancelled && setChatError('Could not open this conversation. Check your connection, then pick it again.'));
     loadNotes(selected.id);
-    Promise.all([authJson(`/api/profiles/${selected.userId}`), authJson(`/api/wallet/${selected.userId}`)]).then(([profile, wallet]) => !cancelled && setBiz({ profile, wallet }));
+    Promise.all([authJson(`/api/profiles/${selected.userId}`), authJson(`/api/wallet/${selected.userId}`), Promise.resolve(authJson(`/api/staff/owners/${selected.userId}/summary`)).catch(() => null)]).then(([profile, wallet, summary]) => !cancelled && setBiz({ profile, wallet, summary }));
     setLabelDraft((selected.labels || []).join(', '));
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -409,11 +409,25 @@ const SupportDashboard: React.FC = () => {
                   <dt className="text-(--fg-subtle)">Industry</dt><dd className="truncate">{biz?.profile?.industry || '—'}</dd>
                   <dt className="text-(--fg-subtle)">Plan</dt><dd>{biz?.wallet?.subscription ? (biz.wallet.subscription === 'PRO' ? 'Pro' : biz.wallet.subscription === 'FREE' ? 'Free' : biz.wallet.subscription) : '—'}</dd>
                   <dt className="text-(--fg-subtle)">Wallet</dt><dd>{biz?.wallet?.balance != null ? `₱${Number(biz.wallet.balance).toLocaleString('en-PH')}` : '—'}</dd>
+                  <dt className="text-(--fg-subtle)">Verification</dt>
+                  <dd>{({ verified: 'Approved', approved: 'Approved', pending: 'Waiting for review', rejected: 'Sent back', none: 'Not submitted' } as Record<string, string>)[biz?.summary?.verificationStatus ?? ''] ?? '—'}</dd>
+                  <dt className="text-(--fg-subtle)">Channels</dt>
+                  <dd>
+                    {biz?.summary?.channels == null ? '—' : biz.summary.channels.length === 0 ? 'None connected' : (
+                      <span className="flex flex-wrap gap-x-2 gap-y-0.5">
+                        {biz.summary.channels.map((c) => (
+                          <span key={c.platform + (c.username ?? '')} className={clsx(!c.isActive && 'font-semibold text-(--danger)')}>
+                            {c.platform === 'facebook' ? 'FB' : c.platform === 'instagram' ? 'IG' : c.platform} {c.isActive ? '✓' : '· expired'}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </dd>
                   <dt className="text-(--fg-subtle)">Email</dt><dd className="truncate">{selected.userEmail}</dd>
                 </dl>
               </details>
               <details open>
-                <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-(--fg-muted)">Earlier tickets</summary>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-(--fg-muted)">Other tickets</summary>
                 <div className="grid gap-1 px-2 pb-4">
                   {earlier.length === 0 ? <p className="px-2 text-(--fg-subtle)">None</p> : earlier.map((t) => (
                     <button key={t.id} type="button" onClick={() => setSelectedId(t.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-(--bg)">

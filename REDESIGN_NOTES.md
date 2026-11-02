@@ -391,7 +391,7 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 ## F6. Staff — Support inbox
 - [x] Mine / Unassigned / All; Open / Waiting / Snoozed / Resolved; priority, number, business, "Reply due in…" — **have** (priority, SLA, snooze and labels already exist on tickets; no migration needed)
 - [x] Thread with Claim / Snooze / Resolve, internal notes (amber), Reply / Internal note tabs, saved replies, R / E hints — **have**
-- [ ] Right rail: business, ticket details, other tickets — **FE** (check and fill what's missing)
+- [x] Right rail: business, ticket details, other tickets — **FE** (check and fill what's missing)
 
 ## F7. Auth, Brand DNA, Verification, Landing leftovers
 - [ ] Login: "Forgot password?" beside the password label, "Kept safe" divider + trust list, "Staff sign in" link — **FE**
@@ -513,3 +513,9 @@ tab) and a right rail (business details, a Checks list for the reviewer — not 
 reason" select + note to the owner, Approve / Send back). The rail sits under the viewer below
 1536px. Send back stores reason + note as the existing rejection reason; the R key still opens
 the reason dialog, A still approves, ↑/↓ still move.
+
+**F6 — Support inbox.** Already had the mockup's lists, filters, thread, notes, saved replies and
+rail. Added to the rail's Business section: Verification (Approved / Waiting / Sent back / Not
+submitted) and Channels (FB ✓ · IG · expired) from the new staff-only
+`GET /api/staff/owners/:userId/summary` (read-only; never creates a Zernio profile; "—" if
+Zernio can't be reached). "Earlier tickets" is now "Other tickets".

@@ -3,7 +3,7 @@
 // carries the Kawayan post id in `title` — so no extra DB columns are needed.
 import { Router } from 'express';
 import { z } from 'zod';
-import { dbService, authenticateToken, validate, id, sendUpstreamError, originOf } from '../shared.js';
+import { dbService, authenticateToken, requireStaff, validate, id, sendUpstreamError, originOf } from '../shared.js';
 
 const router = Router();
 
@@ -77,6 +77,34 @@ router.get('/api/social/accounts', authenticateToken, async (req, res) => {
     res.json(await listSocialAccounts(req.user.userId));
   } catch (error) {
     sendUpstreamError(res, error, 'Failed to load social accounts');
+  }
+});
+
+// Staff (support inbox rail): an owner's verification status and which channels are connected.
+// Read-only: unlike listSocialAccounts it never creates a Zernio profile for the owner.
+router.get('/api/staff/owners/:userId/summary', authenticateToken, requireStaff, async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const verification = await dbService.getVerification(userId).catch(() => null);
+    let channels = null;
+    try {
+      const name = `kawayan:${userId}`;
+      const known = zernioProfileIds.get(userId);
+      const profileId = known || (await zernio(`/profiles?name=${encodeURIComponent(name)}`)).profiles?.find((p) => p.name === name)?._id;
+      if (profileId) {
+        const { accounts = [] } = await zernio(`/accounts?profileId=${profileId}`);
+        channels = accounts
+          .filter((a) => SOCIAL_PLATFORMS.includes(a.platform))
+          .map((a) => ({ platform: a.platform, username: a.username, isActive: !!a.isActive }));
+      } else {
+        channels = [];
+      }
+    } catch {
+      channels = null; // Zernio unreachable or not set up: the rail shows "—".
+    }
+    res.json({ verificationStatus: verification?.status ?? 'none', channels });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load owner summary' });
   }
 });
 
