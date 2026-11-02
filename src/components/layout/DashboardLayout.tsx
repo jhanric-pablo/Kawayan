@@ -53,6 +53,8 @@ interface Props {
   themePref?: ThemePref;
   onChooseTheme?: (pref: ThemePref) => void;
   onReplayTour?: () => void;
+  /** Opens a ticket on the Help desk page (notifications). */
+  onOpenTicket?: (ticketId: string) => void;
   /** Brand profile name (falls back to the account's business name). */
   businessName?: string;
   children: React.ReactNode;
@@ -196,7 +198,7 @@ const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navig
 
 const ENGINE_DOT = { ok: 'bg-(--success)', warn: 'bg-(--amber)', down: 'bg-(--danger)', idle: 'bg-(--fg-subtle)' };
 
-const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account, onNavigate, onHome, onCreatePost, onOpenPost, darkMode, onToggleTheme, themePref, onChooseTheme, onReplayTour, businessName, children }) => {
+const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account, onNavigate, onHome, onCreatePost, onOpenPost, darkMode, onToggleTheme, themePref, onChooseTheme, onReplayTour, onOpenTicket, businessName, children }) => {
   const toast = useToast();
   const isUser = user.role === 'user';
   const feed = useWorkspaceFeed(isUser ? user.id : undefined);
@@ -443,7 +445,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
                   onOpenPost={openPost}
                   payments={payments}
                   tickets={tickets}
-                  onOpenTicket={() => (navItems.some((i) => i.id === ViewState.HELP) ? onNavigate(ViewState.HELP) : setHelpOpen(true))}
+                  onOpenTicket={(id) => (navItems.some((i) => i.id === ViewState.HELP) ? (onOpenTicket ? onOpenTicket(id) : onNavigate(ViewState.HELP)) : setHelpOpen(true))}
                   onOpenSettings={() => onNavigate(ViewState.SETTINGS)}
                 />
               </>

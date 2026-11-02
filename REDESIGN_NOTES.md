@@ -376,7 +376,7 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Delete account — **API** (`DELETE /api/auth/me`, confirm by typing the email)
 
 ## F3. Help desk (owner)
-- [ ] Help desk page (`/help`): ticket list with status badges + search, conversation thread (mine tinted green), reply box with attachment, "Ask the assistant" card, New ticket — **FE** (reuses the Help panel's ticket/chat logic; the slide-over panel stays)
+- [x] Help desk page (`/help`): ticket list with status badges + search, conversation thread (mine tinted green), reply box with attachment, "Ask the assistant" card, New ticket — **FE** (reuses the Help panel's ticket/chat logic; the slide-over panel stays)
 
 ## F4. Staff — Admin overview
 - [ ] 4 stat cards: Businesses, Permits to review, Payments to verify, Open tickets — **FE**
@@ -488,3 +488,11 @@ and "Your data": Export my data (JSON of account without password, brand profile
 tickets) and Delete account (type your email; new `DELETE /api/auth/me`, owners only). Reconnect
 buttons around the app now open Settings › Channels; the /social page and its nav item stay.
 The mockup's two-factor switch is not shown: the app has no 2FA.
+
+**F3 — Help desk.** New `/help` page and "Help desk" sidebar item (Account group). Left: search
+(title, #number, topic), tickets with Open / Replied / Resolved badges and "#N · Joel replied 12m
+ago", and an "Ask the assistant" card (same support bot; "Ask a person instead" fills a new
+ticket). Right: the conversation (same Stream chat as the Help panel, your messages green, attach
+button, Mark resolved, rating once resolved) or the New ticket form (topic + urgency). On phones
+the list and conversation swap. Notifications' "Open ticket" and Billing's "Talk to us" open it.
+The slide-over Help panel (⌘/) stays, with voice and video calls.

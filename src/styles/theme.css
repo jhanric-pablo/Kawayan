@@ -672,3 +672,15 @@ input:focus, textarea:focus, select:focus {
 .kw-cells > .is-hl { background: color-mix(in srgb, var(--green) 5%, var(--card)); }
 @media (min-width: 768px) { .kw-cells--3 { grid-template-columns: repeat(3, 1fr); } }
 .kw-tbl--static tbody tr { cursor: default; }
+
+/* Help desk: ticket list | conversation (mockup .split / .tlist) */
+.kw-split { display: grid; min-height: 620px; }
+@media (min-width: 1024px) { .kw-split { grid-template-columns: 320px minmax(0, 1fr); } .kw-split__list { border-right: 1px solid var(--border); } }
+.kw-split__list { display: flex; flex-direction: column; min-width: 0; }
+.kw-split__main { display: flex; flex-direction: column; min-width: 0; height: min(78vh, 760px); }
+.kw-tlist { border-top: 1px solid var(--border); }
+.kw-tlist > button { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 12px 16px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
+.kw-tlist > button:hover { background: var(--muted); }
+.kw-tlist > button[aria-current="true"] { background: var(--muted); box-shadow: inset 2px 0 0 var(--green); }
+.kw-tlist b { font-weight: 500; font-size: 14px; }
+@media (max-width: 1023px) { .kw-split > .is-away { display: none; } .kw-split__main { height: min(80vh, 720px); } }

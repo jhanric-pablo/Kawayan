@@ -16,6 +16,7 @@ import AccountMenu from './components/AccountMenu';
 import { usePhone } from './utils/usePhone';
 import InsightsDashboard from './components/InsightsDashboard';
 import SocialAccounts from './components/SocialAccounts';
+import HelpDesk from './components/HelpDesk';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
 import VerificationStatusScreen from './components/VerificationStatus';
@@ -88,6 +89,7 @@ const App: React.FC = () => {
   const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
   // Settings section to open on arrival (e.g. Channels from a Reconnect button); cleared on leaving.
   const [settingsSection, setSettingsSection] = useState<string | undefined>();
+  const [helpTicketId, setHelpTicketId] = useState<string | null>(null);
   useEffect(() => {
     if (view !== ViewState.SETTINGS) setSettingsSection(undefined);
   }, [view]);
@@ -535,6 +537,7 @@ const App: React.FC = () => {
     { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
     { id: ViewState.SOCIAL, label: 'Channels', icon: Share2, roles: ['user'], group: 'Account', tour: 'nav-social' },
     { id: ViewState.BILLING, label: 'Plan and billing', icon: CreditCard, roles: ['user'], group: 'Account', tour: 'nav-billing' },
+    { id: ViewState.HELP, label: 'Help desk', icon: LifeBuoy, roles: ['user'], group: 'Account' },
   ].filter((item) => item.roles.includes(user?.role || ''));
 
   // A 'user' account that isn't verified yet must stay on the verification
@@ -712,8 +715,11 @@ const App: React.FC = () => {
                     setCalendarIntent({ type: 'compose' });
                     goTo(ViewState.STUDIO);
                   }}
+                  onTalkToUs={() => goTo(ViewState.HELP)}
                 />
               );
+            case ViewState.HELP:
+              return <HelpDesk initialTicketId={helpTicketId} key={helpTicketId ?? 'help'} />;
             case ViewState.SUPPORT_DASHBOARD:
               return <SupportDashboard />;
             case ViewState.ADMIN_DASHBOARD:
@@ -761,6 +767,10 @@ const App: React.FC = () => {
           themePref={themePref}
           onChooseTheme={chooseTheme}
           onReplayTour={user.role === 'user' ? handleReplayTour : undefined}
+          onOpenTicket={(id) => {
+            setHelpTicketId(id);
+            goTo(ViewState.HELP);
+          }}
           businessName={brandProfile?.businessName || user.businessName}
         >
           <div className={pageClass}>{page}</div>
