@@ -14,6 +14,7 @@ const LINKS: { id: string; label: string }[] = [
   { id: 'features', label: 'Features' },
   { id: 'why', label: 'Why Kawayan' },
   { id: 'pricing', label: 'Pricing' },
+  { id: 'faq', label: 'FAQ' },
 ];
 
 /**
@@ -80,11 +81,10 @@ const LandingNav: React.FC<Props> = ({ onNavigate, darkMode, toggleTheme }) => {
 
   return (
     <>
-      <nav className={`lnav${scrolled ? ' is-scrolled' : ''}${menuOpen ? ' is-menu' : ''}`}>
+      <nav className={`lnav${scrolled ? ' is-scrolled' : ''}${menuOpen ? ' is-menu' : ''}`} aria-label="Main">
         <div className="lnav__inner">
           <button type="button" className="lnav__brand" onClick={toTop} aria-label="Kawayan — back to top">
-            {/* Light letters over the dark hero, normal ones once the bar turns light on scroll */}
-            <KawayanLogo size={17} onDark={!scrolled} />
+            <KawayanLogo size={17} />
           </button>
 
           <div className="lnav__links">

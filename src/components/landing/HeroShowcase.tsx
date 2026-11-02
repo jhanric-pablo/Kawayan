@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import PhonePreview from '../calendar/PhonePreview';
-import TimelinePostCard, { type TimelineCardItem } from '../calendar/TimelinePostCard';
+import { StatusBadge, type CardStatus } from '../calendar/TimelinePostCard';
 import { ViewState } from '../../types';
 import { prefersReducedMotion, useInView } from './useLandingMotion';
 
@@ -35,43 +35,52 @@ const SHOPS: Shop[] = [
 
 const STEP_MS = 4200;
 
-/** The business types that scroll down the right edge, as before. */
-const BUSINESS_TYPES = [
+/** Every business type Kawayan is made for; shown in the strip under the hero. */
+export const BUSINESS_TYPES = [
   'Coffee Shop', 'Sari-sari Store', 'Milk Tea Kiosk', 'Panaderia', 'Carinderia',
   'Ukay Boutique', 'Barbershop', 'Hardware Store', 'Lechon Manok Stall', 'Beauty Salon',
   'Frozen Goods Reseller', 'Halamanan / Plant Shop', 'Native Delicacies', 'Print & Layout Shop',
   'Motoparts Supply', 'Poultry Farm',
 ];
 
-/** The selected shop's week, as the real timeline cards from the calendar. */
+/** The selected shop's week as three post cards (mockup .lane / .post). */
 const WeekLane: React.FC<{ shop: Shop }> = ({ shop }) => {
-  const items: TimelineCardItem[] = [
-    { key: 'a', day: 3, status: 'published', title: shop.week[0], imageUrl: shot(shop, 1) },
-    { key: 'b', day: 5, status: 'scheduled', time: '9:00 AM', title: shop.week[1], imageUrl: shot(shop, 2) },
-    { key: 'c', day: 7, status: 'draft', title: shop.week[2], imageUrl: shot(shop, 3) },
+  const items: { status: CardStatus; time?: string; title: string; img: string; when: string }[] = [
+    { status: 'published', title: shop.week[0], img: shot(shop, 1), when: 'Mon 3 · 6:00 AM' },
+    { status: 'scheduled', time: '9:00 AM', title: shop.week[1], img: shot(shop, 2), when: 'Wed 5 · 9:00 AM' },
+    { status: 'draft', title: shop.week[2], img: shot(shop, 3), when: 'Fri 7 · 7:30 AM' },
   ];
-  const days = ['Mon 3', 'Wed 5', 'Fri 7'];
   return (
-    <div className="lp-hs-lane" aria-hidden="true">
-      <p className="lp-hs-lane__head">This week</p>
-      {items.map((item, i) => (
-        <div key={`${shop.type}-${item.key}`} className="lp-hs-lane__slot" style={{ '--n': i } as React.CSSProperties}>
-          <span className="lp-hs-lane__day">{days[i]}</span>
-          <TimelinePostCard item={item} onOpen={() => {}} />
-        </div>
-      ))}
+    <div className="lp-shot__main" aria-hidden="true">
+      <div className="lp-shot__head">
+        <b>This week</b>
+        <span className="badge badge-sage mono">Mon 3 – Sun 9</span>
+        <span className="badge lp-shot__chan">Facebook</span>
+      </div>
+      <div className="lp-lane">
+        {items.map((item, i) => (
+          <article key={`${shop.key}-${i}`} className="lp-post" style={{ '--n': i } as React.CSSProperties}>
+            <img src={item.img} alt="" />
+            <div>
+              <StatusBadge status={item.status} time={item.time} />
+              <b>{item.title}</b>
+              <small className="mono">{item.when}</small>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 };
 
 /**
- * The hero's three parts: the pitch, the selected shop shown in the real Kawayan UI,
- * and a roller of business types that picks the shop (on its own, or by click).
+ * The hero: the pitch, centred over a dot grid, then a framed screenshot of the selected shop in the
+ * real Kawayan UI. The shop changes on its own every few seconds (the business-type strip below lists them all).
  */
 const HeroShowcase: React.FC<{ onNavigate: (v: ViewState) => void }> = ({ onNavigate }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const inView = useInView(rootRef, 0.2);
-  const [pos, setPos] = useState(0); // keeps counting up, so rows slide instead of jumping on wrap
+  const [pos, setPos] = useState(0);
   const shop = SHOPS[((pos % SHOPS.length) + SHOPS.length) % SHOPS.length];
 
   useEffect(() => {
@@ -84,43 +93,32 @@ const HeroShowcase: React.FC<{ onNavigate: (v: ViewState) => void }> = ({ onNavi
     <div ref={rootRef} className="lp-hs">
       {/* 1. The pitch */}
       <div className="lp-hs__copy">
-        <span className="lp-hs__kicker"><i /> For every Filipino MSME</span>
+        <span className="lp-hs__kicker"><b>New</b> For every Filipino MSME</span>
         <h1 className="lp-hs__title">
-          Social Media <br />
-          <span className="text-sage-400">On Autopilot.</span>
+          Social Media <em>On Autopilot.</em>
         </h1>
         <p className="lp-hs__lede">
           Taglish captions, images and a posting schedule for your{' '}
           <b key={shop.type} className="lp-hs__type">{shop.type.toLowerCase()}</b>, all on one calendar.
         </p>
         <div className="lp-hs__actions">
-          <button type="button" onClick={() => onNavigate(ViewState.SIGNUP)} className="lp-hs__cta">
-            Start Free Trial <ArrowRight className="h-5 w-5" aria-hidden />
+          <button type="button" onClick={() => onNavigate(ViewState.SIGNUP)} className="btn btn-primary btn-lg">
+            Start Free Trial <ArrowRight className="h-4 w-4" aria-hidden />
           </button>
-          <a href="#how" className="lp-hs__link">See how it works</a>
+          <a href="#how" className="btn btn-outline btn-lg">See how it works</a>
         </div>
         <p className="lp-hs__fine">Create your first content calendar in minutes. No credit card required.</p>
         <p className="sr-only" aria-live="polite">Showing a sample post for a {shop.type}.</p>
       </div>
 
       {/* 2. The selected shop, in the real UI */}
-      <div className="lp-hs__stage">
-        <WeekLane shop={shop} />
-        <div className="lp-hs__phone">
-          <PhonePreview businessName={shop.name} caption={shop.caption} imageUrl={shot(shop, 1)} defaultPlatform="facebook" sampleStats />
-          <span className="lp-hs__ai"><Sparkles aria-hidden /> Image made by Kawayan AI</span>
-        </div>
-      </div>
-
-      {/* 3. Business types scrolling down the right edge (the original marquee) */}
-      <div className="lp-hs__marquee" aria-hidden="true">
-        <div className="flex flex-col items-end gap-3 animate-scroll-y">
-          {[...BUSINESS_TYPES, ...BUSINESS_TYPES].map((biz, i) => (
-            <div key={i} className="flex w-max items-center gap-2.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm px-4 py-2.5">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-sage-400" />
-              <span className="eyebrow lg:text-xs text-white/80 whitespace-nowrap">{biz}</span>
-            </div>
-          ))}
+      <div className="lp-shot">
+        <div className="lp-shot__in">
+          <WeekLane shop={shop} />
+          <div className="lp-shot__side">
+            <PhonePreview businessName={shop.name} caption={shop.caption} imageUrl={shot(shop, 1)} defaultPlatform="facebook" sampleStats />
+            <span className="lp-hs__ai"><Sparkles aria-hidden /> Image made by Kawayan AI</span>
+          </div>
         </div>
       </div>
     </div>

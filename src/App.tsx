@@ -791,26 +791,31 @@ const App: React.FC = () => {
         <SpotlightTour open={tourOpen} onClose={closeTour} firstRun={tourFirstRun} businessName={brandProfile?.businessName} />
       )}
 
-      {/* Footer */}
+      {/* Footer: the last band of the ruled landing page */}
       {view === ViewState.LANDING && (
-        <footer className="mt-auto py-7 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-          <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <KawayanLogo size={17} />
-              <span className="text-xs" style={{ color: 'var(--fg-subtle)' }}>© 2025 Built for Philippine MSMEs</span>
+        <footer className="lp-foot">
+          <div className="lp-foot__rail">
+            <div className="lp-foot__row">
+              <div className="flex items-center gap-3">
+                <KawayanLogo size={17} />
+                <span className="text-xs" style={{ color: 'var(--fg-muted)' }}>© 2025 Built for Philippine MSMEs</span>
+              </div>
+              <div className="flex items-center gap-1 text-ui" style={{ color: 'var(--fg-muted)' }}>
+                <button type="button" onClick={() => navigate('/privacy')} className="min-h-9 rounded-md px-2.5 hover:bg-(--muted) hover:text-(--fg)">Privacy</button>
+                <button type="button" onClick={() => navigate('/terms')} className="min-h-9 rounded-md px-2.5 hover:bg-(--muted) hover:text-(--fg)">Terms</button>
+                {!user && (
+                  <button
+                    type="button"
+                    onClick={() => navigateView(ViewState.ADMIN_LOGIN)}
+                    aria-label="Staff sign in"
+                    className="grid h-9 w-9 place-items-center rounded-md opacity-60 hover:bg-(--muted) hover:opacity-100"
+                  >
+                    <Lock className="w-3.5 h-3.5" aria-hidden />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-5 text-xs" style={{ color: 'var(--fg-muted)' }}>
-              <button type="button" onClick={() => navigate('/privacy')} className="hover:text-emerald-500 transition-colors">Privacy</button>
-              <button type="button" onClick={() => navigate('/terms')} className="hover:text-emerald-500 transition-colors">Terms</button>
-              {!user && (
-                <button
-                  onClick={() => navigateView(ViewState.ADMIN_LOGIN)}
-                  className="flex items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
-                >
-                  <Lock className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            <div className="lp-foot__big" aria-hidden="true">Kawayan</div>
           </div>
         </footer>
       )}

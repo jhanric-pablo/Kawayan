@@ -95,13 +95,13 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Support chat thread (`support/ChatThread`)
 
 ### Public / onboarding
-- [ ] Landing: header (`LandingNav`)
-- [ ] Landing: hero (`HeroShowcase`) — roller removed, auto-cycling shops kept
-- [ ] Landing: business-type strip (marquee)
-- [ ] Landing: Features
-- [ ] Landing: How it works
-- [ ] Landing: Why Kawayan (animation unchanged)
-- [ ] Landing: pricing / CTA / footer (whatever exists in `LandingPage.tsx`)
+- [x] Landing: header (`LandingNav`)
+- [x] Landing: hero (`HeroShowcase`) — roller removed, auto-cycling shops kept
+- [x] Landing: business-type strip (marquee)
+- [x] Landing: Features
+- [x] Landing: How it works
+- [x] Landing: Why Kawayan (animation unchanged)
+- [x] Landing: pricing / CTA / footer (whatever exists in `LandingPage.tsx`)
 - [x] Log in (`Login`, `AuthShell`, `AuthField`)
 - [x] Sign up (`SignupStory`, `StepProgress`, `PasswordMeter`)
 - [x] Staff login (ADMIN_LOGIN)
@@ -135,8 +135,8 @@ Legend: `[ ]` todo, `[x]` restyled.
   was added, since that would be a new setting.
 - **Integrations hub section** on the landing page (Facebook / Instagram / GCash / Maya diagram).
 - **Gallery** of AI images on the landing page (the mockup's `img/*.jpg` samples are not app content).
-- **Testimonials wall** ("What shop owners say") — the mockup itself marks them as sample quotes.
-- **Contact form** and **FAQ** sections on the landing page.
+- **Contact form** section on the landing page. (Testimonials and FAQ already existed in the app,
+  so they were restyled into the mockup's wall-of-quotes and two-column FAQ.)
 - **Footer sitemap** with big outlined "Kawayan" wordmark.
 - **Announcement pill** ("New · Plan a whole month in one click") linking to the planner.
 - Calendar: **stat cards row** (posts this month, drafts to approve, needs attention, avg reach
@@ -219,3 +219,18 @@ Legal pages: tabs-style Terms/Privacy switch, green rail on the active section.
 Check: sign up all 3 steps (permit upload), staff login at /admin-portal, reset link, Brand DNA all
 4 steps, verification pending / rejected (re-upload) / approved, /privacy and /terms.
 Left: the mockup's testimonial card beside the login form is not added (it is a sample quote).
+
+**Step 7 — landing page.** Rebuilt on the mockup's ruled page: a centred 1152px column with side
+rails, full-width bands with "+" marks, dashed spacer rows, a floating pill header (links now include
+FAQ), a dot grid behind a centred hero, and a framed "screenshot" of the selected shop (week lane +
+phone preview) that still changes by itself every ~4.2 s. The right-side business-type roller is
+gone; the band under the hero is the mockup's strip ("Made for every Filipino MSME", all 16 types in
+mono uppercase with green dots, one slow seamless row with faded edges, pauses on hover, a static
+wrapped list with reduced motion, plus a screen-reader list). Stats, "Trusted by", How it works,
+Features, testimonials, pricing (cells, Pro highlighted green-soft), trust strip, FAQ (title left /
+questions right), CTA with the mockup's strip, and the footer with the outlined "Kawayan" word.
+Why Kawayan: same markup and animation; now on the near-black band with #111113 cards.
+Removed: the pinned/parallax hero scroll effect and mouse parallax (decorative motion only).
+Check: header links/active section, phone menu, theme toggle, hero CTAs, FAQ open/close, pricing
+buttons → sign up, footer Privacy/Terms/staff lock, reduced motion.
+Left: unused old landing CSS is cleaned up in step 9.
