@@ -178,7 +178,7 @@ const ACCOUNT_VIEWS = new Set<ViewState>([ViewState.SOCIAL, ViewState.BILLING, V
 
 const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 
-const ENGINE_DOT = { ok: 'bg-(--success)', warn: 'bg-amber-500', down: 'bg-(--danger)', idle: 'bg-(--fg-subtle)' };
+const ENGINE_DOT = { ok: 'bg-(--success)', warn: 'bg-(--amber)', down: 'bg-(--danger)', idle: 'bg-(--fg-subtle)' };
 
 const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account, onNavigate, onHome, onCreatePost, onOpenPost, darkMode, onToggleTheme, children }) => {
   const toast = useToast();

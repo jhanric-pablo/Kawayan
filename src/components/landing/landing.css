@@ -411,7 +411,7 @@
 .lp-pv__bar { font-size: var(--text-2xs); font-weight: 700; padding: 0.15rem 0.25rem 0.4rem; transition: color 0.4s ease; }
 .lp-pv__head { display: flex; align-items: center; gap: 0.35rem; font-size: var(--text-2xs); font-weight: 600; padding: 0 0.25rem 0.4rem; color: #1c2320; }
 .lp-pv__avatar { width: 1rem; height: 1rem; border-radius: 50%; background: var(--color-emerald-500); transition: box-shadow 0.4s ease; }
-.lp-pv__img { height: 4.75rem; border-radius: 0.5rem; background: linear-gradient(135deg, #c98a4b, #7a4a22); transition: height 0.4s ease; }
+.lp-pv__img { height: 4.75rem; border-radius: 0.5rem; background: linear-gradient(135deg, #c98a4b, #7a4a22); }
 .lp-pv__lines { display: grid; gap: 0.25rem; padding: 0.45rem 0.25rem 0.2rem; }
 .lp-pv__lines i { height: 0.3rem; border-radius: 2px; background: #e1e4e4; }
 .lp-pv__lines i:last-child { width: 60%; }
@@ -561,8 +561,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(rgba(156, 176, 128, 0.14) 1px, transparent 1.4px);
-  background-size: 30px 30px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
   -webkit-mask-image: radial-gradient(80% 60% at 50% 30%, #000, transparent 80%);
   mask-image: radial-gradient(80% 60% at 50% 30%, #000, transparent 80%);
 }
@@ -570,9 +570,9 @@
 .lp-why__inner { position: relative; max-width: 60rem; margin: 0 auto; }
 
 .lp-eyebrow--on-dark {
-  color: var(--color-sage-200);
-  background: rgba(156, 176, 128, 0.12);
-  border-color: rgba(156, 176, 128, 0.3);
+  color: #a1a1aa;
+  background: #111113;
+  border-color: #262626;
 }
 
 /* The word, split under "Kaway" and under the whole of "Kawayan" */
@@ -661,18 +661,18 @@
 .lp-why-col {
   padding: 1.5rem;
   border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(156, 176, 128, 0.18);
+  background: #111113;
+  border: 1px solid #262626;
 }
 .lp-why-col__viz {
   height: 13rem;
   margin-bottom: 1.25rem;
   border-radius: var(--radius-lg);
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(156, 176, 128, 0.12);
+  background: #0a0a0a;
+  border: 1px solid #262626;
   overflow: hidden;
 }
-.lp-why-col__title { font-size: var(--text-xl); font-weight: 700; color: #fff; line-height: 1.2; }
+.lp-why-col__title { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; color: #fff; line-height: 1.2; }
 .lp-why-col__from { font-size: var(--text-sm); color: rgba(233, 238, 235, 0.6); margin-bottom: 1rem; }
 
 /* Connection: a post types itself out, then customers reply */
@@ -788,11 +788,11 @@
   margin: 0 auto;
   padding: 0.6rem 1.2rem;
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 500;
   font-size: var(--text-base);
-  color: var(--color-sage-200);
-  background: rgba(156, 176, 128, 0.1);
-  border: 1px solid rgba(156, 176, 128, 0.28);
+  color: #5fd39a;
+  background: #111113;
+  border: 1px solid #262626;
 }
 
 
@@ -851,16 +851,12 @@
 .lp-band--why { background: #0a0a0a; border-bottom-color: #262626; }
 .lp-band--why .lp-rail { border-color: #262626; }
 .lp-band--why .lp-px { background: linear-gradient(#a1a1aa, #a1a1aa) center / 1px 100% no-repeat, linear-gradient(#a1a1aa, #a1a1aa) center / 100% 1px no-repeat; }
-.lp-why__dots { background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px); background-size: 18px 18px; }
-.lp-eyebrow--on-dark { color: #a1a1aa; background: #111113; border-color: #262626; }
-.lp-why-col { background: #111113 !important; border-color: #262626 !important; border-radius: 12px !important; }
-.lp-why-col__title { font-weight: 600; letter-spacing: -0.02em; }
+.lp-why-col { border-radius: 12px; }
 .lp-why-col__from { color: #a1a1aa; }
 .lp-why-col__from i { color: #fafafa; }
 .lp-why-col__list li { color: #c4c4cc; }
 .lp-why-col__list li::before { background: #5fd39a !important; }
 .lp-grow__label { color: #a1a1aa; }
-.lp-why__tag { color: #5fd39a !important; }
 .lp-why__lede { color: #c4c4cc !important; }
 
 /* ═══ Footer (App.tsx) ═══ */
@@ -875,3 +871,7 @@
 /* The hero frame peeks out of the band like a cropped screenshot */
 .lp-shot__in { max-height: 460px; -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent); mask-image: linear-gradient(to bottom, #000 78%, transparent); }
 @media (max-width: 900px) { .lp-shot__in { max-height: none; -webkit-mask-image: none; mask-image: none; } .lp-shot__side { display: none; } }
+/* The in-app "Reduce motion" setting (Accessibility widget) stops the strip too */
+html.a11y-reduce-motion .lp-marquee { -webkit-mask-image: none; mask-image: none; padding: 0 20px; }
+html.a11y-reduce-motion .lp-marquee > div { animation: none; width: auto; flex-wrap: wrap; justify-content: center; gap: 10px 28px; }
+html.a11y-reduce-motion .lp-marquee span:nth-child(n + 17) { display: none; }

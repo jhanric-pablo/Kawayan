@@ -195,7 +195,7 @@
 .in-cmp__cell { display: grid; gap: 0.35rem; align-content: center; font-size: var(--text-sm); color: var(--fg); font-variant-numeric: tabular-nums; }
 .in-cmp__val { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .in-cmp__bar { height: 5px; border-radius: 99px; background: var(--bg-alt); overflow: hidden; }
-.in-cmp__bar b { display: block; height: 100%; border-radius: inherit; background: var(--border-strong); transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.in-cmp__bar b { display: block; height: 100%; border-radius: inherit; background: var(--border-strong); }
 .in-cmp__cell.is-best { font-weight: 600; }
 .in-cmp__cell.is-best .in-cmp__bar b { background: var(--green); }
 .in-cmp__grid > .is-key { background: var(--bg-alt); border-bottom-color: transparent; }

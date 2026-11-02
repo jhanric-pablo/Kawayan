@@ -70,7 +70,7 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Spotlight tour (`tour/*`)
 - [x] Accessibility widget (floating, public pages) + Settings › Appearance version
 - [x] Support-role "calendar is for SME accounts" placeholder (App.tsx)
-- [ ] Generic top nav for non-dashboard signed-in views (App.tsx)
+- [x] Generic top nav for non-dashboard signed-in views (App.tsx)
 
 ### Owner screens
 - [x] Calendar: header, stats/up-next, toolbar, Segmented view switch
@@ -123,10 +123,10 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Call window (`support/CallWindow`, `callWindow.css`)
 
 ### Final pass
-- [ ] Dark mode on every screen
-- [ ] 390px: no sideways scroll, drawer, stacked grids, tables scroll in their box
-- [ ] Reduced motion: no movement, no marquee
-- [ ] Remove CSS no longer imported
+- [x] Dark mode on every screen
+- [x] 390px: no sideways scroll, drawer, stacked grids, tables scroll in their box
+- [x] Reduced motion: no movement, no marquee
+- [x] Remove CSS no longer imported
 
 ## Shown in the mockup but not in the app (ideas only, not built)
 
@@ -248,3 +248,48 @@ Settings › Allow registrations / Maintenance), verification approve/reject, su
 internal note, call join/leave/expand/dock.
 Left: on phones the admin console keeps its horizontal tab row (no drawer) — it already works and
 needs no new state.
+
+**Step 9 — final pass.** Swept every component for old palette utilities (emerald/sage/slate/amber/red
+hard-codes, `font-bold`, brand fills) and re-pointed them at the tokens; folded the Why-band
+overrides into the base rules; removed CSS nothing uses any more (old hero roller, glow border,
+section blobs, phone tab bar, sidebar `.adm-nav` rules, unused scroll/pulse keyframes,
+`.dot-pattern-dark`); removed the last width/height transitions. Checked: dark mode on every screen,
+390px on landing, auth, Brand DNA, verification, legal, calendar, insights, billing, settings,
+social and support (page `scrollWidth` = 390 everywhere), reduced motion (static business-type
+list, no hero cycling), and the in-app "Reduce motion" setting also stops the strip.
+Contrast (WCAG, 4.5:1 minimum) for every text/background token pair, both themes:
+fg/bg 19.0 · muted-fg/bg 5.1 (light) 7.8 (dark) · muted-fg/muted 4.8 / 6.7 · white on green 5.4 ·
+green-fg on dark green 7.7 · green-ink on green-soft 7.1 / 10.1 · amber on amber-soft 5.8 / 9.0 ·
+danger on card 5.9 / 6.8 · staff sidebar #a1a1aa on #0a0a0a 7.7. All pass.
+
+## Files changed (whole redesign)
+
+`index.html`, `package.json`, `package-lock.json` (adds @fontsource/geist, geist-mono, fraunces),
+`REDESIGN_NOTES.md`, `src/index.tsx`, `src/App.tsx`, `src/styles/theme.css`,
+`src/styles/accessibility.css`, `src/components/`: AccessibilityWidget, AccountMenu, AdminDashboard,
+AppHydrationLoader, Billing, ContentCalendar, HelpPanel, InsightsDashboard, KawayanLogo, LandingPage,
+LegalPage, OrganicDialog, Settings, SettingsAppearance, SocialAccounts, SupportDashboard,
+VerificationStatus, appShell.css, insights.css, onboarding.css; `admin/` AdminVerification,
+adminConsole.css; `auth/` AuthShell, ResetPassword, authShell.css; `calendar/` ChannelTimelineTrack,
+FormatPicker, MonthGrid, PhonePreview, PlanningModal, PostComposer, PostCountPicker, PostDetailSheet,
+Segmented, TimelinePostCard, kawayanCalendar.css; `landing/` HeroShowcase, LandingNav, landing.css;
+`layout/` DashboardLayout, NotificationCenter; `settings/` SettingsParts, VoicePreview; `support/`
+callWindow.css, support.css; `tour/tour.css`; `ui/` DynamicIslandAlert, button, dialog,
+dropdown-menu, popover, sheet, stepper.css, switch, tabs.
+
+## Test by hand (needs real keys / a backend)
+
+1. Sign up: all three steps incl. permit upload and terms → verification pending screen.
+2. Admin approval: staff login at /admin-portal → Verification → approve → owner screen flips to approved.
+3. Brand DNA: all four steps → lands on the calendar and the tour starts.
+4. Generate a month: Plan month → plan ideas → create posts; check the planner progress bar.
+5. Approve a post: open a draft (side panel on a wide window, sheet on a narrow one) → Edit →
+   schedule; drag a draft to another day; Reschedule from the panel.
+6. Publish: Post now / Schedule to Facebook and Instagram; check the notification center and the
+   "Posted" chip/badge; Retry a failed post.
+7. Payment: Billing → top up via PayMongo (test card) and Upgrade to Pro; cancel a pending payment.
+8. Support chat and call: Help → message, voice and video call from the owner; reply, internal
+   note, join/expand/dock the call from the support inbox.
+9. Theme: top-bar toggle, Settings › Appearance, admin Settings › Appearance; accessibility widget
+   (public pages) and Settings › Accessibility (text size, high contrast, reduce motion).
+10. Phone: open/close the drawer, ⌘K help on desktop, landing phone menu.

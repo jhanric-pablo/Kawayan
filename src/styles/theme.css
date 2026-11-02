@@ -118,24 +118,11 @@
 
   /* Motion: small things 150–200ms, panels 240–320ms, one easing */
   --ease-kw: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --animate-scroll: scroll 20s linear infinite;
-  --animate-scroll-y: scroll-y 24s linear infinite;
-  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
   --animate-fade-in: fade-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-scale-in: scale-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-island-in: island-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-toast-drain: toast-drain 1s linear forwards;
 
-  @keyframes scroll {
-    to { transform: translateX(-100%); }
-  }
-  @keyframes scroll-y {
-    to { transform: translateY(-50%); }
-  }
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.45; transform: scale(0.78); }
-  }
   @keyframes fade-in {
     from { opacity: 0; }
   }
@@ -523,7 +510,6 @@ input:focus, textarea:focus, select:focus {
 .badge-blue  { background: var(--card); color: var(--fg); border-color: var(--border); }
 .badge-dashed { border-style: dashed; }
 
-.dot-pattern-dark,
 .dot-grid {
   background-image: radial-gradient(var(--dot) 1px, transparent 1px);
   background-size: 18px 18px;

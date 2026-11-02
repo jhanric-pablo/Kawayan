@@ -99,7 +99,7 @@ html.a11y-reduce-motion *::after {
 }
 
 .a11y-widget-toggle:focus-visible {
-  outline: 3px solid var(--kw-green, #2b5748);
+  outline: 3px solid var(--green, #0b7a4e);
   outline-offset: 3px;
 }
 

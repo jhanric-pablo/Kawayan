@@ -131,7 +131,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
               </div>
               <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-[linear-gradient(45deg,#f09433,#dc2743_50%,#bc1888)] p-[2px]">
-                  <span className="grid h-full w-full place-items-center rounded-full bg-white text-[9px] font-bold text-zinc-900 ring-2 ring-white dark:bg-black dark:text-white dark:ring-black">{initials}</span>
+                  <span className="grid h-full w-full place-items-center rounded-full bg-white text-[9px] font-semibold text-zinc-900 ring-2 ring-white dark:bg-black dark:text-white dark:ring-black">{initials}</span>
                 </span>
                 <span className="font-semibold">{handle}</span>
                 <MoreHorizontal className="ml-auto h-4 w-4" aria-hidden />
@@ -154,10 +154,10 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
 
           {platform === 'facebook' && (
             <div className="absolute inset-0 overflow-y-auto pt-9 scrollbar-none">
-              <p className="px-3 pb-2 text-[22px] font-bold tracking-tight text-[#1877F2]">facebook</p>
+              <p className="px-3 pb-2 text-[22px] font-semibold tracking-tight text-[#1877F2]">facebook</p>
               <div className="border-t-4 border-zinc-100 dark:border-zinc-900">
                 <div className="flex items-center gap-2 px-3 py-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">{initials}</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1877F2] text-[10px] font-semibold text-white">{initials}</span>
                   <div className="min-w-0">
                     <p className="truncate text-[12.5px] font-semibold">{businessName}</p>
                     <p className="flex items-center gap-1 text-[10.5px] text-zinc-500">
@@ -193,7 +193,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                 Following <span className="mx-1 text-white/40">|</span> <span className="text-white">For You</span>
               </p>
               <div className="absolute bottom-24 right-2.5 flex flex-col items-center gap-3.5 text-[10px] font-semibold">
-                <span className="relative grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-zinc-800 text-[10px] font-bold">
+                <span className="relative grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-zinc-800 text-[10px] font-semibold">
                   {initials}
                   <span className="absolute -bottom-2 grid h-4 w-4 place-items-center rounded-full bg-[#FE2C55] text-[11px] leading-none">+</span>
                 </span>
