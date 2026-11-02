@@ -587,3 +587,16 @@ phones (< 768 px) get shadcn's Sheet drawer (the admin's phone tab strip stays t
 animates 200 ms with cubic-bezier(0.2, 0.8, 0.2, 1) (none with reduced motion); the inset is flex-1
 so pages reflow and charts / the calendar resize via their ResizeObservers. Shared glue in
 `layout/shellSidebar.tsx`.
+
+**2 — New post composer redesign.** Header: "New post" (or the topic) with the date, "Tuned to:
+<voice>" and status as small badges, plus close. Idea card: shadcn ToggleGroup for Image / Video /
+Text, the textarea, and up to 4 idea chips (the day's planned idea, upcoming PH holidays / paydays
+from phCalendar, Brand DNA themes) that fill it. "Draft with AI" is solid green, grey only while the
+idea is empty or work is running (⌘/Ctrl+↵ kept). While drafting, a 3-line list (Writing caption →
+Scoring → Making image) ticks off from the real post state. Caption and Image are an Accordion that
+opens itself after generation (one quiet line before). Phone preview uses our tokens (no brand blue
+or gradient) with a soft skeleton when empty. Footer: per-page switches, a date + time Popover
+(shadcn Calendar, suggested times, other time, "Post right away instead"; changing the day moves the
+draft like the calendar does) and the Schedule button; "Connect a page" when none. Versions,
+quick tweaks, ask box, upload, Describe it, reach score, undo and autosave are unchanged. The
+Post studio page uses the same ToggleGroup and progress list.

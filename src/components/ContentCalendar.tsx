@@ -1644,6 +1644,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         publishing={publishing}
         onPublish={handlePublish}
         onOpenSocial={onOpenSocial}
+        onMoveDate={async (p, d) => {
+          if (await movePost(p, d)) openPost({ ...p, date: d });
+        }}
       />
 
       {/* ── Post details (from a timeline card, search or a notification) ── */}

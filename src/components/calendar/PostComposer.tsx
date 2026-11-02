@@ -5,16 +5,21 @@ import type { CaptionRewrite } from '../../services/aiService';
 import {
   X, RefreshCcw, Loader2, Upload, Image as ImageIcon, Send, Facebook, Instagram, Scissors, Smile, Briefcase, Megaphone,
   Languages, Hash, ArrowUp, ArrowUpRight, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine,
-  CircleAlert, Clock, Globe, AudioLines, Sparkles,
+  CircleAlert, Clock, Globe, AudioLines, Sparkles, Video, Type,
 } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import clsx from 'clsx';
-import { m } from 'motion/react';
-import FormatPicker, { PostFormat } from './FormatPicker';
+import type { PostFormat } from './FormatPicker';
 import PhonePreview from './PhonePreview';
 import { StatusBadge } from './TimelinePostCard';
 import { normalizeFormat } from '../../services/validationService';
 import { useFocusTrap } from '../../utils/useFocusTrap';
+import { phDatesInMonth } from '../../utils/phCalendar';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar as DayCalendar } from '../ui/calendar';
+import { Switch } from '../ui/switch';
 
 /* ── Shared looks ── */
 
@@ -43,76 +48,6 @@ const IG_CAPTION_LIMIT = 2200;
 
 const scoreWord = (s: number) => (s >= 75 ? 'Strong' : s >= 50 ? 'Promising' : 'Needs work');
 
-type StepState = 'active' | 'done' | 'locked';
-
-/** One of the studio's three steps (Idea, Caption, Image): a numbered header, then its tools. */
-const Step: React.FC<{ n: number; title: string; state: StepState; summary?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }> = ({
-  n, title, state, summary, action, children,
-}) => (
-  <section className={clsx('rounded-xl border bg-(--card)', state === 'locked' ? 'border-dashed border-(--border)' : 'border-(--border)')}>
-    <div className="flex items-center gap-3 px-4 py-3">
-      <span
-        className={clsx(
-          'mono grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-medium',
-          state === 'done' ? 'bg-(--green) text-(--green-fg)' : state === 'active' ? 'bg-(--fg) text-(--bg)' : 'bg-(--muted) text-(--fg-muted)',
-        )}
-      >
-        {state === 'done' ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : n}
-      </span>
-      <h3 className={clsx('shrink-0 text-ui font-semibold', state === 'locked' && 'text-(--fg-subtle)')}>{title}</h3>
-      {summary && <span className="min-w-0 truncate text-xs text-(--fg-muted)">{summary}</span>}
-      {action && <span className="ml-auto shrink-0">{action}</span>}
-    </div>
-    {children && (
-      // Unfolds when a step opens (e.g. once the AI has written the caption).
-      <m.div
-        initial={{ y: -4, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
-        className="overflow-hidden"
-      >
-        <div className="border-t border-(--border) px-4 py-4">{children}</div>
-      </m.div>
-    )}
-  </section>
-);
-
-/** Narrates the first draft while it's made (caption, then image), so the wait reads as progress. */
-const GeneratingSteps: React.FC = () => {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const a = setTimeout(() => setStep(1), 1200);
-    const b = setTimeout(() => setStep(2), 9000);
-    return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-    };
-  }, []);
-  const steps = ['Reading your brand profile', 'Writing a Taglish caption', 'Creating a matching visual'];
-  return (
-    <ol className="mt-5 space-y-2.5" aria-live="polite">
-      {steps.map((s, i) => (
-        <li
-          key={s}
-          className={clsx(
-            'flex items-center gap-2.5 text-ui transition-colors',
-            i < step ? 'text-(--fg-muted)' : i === step ? 'font-semibold text-(--fg)' : 'text-(--fg-subtle)',
-          )}
-        >
-          <span
-            className={clsx(
-              'grid h-5 w-5 place-items-center rounded-full border',
-              i < step ? 'border-transparent bg-(--green) text-(--green-fg)' : i === step ? 'border-(--fg) text-(--fg)' : 'border-(--border-strong)',
-            )}
-          >
-            {i < step ? <Check className="h-3 w-3" strokeWidth={3} /> : i === step ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-          </span>
-          {s}
-        </li>
-      ))}
-    </ol>
-  );
-};
 
 /* ── Scheduling helpers ── */
 
@@ -240,6 +175,20 @@ const PostComposer: React.FC<Props> = ({
   const [format, setFormat] = useState<PostFormat>('Image');
   const [extraBusy, setExtraBusy] = useState(false);
   const [extraError, setExtraError] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
+  const [openSteps, setOpenSteps] = useState<string[]>(['caption', 'image']);
+  // A post drafted while the dialog is open: show the progress list until its image is in.
+  const [freshDraft, setFreshDraft] = useState(false);
+  useEffect(() => {
+    if (generatingPost) setFreshDraft(true);
+  }, [generatingPost]);
+  useEffect(() => {
+    if (post?.imageUrl && !loadingImage) setFreshDraft(false);
+  }, [post?.imageUrl, loadingImage]);
+  // Caption and image open on their own once a draft arrives.
+  useEffect(() => {
+    if (post?.id) setOpenSteps(['caption', 'image']);
+  }, [post?.id]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLDivElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -383,7 +332,7 @@ const PostComposer: React.FC<Props> = ({
 
   const submitBrief = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (brief.trim().length < 3 || generatingPost || extraBusy) return;
+    if (brief.trim().length === 0 || generatingPost || extraBusy) return;
     if (!limitReached) return runGenerate();
     setExtraBusy(true);
     setExtraError('');
@@ -530,11 +479,17 @@ const PostComposer: React.FC<Props> = ({
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {!limitReached && <FormatPicker value={format} onChange={setFormat} disabled={generatingPost} />}
+                    {!limitReached && (
+                      <ToggleGroup aria-label="Post format" value={[format]} onValueChange={(v) => v[0] && setFormat(v[0] as PostFormat)} disabled={generatingPost} variant="outline" size="sm" spacing={0} className="kw-toggle">
+                        {FORMAT_ITEMS.map(({ key, Icon }) => (
+                          <ToggleGroupItem key={key} value={key} aria-label={key}><Icon aria-hidden /> {key}</ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    )}
                     <button
                       type="submit"
-                      disabled={brief.trim().length < 3 || generatingPost || extraBusy}
-                      className={clsx(PRIMARY_BTN, 'ml-auto')}
+                      disabled={brief.trim().length === 0 || generatingPost || extraBusy}
+                      className="btn btn-primary kw-draft-btn ml-auto"
                     >
                       {generatingPost || extraBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
                       {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
@@ -545,7 +500,7 @@ const PostComposer: React.FC<Props> = ({
                     </button>
                   </div>
                   {generatingPost ? (
-                    <GeneratingSteps />
+                    <div className="mt-4"><GenerationProgress post={post} loadingImage={loadingImage} /></div>
                   ) : limitReached ? (
                     <p
                       id="ps-brief-msg"
@@ -1021,6 +976,17 @@ const PostComposer: React.FC<Props> = ({
     );
   }
 
+  /* ── Dialog (mockup APP.composer): idea → caption + image (accordion) | phone; footer publishes ── */
+  const ideaChips = ideaSuggestions(profile, currentDate, selectedDay, currentIdea?.title);
+  const draftDisabled = brief.trim().length === 0 || generatingPost || extraBusy;
+  const showProgress = generatingPost || (!!post && freshDraft && (loadingImage || !post.imageUrl));
+  const pickDate = (d: Date | undefined) => {
+    if (!d || !post) return;
+    const next = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    setDateOpen(false);
+    if (next !== post.date) onMoveDate?.(post, next);
+  };
+
   return (
     <div className="fixed inset-0 z-90 flex items-center justify-center sm:p-6" role="presentation">
       <div className="absolute inset-0 bg-black/45 animate-fade-in motion-reduce:animate-none" onClick={close} aria-hidden="true" />
@@ -1033,135 +999,206 @@ const PostComposer: React.FC<Props> = ({
         tabIndex={-1}
         className="relative flex h-full w-full max-w-[1120px] flex-col overflow-hidden bg-(--bg) text-(--fg) outline-hidden animate-scale-in motion-reduce:animate-none sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border sm:border-(--border) sm:shadow-lg"
       >
-        {/* ── Header ── */}
+        {/* ── Header: title, date and voice as small badges, close ── */}
         <header className="flex items-start gap-3 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold leading-snug" title={heading}>{heading}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--fg-muted)">
-              {post ? (
-                <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
-              ) : (
-                <span className="badge badge-dashed">New</span>
-              )}
-              <span className="font-semibold text-(--fg)">{dateLabel}</span>
-              {currentIdea && !post && <span>From your {monthName} plan</span>}
-              {post?.format && <span>{normalizeFormat(post.format)} post</span>}
+            <h2 className="truncate text-lg font-semibold leading-snug" title={heading}>{post ? heading : 'New post'}</h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              {post && <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />}
+              <span className="badge"><CalendarClock className="h-3 w-3" aria-hidden /> {dateLabel}</span>
               {profile.brandVoice && (
-                <span className="inline-flex items-center gap-1" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
-                  <AudioLines className="h-3.5 w-3.5 text-(--primary)" aria-hidden />
-                  Tuned to: <b className="font-semibold text-(--fg)">{profile.brandVoice}</b>
+                <span className="badge" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
+                  <AudioLines className="h-3 w-3" aria-hidden /> Tuned to: {profile.brandVoice}
                 </span>
               )}
+              {currentIdea && !post && <span className="badge badge-sage">From your {monthName} plan</span>}
+              {post?.format && <span className="badge">{normalizeFormat(post.format)}</span>}
             </div>
           </div>
           <button
             type="button"
             onClick={close}
             aria-label="Close composer"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--muted) hover:text-(--fg)"
           >
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        {/* ── Body: three steps | phone ── */}
+        {/* ── Body: idea, then caption + image | phone ── */}
         <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-h-0 space-y-3 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
+          <div className="min-h-0 space-y-4 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
             {isPublished && post && (
-              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-(--green) bg-(--green-soft) px-4 py-2.5 text-ui text-(--fg)">
-                <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
+              <p className="kw-alert kw-alert--ok">
+                <Check className="h-4 w-4" /> This post is live, so editing is turned off.
                 {post.externalLink && (
-                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">
+                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium underline underline-offset-2">
                     View post <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 )}
               </p>
             )}
             {isScheduled && post && (
-              <p className="flex items-center gap-2 rounded-lg border border-transparent bg-(--amber-soft) px-4 py-2.5 text-ui text-(--amber)">
+              <p className="kw-alert kw-alert--warn">
                 <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
               </p>
             )}
 
-            {/* 1 · Idea */}
+            {/* Idea */}
             {!post ? (
-              <Step n={1} title={limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'} state="active">
-                {briefForm}
-              </Step>
-            ) : (
-              <Step
-                n={1}
-                title="Idea"
-                state="done"
-                summary={`${post.topic}${post.format ? ` · ${normalizeFormat(post.format)}` : ''}`}
-                action={
-                  !isPublished && (
-                    <button
-                      type="button"
-                      className={CHIP}
-                      onClick={() => {
-                        setRedoing(true);
-                        runGenerate();
+              <section className="card p-4">
+                <form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy} className="grid gap-3">
+                  {limitReached ? (
+                    <p className="text-ui text-(--fg-muted)">You’ve used all {planPostCount} posts for {monthName}. Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label htmlFor="ps-brief" className="text-ui font-semibold">What should this post say?</label>
+                      <ToggleGroup
+                        aria-label="Post format"
+                        value={[format]}
+                        onValueChange={(v) => v[0] && setFormat(v[0] as PostFormat)}
+                        disabled={generatingPost}
+                        variant="outline"
+                        size="sm"
+                        spacing={0}
+                        className="kw-toggle"
+                      >
+                        {FORMAT_ITEMS.map(({ key, Icon }) => (
+                          <ToggleGroupItem key={key} value={key} aria-label={key}>
+                            <Icon aria-hidden /> {key}
+                          </ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    </div>
+                  )}
+                  <div className={clsx(FIELD, 'p-3')}>
+                    <TextareaAutosize
+                      id="ps-brief"
+                      className="block w-full resize-none bg-transparent text-sm leading-relaxed outline-hidden placeholder:text-(--fg-subtle)"
+                      minRows={3}
+                      maxRows={10}
+                      maxLength={400}
+                      value={brief}
+                      onChange={(e) => setBrief(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitBrief();
                       }}
-                      disabled={generatingPost || rewritesLeft === 0}
-                      title="New caption, score and image from the same idea"
-                    >
-                      {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
-                      {rewritesLeft === 0 ? 'No rewrites left' : `Start over · ${rewritesLeft} left`}
-                    </button>
-                  )
-                }
-              />
-            )}
-
-            {/* 2 · Caption */}
-            {!post ? (
-              <Step n={2} title="Caption" state="locked" summary="Kawayan writes this from your idea." />
-            ) : (
-              <Step
-                n={2}
-                title="Caption"
-                state="done"
-                action={
-                  counts && (
-                    <span className={clsx('text-xs tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-subtle)')}>
-                      {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
-                    </span>
-                  )
-                }
-              >
-                {captionEditor}
-
-                {scoreBox}
-
-                {post.history?.length > 0 && (
-                  <details className="mt-3 text-ui">
-                    <summary className="cursor-pointer text-xs font-semibold text-(--fg-muted) hover:text-(--fg)">Earlier versions ({post.history.length})</summary>
-                    <div className="mt-2 space-y-2">
-                      {post.history.map((v, i) => (
-                        <div key={`${v.createdAt}-${i}`} className="rounded-lg border border-(--border) p-3">
-                          <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
-                          <div className="mt-2 flex items-center justify-between">
-                            {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
-                            {!isPublished && (
-                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)">Use this</button>
-                            )}
-                          </div>
-                        </div>
+                      readOnly={generatingPost || extraBusy}
+                      placeholder="e.g. Behind the scenes of our 5 AM bake, and 10% off pandesal this weekend"
+                      aria-invalid={!!extraError}
+                      aria-describedby="ps-brief-msg"
+                    />
+                  </div>
+                  {ideaChips.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Ideas">
+                      {ideaChips.map((c) => (
+                        <button key={c} type="button" className="kw-chip" onClick={() => setBrief(c)} disabled={generatingPost || extraBusy}>
+                          <Sparkles className="h-3 w-3" aria-hidden /> {c}
+                        </button>
                       ))}
                     </div>
-                  </details>
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p
+                      id="ps-brief-msg"
+                      className={clsx('min-w-0 flex-1 text-xs [&_button]:font-medium [&_button]:text-(--fg) [&_button]:underline [&_button]:underline-offset-2', extraError ? 'text-(--danger)' : 'text-(--fg-muted)')}
+                      role={extraError ? 'alert' : undefined}
+                    >
+                      {limitReached ? (
+                        <>
+                          {extraError || (walletBalance != null ? `Wallet balance: ₱${walletBalance.toLocaleString('en-PH')}.` : 'Paid from your Kawayan wallet.')}{' '}
+                          {(extraError || (walletBalance != null && walletBalance < addOnPrice)) && <button type="button" onClick={onOpenBilling}>Top up</button>}{' '}
+                          {planPostCount < 16 && <button type="button" onClick={onOpenBilling}>Or upgrade to Pro for 16 posts a month</button>}
+                        </>
+                      ) : (
+                        'Kawayan writes the caption, scores it and makes a matching image. About 20 seconds.'
+                      )}
+                    </p>
+                    <button type="submit" disabled={draftDisabled} className="btn btn-primary kw-draft-btn">
+                      {generatingPost || extraBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
+                      <span className="hidden gap-0.5 opacity-70 sm:inline-flex" aria-hidden>
+                        <kbd className="rounded border border-current/30 px-1 font-sans text-xs">{MOD_KEY}</kbd>
+                        <kbd className="rounded border border-current/30 px-1 font-sans text-xs">↵</kbd>
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              </section>
+            ) : (
+              <section className="card flex flex-wrap items-center gap-2 px-4 py-3">
+                <Check className="h-4 w-4 text-(--green-ink)" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-ui"><b className="font-semibold">Idea</b> <span className="text-(--fg-muted)">· {post.topic}</span></span>
+                {!isPublished && (
+                  <button
+                    type="button"
+                    className={CHIP}
+                    onClick={() => {
+                      setRedoing(true);
+                      runGenerate();
+                    }}
+                    disabled={generatingPost || rewritesLeft === 0}
+                    title="New caption, score and image from the same idea"
+                  >
+                    {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
+                    {rewritesLeft === 0 ? 'No rewrites left' : `Start over · ${rewritesLeft} left`}
+                  </button>
                 )}
-              </Step>
+              </section>
             )}
 
-            {/* 3 · Image */}
+            {showProgress && <GenerationProgress post={post} loadingImage={loadingImage} />}
+
+            {/* Caption + image: one quiet line before generation, an accordion after */}
             {!post ? (
-              <Step n={3} title="Image" state="locked" summary="Made to match the caption, or upload your own photo." />
+              <p className="px-1 text-ui text-(--fg-muted)">The caption and image appear here once Kawayan drafts them. You can edit both.</p>
             ) : (
-              <Step n={3} title="Image" state={post.imageUrl ? 'done' : 'active'}>
-                {imageTools}
-              </Step>
+              <Accordion multiple value={openSteps} onValueChange={(v) => setOpenSteps(v as string[])} className="card overflow-hidden">
+                <AccordionItem value="caption" className="border-(--border)">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="font-semibold">Caption</span>
+                      {counts && (
+                        <span className={clsx('text-xs font-normal tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-muted)')}>
+                          {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
+                        </span>
+                      )}
+                      <span className={clsx("ml-auto mr-2 badge", score >= 75 && "badge-green")}>{score}</span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    {captionEditor}
+                    {scoreBox}
+                    {post.history?.length > 0 && (
+                      <details className="mt-3 text-ui">
+                        <summary className="cursor-pointer text-xs font-semibold text-(--fg-muted) hover:text-(--fg)">Earlier versions ({post.history.length})</summary>
+                        <div className="mt-2 space-y-2">
+                          {post.history.map((v, i) => (
+                            <div key={`${v.createdAt}-${i}`} className="rounded-lg border border-(--border) p-3">
+                              <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
+                              <div className="mt-2 flex items-center justify-between">
+                                {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
+                                {!isPublished && (
+                                  <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-medium underline underline-offset-2 hover:text-(--green-ink)">Use this</button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="image" className="border-(--border)">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <span className="flex flex-1 items-center gap-2">
+                      <span className="font-semibold">Image</span>
+                      <span className="text-xs font-normal text-(--fg-muted)">{loadingImage ? 'Making it…' : post.imageUrl ? 'Ready' : 'Not made yet'}</span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">{imageTools}</AccordionContent>
+                </AccordionItem>
+              </Accordion>
             )}
 
             <details className="rounded-xl border border-(--border) bg-(--card) p-4 lg:hidden">
@@ -1170,81 +1207,179 @@ const PostComposer: React.FC<Props> = ({
             </details>
           </div>
 
-          <aside className="hidden min-h-0 flex-col items-center overflow-y-auto border-l border-(--border) bg-(--bg-alt) px-5 py-5 lg:flex">
+          <aside className="hidden min-h-0 flex-col items-center overflow-y-auto border-l border-(--border) bg-(--muted) px-5 py-5 lg:flex">
             {preview}
-            <p className="mt-3 text-center text-xs text-(--fg-subtle)">Preview only. Reactions show up after it posts.</p>
+            <p className="mt-3 text-center text-xs text-(--fg-muted)">Preview only. Reactions show up after it posts.</p>
           </aside>
         </div>
 
-        {/* ── Where + when, paired with publish ── */}
-        <footer className="flex flex-wrap items-center gap-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
-          <p className="text-xs text-(--fg-muted)">
-            {post ? saveIndicator : 'Draft the post first, then pick where and when it goes out.'}
-          </p>
+        {/* ── Footer: channels, date + time, Schedule ── */}
+        <footer className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
           {isPublished ? (
-            <div className="ml-auto flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-(--primary)"><Check className="h-4 w-4" /> Published</span>
-              {post?.externalLink && (
-                <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
-                  View post <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-            </div>
+            <>
+              <span className="text-xs text-(--fg-muted)">{saveIndicator}</span>
+              <div className="ml-auto flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-(--green-ink)"><Check className="h-4 w-4" /> Published</span>
+                {post?.externalLink && (
+                  <a className="btn btn-outline btn-sm" href={post.externalLink} target="_blank" rel="noreferrer">
+                    View post <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </>
           ) : isScheduled ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-(--amber)">
-              <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
-            </span>
-          ) : accounts && accounts.length === 0 ? (
-            <div className="ml-auto flex flex-wrap items-center gap-3">
-              <span className="text-xs text-(--fg-muted)">{post ? 'Connect a page to publish. Your draft is saved.' : 'Connect a page to publish.'}</span>
-              <button type="button" className="btn btn-glass btn-sm" onClick={onOpenSocial}>Connect a page</button>
-            </div>
-          ) : !post ? null : (
-            <div className="relative ml-auto flex items-stretch" ref={planRef}>
-              <button
-                type="button"
-                onClick={() => setPlanOpen((v) => !v)}
-                disabled={!post}
-                aria-expanded={planOpen}
-                aria-haspopup="dialog"
-                className="flex items-center gap-2.5 rounded-l-lg border border-r-0 border-(--border-strong) bg-(--bg-alt) py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-(--card-hover) disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex -space-x-1" aria-hidden>
-                  {chosenAccounts.length > 0
-                    ? chosenAccounts.map((a) => (
-                        <span key={a.id} className="grid h-6 w-6 place-items-center rounded-full bg-(--card) ring-2 ring-(--bg-alt)">
-                          <PlatformIcon platform={a.platform} />
-                        </span>
-                      ))
-                    : <span className="grid h-6 w-6 place-items-center rounded-full bg-(--card)"><Globe className="h-3.5 w-3.5 text-(--fg-muted)" /></span>}
-                </span>
-                <span className="min-w-0">
-                  <b className="block max-w-[180px] truncate text-ui font-semibold">{whereLabel}</b>
-                  <small className="block text-xs text-(--fg-muted)">{whenLabel}</small>
-                </span>
-                <ChevronDown className={clsx('h-4 w-4 text-(--fg-muted) transition-transform', planOpen && 'rotate-180')} />
-              </button>
+            <>
+              <span className="text-xs text-(--fg-muted)">{saveIndicator}</span>
+              <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-(--amber)">
+                <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
+              </span>
+            </>
+          ) : (
+            <>
+              {/* Channels */}
+              <div className="flex flex-wrap items-center gap-3" role="group" aria-label="Post to">
+                {accounts === null ? (
+                  <span className="flex items-center gap-1.5 text-xs text-(--fg-muted)"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading your pages…</span>
+                ) : accounts.length === 0 ? (
+                  <span className="text-xs text-(--fg-muted)">{accountsError || (post ? 'Connect a page to publish. Your draft is saved.' : 'No page connected yet.')}</span>
+                ) : (
+                  accounts.map((a) => {
+                    const on = chosen.includes(a.id);
+                    return (
+                      <label key={a.id} className={clsx('flex items-center gap-2 text-ui', !a.isActive && 'text-(--fg-muted)')} title={!a.isActive ? 'Needs reconnecting' : undefined}>
+                        <Switch
+                          size="sm"
+                          checked={on}
+                          disabled={!post}
+                          onCheckedChange={(v) => setChosen((ids) => (v ? [...ids, a.id] : ids.filter((id) => id !== a.id)))}
+                          aria-label={`Post to @${a.username}`}
+                        />
+                        <PlatformIcon platform={a.platform} className="h-3.5 w-3.5" />
+                        <span className="max-w-[9rem] truncate">@{a.username}</span>
+                        {!a.isActive && <span className="badge badge-red">Reconnect</span>}
+                      </label>
+                    );
+                  })
+                )}
+              </div>
 
-              <button type="button" className={clsx(PRIMARY_BTN, 'rounded-l-none')} onClick={publish} disabled={ctaDisabled}>
-                {publishing ? <Loader2 className="animate-spin" /> : mode === 'now' ? <Send /> : <CalendarClock />}
-                {publishing ? 'Sending…' : ctaLabel}
-                {!publishing && mode === 'schedule' && accounts?.length !== 0 && <ArrowUpRight />}
-              </button>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {/* Date + time */}
+                {post && accounts && accounts.length > 0 && (
+                  <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                    <PopoverTrigger className="btn btn-outline btn-sm" aria-label="Pick date and time">
+                      <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                      {mode === 'now' ? 'Right away' : `${longDate(post.date)} · ${to12h(time)}`}
+                      <ChevronDown className="h-3.5 w-3.5 text-(--fg-muted)" aria-hidden />
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="end" className="w-auto gap-3 p-3">
+                      <DayCalendar
+                        mode="single"
+                        selected={new Date(`${post.date}T00:00:00`)}
+                        onSelect={pickDate}
+                        disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+                        defaultMonth={new Date(`${post.date}T00:00:00`)}
+                      />
+                      {!onMoveDate && <p className="text-xs text-(--fg-muted)">Move the post on the calendar to change its day.</p>}
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {SUGGESTED_TIMES.map((t) => {
+                          const past = isPast(post.date, t.time);
+                          return (
+                            <button
+                              key={t.time}
+                              type="button"
+                              aria-pressed={mode === 'schedule' && time === t.time}
+                              disabled={past || !canSchedule}
+                              onClick={() => { setMode('schedule'); setTime(t.time); }}
+                              className={clsx('rounded-lg border px-2 py-1.5 text-left text-xs transition-colors disabled:opacity-40', mode === 'schedule' && time === t.time ? 'border-(--green) bg-(--green-soft)' : 'border-(--border) hover:border-(--border-strong)')}
+                            >
+                              <b className="block font-semibold">{to12h(t.time)}</b>
+                              <span className="text-(--fg-muted)">{past ? 'Passed' : t.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-(--fg-muted)">
+                        <Clock className="h-3.5 w-3.5" /> Other time
+                        <input
+                          type="time"
+                          value={time}
+                          disabled={!canSchedule}
+                          onChange={(e) => { if (e.target.value) { setMode('schedule'); setTime(e.target.value); } }}
+                          className="ml-auto rounded-md border border-(--border) bg-(--card) px-2 py-1 text-(--fg)"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch size="sm" checked={mode === 'now'} onCheckedChange={(v) => setMode(v ? 'now' : 'schedule')} />
+                        Post right away instead
+                      </label>
+                      {!canSchedule && <p className="text-xs text-(--fg-muted)">This day has passed, so the post can only go out now.</p>}
+                      {!timeOk && <p className="text-xs font-semibold text-(--danger)">That time has passed. Pick a later one.</p>}
+                    </PopoverContent>
+                  </Popover>
+                )}
 
-              {planOpen && post && (
-                <div
-                  role="dialog"
-                  aria-label="Where and when to post"
-                  className="absolute bottom-[calc(100%+10px)] right-0 z-10 w-[min(92vw,360px)] space-y-4 rounded-xl border border-(--border) bg-(--card) p-4 shadow-lg"
-                >
-                  {whereWhen}
-                </div>
-              )}
-            </div>
+                {accounts && accounts.length === 0 ? (
+                  <button type="button" className="btn btn-outline btn-sm" onClick={onOpenSocial}>Connect a page</button>
+                ) : (
+                  <button type="button" className="btn btn-primary btn-sm kw-draft-btn" onClick={publish} disabled={ctaDisabled}>
+                    {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : mode === 'now' ? <Send className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
+                    {publishing ? 'Sending…' : mode === 'now' ? 'Post now' : 'Schedule'}
+                  </button>
+                )}
+              </div>
+              {post && <span className="w-full text-xs text-(--fg-muted) sm:w-auto sm:order-first sm:basis-full">{saveIndicator}</span>}
+            </>
           )}
         </footer>
       </div>
     </div>
+  );
+};
+
+/** Upcoming idea chips: today's planned idea, Brand DNA themes, and PH dates from this day on. */
+function ideaSuggestions(profile: BrandProfile, month: Date, day: number | null, planned?: string): string[] {
+  const out: string[] = [];
+  if (planned) out.push(planned);
+  const from = day ?? 1;
+  phDatesInMonth(month.getFullYear(), month.getMonth())
+    .filter((d) => d.day >= from)
+    .slice(0, 2)
+    .forEach((d) => out.push(d.kind === 'payday' ? `Payday treat on the ${d.day}${d.day === 15 ? 'th' : ''}` : `${d.name} special`));
+  profile.keyThemes
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .forEach((t) => out.push(`${t[0].toUpperCase()}${t.slice(1)} post`));
+  return [...new Set(out)].slice(0, 4);
+}
+
+const FORMAT_ITEMS: { key: PostFormat; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'Image', Icon: ImageIcon },
+  { key: 'Video', Icon: Video },
+  { key: 'Text', Icon: Type },
+];
+
+/** Writing caption → Scoring → Making image, each ticked as it really finishes. */
+const GenerationProgress: React.FC<{ post: GeneratedPost | null; loadingImage: boolean }> = ({ post, loadingImage }) => {
+  const steps = [
+    { label: 'Writing caption…', done: !!post?.caption },
+    { label: 'Scoring…', done: post?.viralityScore != null },
+    { label: 'Making image…', done: !!post?.imageUrl && !loadingImage },
+  ];
+  const current = steps.findIndex((s) => !s.done);
+  return (
+    <ol className="card grid gap-2 px-4 py-3" aria-live="polite" aria-label="Drafting progress">
+      {steps.map((s, i) => (
+        <li key={s.label} className={clsx('flex items-center gap-2.5 text-ui', s.done ? 'text-(--fg-muted)' : i === current ? 'font-medium text-(--fg)' : 'text-(--fg-subtle)')}>
+          <span className={clsx('grid h-5 w-5 place-items-center rounded-full border', s.done ? 'border-transparent bg-(--green) text-(--green-fg)' : i === current ? 'border-(--fg)' : 'border-(--border-strong)')}>
+            {s.done ? <Check className="h-3 w-3" strokeWidth={3} /> : i === current ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          </span>
+          {s.done ? s.label.replace('…', '') : s.label}
+        </li>
+      ))}
+    </ol>
   );
 };
 

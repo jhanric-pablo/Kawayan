@@ -691,3 +691,19 @@ input:focus, textarea:focus, select:focus {
 .kw-tlist b { font-weight: 500; font-size: 14px; }
 @media (max-width: 1023px) { .kw-split > .is-away { display: none; } .kw-split__main { height: min(80vh, 720px); } }
 .kw-segpick--text button { text-align: center; font-size: var(--text-ui); font-weight: 500; color: var(--fg); padding: 8px 10px; }
+
+/* Soft skeleton: a muted block that breathes (opacity only); still with reduced motion. */
+.kw-skel { background: color-mix(in srgb, var(--fg) 7%, transparent); animation: kw-pulse 1.6s var(--ease) infinite; }
+@media (prefers-reduced-motion: reduce) { .kw-skel { animation: none; } }
+
+/* Composer: the primary action is solid green; disabled it turns grey, never pale green. */
+.btn.kw-draft-btn:disabled { background: var(--muted); color: var(--fg-subtle); border-color: var(--border); opacity: 1; cursor: not-allowed; }
+/* Format toggle group (shadcn ToggleGroup): one hairline segmented control */
+.kw-toggle [data-slot='toggle-group-item'] { height: 30px; gap: 6px; border-color: var(--border); color: var(--fg-muted); background: var(--card); }
+.kw-toggle [data-slot='toggle-group-item'][data-pressed] { background: var(--muted); color: var(--fg); font-weight: 500; }
+.kw-toggle [data-slot='toggle-group-item'] svg { width: 14px; height: 14px; }
+/* Accordion: no height animation (transform/opacity only); the panel's content fades in. */
+[data-slot='accordion-content'] { animation: none !important; }
+[data-slot='accordion-content'][data-open] > div { animation: fade-in 0.2s var(--ease) both; }
+[data-slot='accordion-item'] { border-color: var(--border); }
+@media (prefers-reduced-motion: reduce) { [data-slot='accordion-content'][data-open] > div { animation: none; } }

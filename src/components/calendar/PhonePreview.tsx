@@ -43,10 +43,15 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
   const initials = businessName.substring(0, 2).toUpperCase();
   const tiktok = platform === 'tiktok';
 
+  // Empty: soft skeleton lines (opacity pulse only) instead of placeholder text.
   const captionNode = caption ? (
     <span className="whitespace-pre-wrap wrap-break-word">{caption}</span>
   ) : (
-    <span className="italic opacity-50">Your caption will show here…</span>
+    <span className="mt-1 grid gap-1.5" aria-label="Your caption will show here">
+      <span className="kw-skel h-2 w-full rounded-full" />
+      <span className="kw-skel h-2 w-11/12 rounded-full" />
+      <span className="kw-skel h-2 w-2/3 rounded-full" />
+    </span>
   );
 
   const media = (
@@ -59,20 +64,19 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
         const file = e.dataTransfer.files[0];
         if (file && PHOTO_TYPES.test(file.type)) onDropImage(file);
       })}
-      className={clsx('overflow-hidden bg-zinc-100 dark:bg-zinc-900', tiktok ? 'absolute inset-0 bg-zinc-900' : 'relative aspect-square')}
+      className={clsx('overflow-hidden bg-(--muted)', tiktok ? 'absolute inset-0 bg-zinc-900' : 'relative aspect-square')}
     >
       {imageUrl ? (
         <img key={imageUrl} src={imageUrl} alt="Post visual" className="h-full w-full object-cover" />
       ) : (
         <div
           className={clsx(
-            'absolute inset-2.5 grid place-content-center justify-items-center gap-1.5 rounded-xl border-2 border-dashed text-center text-[11px] font-medium transition-colors',
-            dragging ? 'border-(--green) bg-(--green-soft) text-(--green-ink)' : 'border-zinc-300 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500',
-            tiktok && !dragging && 'border-zinc-700 text-zinc-500',
+            'absolute inset-0 grid place-content-center justify-items-center gap-1.5 text-center text-[11px] font-medium transition-colors',
+            dragging ? 'bg-(--green-soft) text-(--green-ink) ring-2 ring-inset ring-(--green)' : 'kw-skel text-(--fg-subtle)',
           )}
         >
-          <ImagePlus className="h-6 w-6" strokeWidth={1.5} aria-hidden />
-          {onDropImage ? 'Drop a photo here' : 'Visual appears here'}
+          <ImagePlus className="h-6 w-6 opacity-70" strokeWidth={1.5} aria-hidden />
+          {onDropImage ? (dragging ? 'Drop to use this photo' : 'Image appears here, or drop a photo') : 'Image appears here'}
         </div>
       )}
       {imageUrl && dragging && (
@@ -108,7 +112,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
         <div
           className={clsx(
             'relative aspect-9/19 overflow-hidden rounded-[22px] border border-(--border) text-[12px] leading-snug',
-            tiktok ? 'bg-black text-white' : 'bg-white text-zinc-900 dark:bg-black dark:text-zinc-100',
+            tiktok ? 'bg-black text-white' : 'bg-(--card) text-(--fg)',
           )}
         >
           {/* Status bar + island */}
@@ -130,7 +134,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                 <Send className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </div>
               <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[linear-gradient(45deg,#f09433,#dc2743_50%,#bc1888)] p-[2px]">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-(--border-strong) p-[2px]">
                   <span className="grid h-full w-full place-items-center rounded-full bg-white text-[9px] font-semibold text-zinc-900 ring-2 ring-white dark:bg-black dark:text-white dark:ring-black">{initials}</span>
                 </span>
                 <span className="font-semibold">{handle}</span>
@@ -154,10 +158,10 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
 
           {platform === 'facebook' && (
             <div className="absolute inset-0 overflow-y-auto pt-9 scrollbar-none">
-              <p className="px-3 pb-2 text-[22px] font-semibold tracking-tight text-[#1877F2]">facebook</p>
+              <p className="px-3 pb-2 text-[20px] font-semibold tracking-tight">facebook</p>
               <div className="border-t-4 border-zinc-100 dark:border-zinc-900">
                 <div className="flex items-center gap-2 px-3 py-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1877F2] text-[10px] font-semibold text-white">{initials}</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-(--green) text-[10px] font-semibold text-(--green-fg)">{initials}</span>
                   <div className="min-w-0">
                     <p className="truncate text-[12.5px] font-semibold">{businessName}</p>
                     <p className="flex items-center gap-1 text-[10.5px] text-zinc-500">
@@ -170,7 +174,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                 {media}
                 {sampleStats && <div className="flex items-center justify-between px-3 py-2 text-[11px] text-zinc-500">
                   <span className="flex items-center gap-1">
-                    <span className="grid h-4 w-4 place-items-center rounded-full bg-[#1877F2] text-white"><ThumbsUp className="h-2.5 w-2.5" aria-hidden /></span>
+                    <span className="grid h-4 w-4 place-items-center rounded-full bg-(--fg) text-(--bg)"><ThumbsUp className="h-2.5 w-2.5" aria-hidden /></span>
                     <span className="-ml-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#F33E58] text-white ring-2 ring-white dark:ring-black"><Heart className="h-2.5 w-2.5" fill="currentColor" aria-hidden /></span>
                     {fmt(likes)}
                   </span>
