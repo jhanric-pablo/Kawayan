@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kawayan Efferd System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,900&display=swap">
+<style>
+/* Layout idea: Efferd blocks on ruled rails (bands, + marks, dashed spacer rows); neutral shadcn base with green kept for the main action, active states and good news. */
+:root {
+  --bg: #fafafa;
+  --card: #ffffff;
+  --fg: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-fg: #6b6b73;
+  --border: #e4e4e7;
+  --green: #0b7a4e;
+  --green-fg: #ffffff;
+  --green-soft: #e6f3ec;
+  --green-ink: #0a5c3b;
+  --danger: #c2261d;
+  --amber: #8a5300;
+  --amber-soft: #fff4e0;
+  --dot: rgba(10,10,10,.08);
+  --shadow: 0 1px 2px rgba(0,0,0,.05);
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "Fraunces", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #09090b; --card: #111113; --fg: #fafafa; --muted: #1b1b1f; --muted-fg: #a1a1aa; --border: #27272a;
+    --green: #34d399; --green-fg: #052e1c; --green-soft: rgba(52,211,153,.12); --green-ink: #6ee7b7;
+    --danger: #f87171; --amber: #fbbf24; --amber-soft: rgba(251,191,36,.12); --dot: rgba(255,255,255,.07); --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #09090b; --card: #111113; --fg: #fafafa; --muted: #1b1b1f; --muted-fg: #a1a1aa; --border: #27272a;
+  --green: #34d399; --green-fg: #052e1c; --green-soft: rgba(52,211,153,.12); --green-ink: #6ee7b7;
+  --danger: #f87171; --amber: #fbbf24; --amber-soft: rgba(251,191,36,.12); --dot: rgba(255,255,255,.07); --shadow: none; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+h1, h2, h3, h4 { text-wrap: balance; margin: 0; letter-spacing: -0.025em; font-weight: 600; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 6px; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted-fg); }
+.green { color: var(--green-ink); }
+.icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.view { display: none; }
+.view.on { display: block; }
+.row-flex { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* primitives */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; line-height: 1; text-decoration: none; border: 1px solid transparent; cursor: pointer; white-space: nowrap; background: none; transition: background .15s, opacity .15s, transform .15s; }
+.btn:active { transform: translateY(1px); }
+.btn-green { background: var(--green); color: var(--green-fg); }
+.btn-green:hover { opacity: .9; }
+.btn-dark { background: var(--fg); color: var(--bg); }
+.btn-outline { background: var(--card); border-color: var(--border); box-shadow: var(--shadow); }
+.btn-outline:hover, .btn-ghost:hover { background: var(--muted); }
+.btn-danger { background: var(--card); border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
+.btn-sm { height: 32px; padding: 0 10px; font-size: 13px; }
+.btn-lg { height: 42px; padding: 0 18px; }
+.btn-icon { width: 36px; padding: 0; }
+.btn-sm.btn-icon { width: 32px; }
+.btn-pill { border-radius: 999px; }
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); white-space: nowrap; background: var(--card); }
+.b-green { background: var(--green-soft); color: var(--green-ink); border-color: transparent; }
+.b-muted { background: var(--muted); border-color: transparent; }
+.b-dashed { border-style: dashed; }
+.b-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); background: color-mix(in srgb, var(--danger) 7%, var(--card)); }
+.b-amber { color: var(--amber); background: var(--amber-soft); border-color: transparent; }
+.b-dark { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.card-h h3 { font-size: 15px; }
+.card-b { padding: 16px; }
+.input, .select, .textarea { width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 14px; box-shadow: var(--shadow); }
+.textarea { height: auto; min-height: 96px; padding: 10px 12px; resize: vertical; line-height: 1.5; }
+.select { appearance: none; padding-right: 30px; background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.input::placeholder, .textarea::placeholder { color: var(--muted-fg); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 14px; font-weight: 500; }
+.hint { font-size: 12px; color: var(--muted-fg); }
+.kbd { font: 500 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted-fg); background: var(--muted); }
+.sep { height: 1px; background: var(--border); border: 0; margin: 0; }
+.tabs { display: inline-flex; padding: 3px; gap: 2px; background: var(--muted); border-radius: 9px; }
+.tabs button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted-fg); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected="true"] { background: var(--card); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.avatar { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--muted); font-weight: 600; font-size: 12px; flex: none; }
+.avatar.round { border-radius: 50%; }
+.avatar.g { background: var(--green); color: var(--green-fg); }
+.bar { height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--fg) 9%, transparent); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--green); border-radius: 99px; }
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
+.check input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--green); flex: none; }
+.switch-ui { width: 36px; height: 20px; border-radius: 99px; background: color-mix(in srgb, var(--fg) 15%, transparent); position: relative; border: 0; cursor: pointer; flex: none; }
+.switch-ui::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+.switch-ui[aria-checked="true"] { background: var(--green); }
+.switch-ui[aria-checked="true"]::after { transform: translateX(16px); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-btn { height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip-btn:hover { background: var(--muted); }
+.chip-btn[aria-pressed="true"] { background: var(--green-soft); color: var(--green-ink); border-color: transparent; font-weight: 500; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; font-weight: 500; color: var(--muted-fg); padding: 10px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tbl td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover td { background: var(--muted); }
+.scroll-x { overflow-x: auto; }
+
+/* ===== ruled rails (Efferd page frame) ===== */
+.band { border-bottom: 1px solid var(--border); }
+.rail { max-width: 1152px; margin: 0 auto; border-inline: 1px solid var(--border); position: relative; }
+.pad { padding: 64px 48px; }
+.px { position: absolute; bottom: -7px; width: 13px; height: 13px; z-index: 3; pointer-events: none; background: linear-gradient(var(--muted-fg), var(--muted-fg)) center / 1px 100% no-repeat, linear-gradient(var(--muted-fg), var(--muted-fg)) center / 100% 1px no-repeat; opacity: .7; }
+.px.l { left: -7px; } .px.r { right: -7px; }
+.spacer { height: 48px; background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat; -webkit-mask: repeating-linear-gradient(to bottom, #000 0 4px, transparent 4px 8px); mask: repeating-linear-gradient(to bottom, #000 0 4px, transparent 4px 8px); }
+.dots { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
+.sec-title { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px 32px; margin-bottom: 32px; }
+.sec-title h2 { font-size: clamp(26px, 2vw + 16px, 34px); line-height: 1.15; }
+.sec-title p { margin-top: 8px; max-width: 56ch; color: var(--muted-fg); }
+.cells { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cells > * { background: var(--card); }
+
+/* ===== screens index ===== */
+.idx-head { padding: 56px 48px 40px; }
+.idx-head h1 { font-size: clamp(32px, 3vw + 18px, 48px); letter-spacing: -0.04em; line-height: 1.05; }
+.idx-head p { margin-top: 12px; color: var(--muted-fg); max-width: 60ch; }
+.idx-group { padding: 22px 40px; font-weight: 500; font-size: 17px; display: flex; justify-content: space-between; align-items: center; }
+.idx-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+.idx-card { display: flex; flex-direction: column; gap: 4px; padding: 26px 30px; min-height: 230px; text-decoration: none; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background .15s; }
+.idx-card:nth-child(4n) { border-right: 0; }
+.idx-card:hover { background: var(--card); }
+.idx-card b { font-size: 19px; font-weight: 500; letter-spacing: -0.02em; }
+.idx-card small { font-size: 14px; color: var(--muted-fg); }
+.sk { margin-top: auto; padding-top: 18px; display: flex; flex-direction: column; gap: 7px; }
+.sk i { display: block; height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--fg) 9%, transparent); }
+.sk .p { height: 22px; width: 40%; border-radius: 99px; }
+.sk .g { background: color-mix(in srgb, var(--green) 55%, transparent); }
+.sk .box { height: 46px; border-radius: 8px; background: var(--card); border: 1px solid var(--border); }
+.sk-row { display: flex; gap: 7px; }
+.sk-row > * { flex: 1; }
+.sk-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.sk-grid i { height: 14px; border-radius: 3px; }
+.sk-bars { display: flex; align-items: end; gap: 5px; height: 54px; }
+.sk-bars i { flex: 1; border-radius: 3px 3px 0 0; }
+
+/* ===== landing ===== */
+.hdr { position: sticky; top: 0; z-index: 30; padding: 12px 16px; }
+.hdr-pill { max-width: 880px; margin: 0 auto; display: flex; align-items: center; gap: 18px; height: 52px; padding: 0 8px 0 16px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in srgb, var(--card) 85%, transparent); backdrop-filter: blur(12px); box-shadow: 0 6px 24px -12px rgba(0,0,0,.15); }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; letter-spacing: -0.03em; text-decoration: none; }
+.logo svg { width: 22px; height: 22px; color: var(--green); }
+.nav { display: flex; gap: 2px; }
+.nav a { padding: 6px 10px; border-radius: 999px; font-size: 14px; color: var(--muted-fg); text-decoration: none; }
+.nav a:hover { color: var(--fg); background: var(--muted); }
+.hdr-end { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+.hero { text-align: center; padding: 72px 48px 0; position: relative; }
+.hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 25%, #000 20%, transparent 75%); mask-image: radial-gradient(ellipse 60% 60% at 50% 25%, #000 20%, transparent 75%); }
+.hero > * { position: relative; }
+.announce { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 4px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; text-decoration: none; background: var(--card); box-shadow: var(--shadow); }
+.announce b { font-weight: 500; background: var(--green); color: var(--green-fg); border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+.hero h1 { margin: 22px auto 0; max-width: 15ch; font-size: clamp(40px, 5vw + 12px, 68px); line-height: 1.02; letter-spacing: -0.045em; }
+.hero h1 em { font-style: normal; color: var(--green-ink); }
+.hero .lead { margin: 18px auto 0; max-width: 54ch; font-size: 17px; color: var(--muted-fg); }
+.ctas { margin-top: 26px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.fine { margin-top: 12px; font-size: 13px; color: var(--muted-fg); }
+.shot { margin: 48px auto 0; max-width: 980px; padding: 8px 8px 0; border: 1px solid var(--border); border-bottom: 0; border-radius: 16px 16px 0 0; background: var(--muted); text-align: left; }
+.shot-in { display: grid; grid-template-columns: 1fr 250px; background: var(--card); border: 1px solid var(--border); border-bottom: 0; border-radius: 10px 10px 0 0; overflow: hidden; }
+.shot-main { padding: 18px; border-right: 1px solid var(--border); }
+.lane { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.post { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); }
+.post img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+.post div { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.post b { font-size: 13px; font-weight: 600; }
+.post small { font-size: 12px; color: var(--muted-fg); }
+.phone-side { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.ig { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card); }
+.ig-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; font-weight: 600; }
+.ig-h span { width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: var(--green-fg); display: grid; place-items: center; font-size: 10px; }
+.ig img { aspect-ratio: 1; object-fit: cover; width: 100%; }
+.ig p { padding: 8px 10px 10px; font-size: 12px; line-height: 1.45; }
+
+.cloud { padding: 28px 0; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.cloud p { font-size: 14px; color: var(--muted-fg); }
+.marquee { width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent); }
+.marquee div { display: flex; gap: 40px; width: max-content; animation: slide 40s linear infinite; font: 500 13px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted-fg); }
+.marquee span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.marquee span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+@keyframes slide { to { transform: translateX(-50%); } }
+
+.feat3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+.feat3 > div { padding: 32px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border); }
+.feat3 > div:last-child { border-right: 0; }
+.feat3 .ic { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; background: var(--card); color: var(--green-ink); box-shadow: var(--shadow); }
+.feat3 h3 { font-size: 17px; margin-top: 6px; }
+.feat3 p { font-size: 14px; color: var(--muted-fg); }
+.feat3.top { border-bottom: 1px solid var(--border); }
+
+.why { background: #0a0a0a; color: #fafafa; }
+.why .rail { border-color: #262626; }
+.why .px { background: linear-gradient(#a1a1aa, #a1a1aa) center / 1px 100% no-repeat, linear-gradient(#a1a1aa, #a1a1aa) center / 100% 1px no-repeat; }
+.word { display: inline-grid; grid-template-columns: auto auto; font: 900 clamp(64px, 6vw + 36px, 128px)/1.15 var(--display); letter-spacing: -0.02em; }
+.word .k { display: inline-flex; color: #eef5e6; }
+.word .k span { display: inline-block; transform-origin: 50% 90%; animation: wave 4.2s ease-in-out infinite; animation-delay: calc(.5s + var(--i) * .09s); }
+.word .an-clip { overflow: hidden; }
+.word .an { display: inline-block; color: #5fd39a; animation: sprout .9s cubic-bezier(.2, 1.3, .4, 1) 1.25s both; }
+.brk { font: 500 13px var(--mono); letter-spacing: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 4px; color: #a1a1aa; }
+.brk::before { content: ""; width: 100%; height: 12px; border: 2px solid currentColor; border-top: 0; border-radius: 0 0 12px 12px; transform-origin: center; animation: draw .7s cubic-bezier(.16, 1, .3, 1) both; }
+.brk.b1 { grid-column: 1; } .brk.b1::before { animation-delay: .3s; }
+.brk.b2 { grid-column: 1 / 3; color: #5fd39a; } .brk.b2::before { animation-delay: 1.9s; }
+.brk em { font-style: italic; font-weight: 600; color: #fafafa; }
+@keyframes wave { 0%, 26%, 100% { transform: none; } 8% { transform: translateY(-.14em) rotate(-5deg); } 17% { transform: translateY(.02em) rotate(2deg); } }
+@keyframes sprout { 0% { transform: translateY(105%); } 60% { transform: translateY(-6%) scaleY(1.05); } 100% { transform: none; } }
+@keyframes draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.why-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 32px; align-items: center; }
+.why-card { border: 1px solid #262626; border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 10px; background: #111113; }
+.why-card h3 { font-size: 17px; }
+.why-card ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: #c4c4cc; }
+.why-card li { display: flex; gap: 8px; }
+.why-card li::before { content: ""; width: 6px; height: 6px; margin-top: 8px; border-radius: 50%; background: #5fd39a; flex: none; }
+
+.steps { grid-template-columns: repeat(3, 1fr); }
+.step { padding: 28px; display: flex; flex-direction: column; gap: 10px; }
+.step .mono { font-size: 13px; color: var(--green-ink); }
+.step h3 { font-size: 18px; }
+.step p { color: var(--muted-fg); font-size: 14px; }
+
+.integ { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+.hub { position: relative; height: 300px; }
+.hub svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hub svg.lines line { stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+.node span { width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); display: grid; place-items: center; box-shadow: var(--shadow); }
+.node.center span { width: 76px; height: 76px; background: var(--green); color: var(--green-fg); border: 0; box-shadow: 0 0 0 8px var(--green-soft); }
+.node.center svg { width: 34px; height: 34px; }
+.node .icon { width: 20px; height: 20px; }
+.int-list { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.int-list div { display: flex; gap: 10px; font-size: 14px; }
+.int-list b { font-weight: 500; }
+
+.gallery { columns: 4 180px; column-gap: 10px; position: relative; max-height: 560px; overflow: hidden; }
+.gallery img { width: 100%; margin-bottom: 10px; border-radius: 10px; border: 1px solid var(--border); break-inside: avoid; }
+.gallery::after { content: ""; position: absolute; inset: auto 0 0 0; height: 160px; background: linear-gradient(transparent, var(--bg)); }
+
+.wall { columns: 3 260px; column-gap: 16px; }
+.quote { break-inside: avoid; margin-bottom: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.quote p { font-size: 14px; }
+.who { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.who b { display: block; font-weight: 600; }
+.note { font: 12px var(--mono); color: var(--muted-fg); }
+
+.prices { grid-template-columns: repeat(3, 1fr); }
+.price { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+.price.hl { background: var(--green-soft); }
+.price h3 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.amt { font-size: 40px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+.amt small { font-size: 14px; font-weight: 400; color: var(--muted-fg); letter-spacing: 0; }
+.price ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: 14px; }
+.price li { display: flex; gap: 9px; align-items: flex-start; }
+.price li .icon { margin-top: 3px; color: var(--green-ink); }
+.price .btn { margin-top: auto; }
+
+.contact { display: grid; grid-template-columns: 1fr 1fr; }
+.contact > div:first-child { padding: 48px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+.contact > div:first-child h2 { font-size: clamp(26px, 2vw + 16px, 34px); }
+.contact dl { margin: 18px 0 0; display: grid; gap: 0; }
+.contact dl div { display: flex; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px dashed var(--border); font-size: 14px; }
+.contact dt { color: var(--muted-fg); } .contact dd { margin: 0; font-weight: 500; }
+.contact form { padding: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start; }
+.contact form .full { grid-column: 1 / -1; }
+
+.faq { display: grid; grid-template-columns: 1fr 1.6fr; gap: 48px; }
+.faq h2 { font-size: clamp(26px, 2vw + 16px, 34px); }
+details { border-bottom: 1px solid var(--border); }
+details:first-child { border-top: 1px solid var(--border); }
+summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 2px; font-weight: 500; }
+summary::-webkit-details-marker { display: none; }
+summary .icon { transition: transform .2s; }
+details[open] summary .icon { transform: rotate(45deg); }
+details p { padding: 0 2px 18px; color: var(--muted-fg); font-size: 14px; max-width: 62ch; }
+
+.cta { text-align: center; padding: 64px 0 0; }
+.cta h2 { font-size: clamp(30px, 3vw + 16px, 46px); letter-spacing: -0.04em; padding: 0 24px; }
+.cta p { margin: 10px auto 0; max-width: 46ch; color: var(--muted-fg); padding: 0 24px; }
+.cta-strip { margin-top: 36px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 48px 1fr auto auto 48px; }
+.cta-strip > * { border-right: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; }
+.cta-strip > *:last-child { border-right: 0; }
+.cta-strip span { font-size: 14px; color: var(--muted-fg); }
+
+.foot { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; padding: 48px; }
+.foot h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; }
+.foot ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--muted-fg); }
+.foot a { text-decoration: none; } .foot a:hover { color: var(--fg); }
+.foot-big { font-size: clamp(56px, 12vw, 160px); font-weight: 700; letter-spacing: -0.06em; line-height: .8; text-align: center; color: transparent; -webkit-text-stroke: 1px var(--border); padding: 12px 0 0; overflow: hidden; height: .62em; user-select: none; }
+.copy { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 18px 48px; font-size: 13px; color: var(--muted-fg); border-top: 1px solid var(--border); }
+
+/* ===== auth ===== */
+.auth { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+.auth-l { display: flex; flex-direction: column; padding: 20px 28px; }
+.auth-top { display: flex; align-items: center; justify-content: space-between; }
+.auth-form { margin: auto; width: 100%; max-width: 380px; padding: 40px 0 72px; display: flex; flex-direction: column; gap: 20px; }
+.auth-form h1 { font-size: 30px; }
+.auth-form .sub { font-size: 14px; color: var(--muted-fg); margin-top: 6px; }
+.field-row { display: flex; justify-content: space-between; align-items: center; }
+.field-row a { font-size: 13px; color: var(--muted-fg); }
+.pw { position: relative; }
+.pw button { position: absolute; right: 4px; top: 3px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; background: none; color: var(--muted-fg); cursor: pointer; border-radius: 6px; }
+.or { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted-fg); }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.trust { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted-fg); }
+.trust li { display: flex; gap: 8px; align-items: center; }
+.trust .icon { color: var(--green-ink); }
+.auth-r { margin: 8px; border: 1px solid var(--border); border-radius: 16px; background: var(--muted); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 32px; gap: 20px; }
+.auth-r::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; -webkit-mask-image: linear-gradient(to bottom, #000, transparent 70%); mask-image: linear-gradient(to bottom, #000, transparent 70%); }
+.auth-r > * { position: relative; }
+.collage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.collage img { aspect-ratio: 3 / 4; object-fit: cover; width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+.collage img:nth-child(2) { transform: translateY(-24px); }
+.stepper { display: flex; gap: 6px; }
+.stepper div { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted-fg); }
+.stepper div::before { content: ""; height: 3px; border-radius: 99px; background: var(--border); }
+.stepper .on { color: var(--fg); font-weight: 500; }
+.stepper .on::before { background: var(--green); }
+.meter { display: flex; gap: 4px; }
+.meter i { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
+.meter i.f { background: var(--green); }
+.story { display: flex; flex-direction: column; }
+.story details { border-color: var(--border); background: var(--card); }
+.story details:first-child { border-radius: 12px 12px 0 0; border: 1px solid var(--border); }
+.story details { border: 1px solid var(--border); border-top: 0; }
+.story details:last-child { border-radius: 0 0 12px 12px; }
+.story details[open] { box-shadow: inset 2px 0 0 var(--green); }
+.story summary { padding: 14px 16px; }
+.story summary span { display: flex; align-items: center; gap: 10px; }
+.story summary .mono { font-size: 12px; color: var(--muted-fg); }
+.story .body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: var(--muted-fg); }
+.mini-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; color: var(--fg); font-size: 13px; background: var(--card); }
+.mini-row .badge { margin-left: auto; }
+.tiles3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tiles3 figure { margin: 0; font-size: 11px; color: var(--fg); }
+.tiles3 img { aspect-ratio: 1; object-fit: cover; border-radius: 8px; margin-bottom: 4px; }
+.center-card { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+
+/* ===== onboarding ===== */
+.ob-top { border-bottom: 1px solid var(--border); background: var(--card); }
+.ob-top .in { max-width: 1100px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.ob-main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 96px; }
+.ob-main > h1 { font-size: 32px; letter-spacing: -0.035em; }
+.ob-main > p { color: var(--muted-fg); margin-top: 6px; max-width: 60ch; }
+.set-rows { margin-top: 28px; }
+.set-row { display: grid; grid-template-columns: 300px 1fr; gap: 32px; padding: 24px; border-bottom: 1px solid var(--border); }
+.set-row:last-child { border-bottom: 0; }
+.set-row h3 { font-size: 15px; }
+.set-row .d { font-size: 13px; color: var(--muted-fg); margin-top: 4px; }
+.set-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--muted); border-radius: 0 0 12px 12px; }
+.voices { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.voice-list { display: flex; flex-direction: column; gap: 6px; }
+.voice { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); cursor: pointer; text-align: left; font-size: 14px; }
+.voice::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); flex: none; }
+.voice[aria-checked="true"] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.voice[aria-checked="true"]::before { border: 4px solid var(--green); }
+.vp { padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--muted); border: 1px solid var(--border); border-radius: 12px; }
+.vp-post { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.swatches { display: flex; gap: 8px; }
+.swatches span { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.timeline li { display: flex; gap: 14px; }
+.timeline .rail-dot { display: flex; flex-direction: column; align-items: center; flex: none; }
+.timeline .rail-dot span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--border); background: var(--card); }
+.timeline .rail-dot i { width: 2px; flex: 1; min-height: 26px; background: var(--border); }
+.timeline .done span { background: var(--green); border-color: var(--green); color: var(--green-fg); }
+.timeline .done i { background: var(--green); }
+.timeline .now span { border-color: var(--amber); }
+.timeline .now span::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.timeline .txt { padding-bottom: 18px; display: flex; flex-direction: column; font-size: 14px; }
+.timeline .txt b { font-weight: 500; }
+.wait { display: flex; gap: 14px; padding: 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); text-decoration: none; }
+.wait b { display: block; font-weight: 600; margin-bottom: 2px; }
+.wait span { font-size: 13px; color: var(--muted-fg); }
+.wait.hl { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.wait.locked { background: var(--muted); }
+.two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; margin-top: 32px; align-items: start; }
+
+/* ===== app shell ===== */
+.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; background: var(--muted); }
+.side { display: flex; flex-direction: column; gap: 2px; padding: 10px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.biz { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; text-decoration: none; }
+.biz b, .me b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.biz small, .me small { font-size: 12px; color: var(--muted-fg); }
+.grp { padding: 14px 8px 4px; font-size: 12px; font-weight: 500; color: var(--muted-fg); }
+.menu { display: flex; flex-direction: column; gap: 1px; }
+.menu a { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; font-size: 14px; text-decoration: none; border: 1px solid transparent; }
+.menu a:hover, .biz:hover, .me:hover { background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.menu a[aria-current="page"] { background: var(--card); font-weight: 500; box-shadow: var(--shadow); border-color: var(--border); }
+.menu a[aria-current="page"] .icon { color: var(--green-ink); }
+.menu .badge { margin-left: auto; height: 20px; }
+.quota { margin: auto 0 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.me { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; border: 0; background: none; text-align: left; cursor: pointer; width: 100%; }
+.inset { margin: 8px 8px 8px 0; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; min-width: 0; position: relative; }
+.topbar { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--border); position: relative; }
+.crumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted-fg); }
+.crumb b { color: var(--fg); font-weight: 500; }
+.vr { width: 1px; height: 18px; background: var(--border); }
+.search { margin-left: auto; display: flex; align-items: center; gap: 8px; height: 34px; width: 240px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted-fg); font-size: 13px; background: var(--card); }
+.search .kbd { margin-left: auto; }
+.bell { position: relative; }
+.bell i { position: absolute; top: 6px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); border: 2px solid var(--bg); }
+.page { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.page-h { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.page-h h1 { font-size: 24px; }
+.page-h p { color: var(--muted-fg); font-size: 14px; margin-top: 2px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.stat-h { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted-fg); }
+.stat b { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+.stat small { font-size: 12px; color: var(--muted-fg); }
+.up { color: var(--green-ink); font-weight: 500; }
+.spark { width: 100%; height: 34px; }
+.spark path.a { fill: var(--green-soft); }
+.spark path.l { fill: none; stroke: var(--green); stroke-width: 1.5; }
+
+/* calendar */
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.cal-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.cal-tools h2 { font-size: 16px; margin-right: 4px; }
+.cal-tools .push { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cal-tools .select { height: 32px; width: auto; font-size: 13px; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); min-width: 680px; }
+.dow { padding: 8px 10px; font-size: 12px; font-weight: 500; color: var(--muted-fg); border-bottom: 1px solid var(--border); }
+.day { min-height: 108px; padding: 6px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.day:nth-child(7n) { border-right: 0; }
+.day.out { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--dot) 6px 7px); }
+.day.out .dn { opacity: .45; }
+.day-h { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 24px; }
+.dn { font-size: 12px; font-weight: 500; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; }
+.day.today .dn { background: var(--green); color: var(--green-fg); }
+.tag { font: 500 10px var(--mono); color: var(--green-ink); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pchip { display: flex; align-items: center; gap: 6px; width: 100%; padding: 3px 6px 3px 3px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); font-size: 12px; font-weight: 500; text-align: left; cursor: pointer; }
+.pchip img { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; flex: none; }
+.pchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.pchip time { font: 11px var(--mono); color: var(--muted-fg); }
+.pchip:hover { background: var(--muted); }
+.pchip.posted { background: var(--green-soft); border-color: transparent; }
+.pchip.posted time { color: var(--green-ink); }
+.pchip.draft { border-style: dashed; }
+.pchip.held { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.pchip.held time { color: var(--danger); }
+.pchip[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: -1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 10px 14px; font-size: 12px; color: var(--muted-fg); border-top: 1px solid var(--border); }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 10px; border-radius: 3px; border: 1px solid var(--border); background: var(--card); }
+.tl { display: grid; grid-template-columns: 120px repeat(7, minmax(84px, 1fr)); min-width: 720px; }
+.tl > div { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 8px; min-height: 64px; display: flex; flex-direction: column; gap: 4px; }
+.tl > div:nth-child(8n) { border-right: 0; }
+.tl .ch { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.tl .hd { min-height: 0; font-size: 12px; color: var(--muted-fg); font-weight: 500; }
+.detail { position: sticky; top: 16px; overflow: hidden; }
+.detail > img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; border-bottom: 1px solid var(--border); }
+.d-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.d-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.d-top h3 { font-size: 17px; }
+.d-top p { font-size: 13px; color: var(--muted-fg); }
+.caption { padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--muted); }
+.ver { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted-fg); }
+.score-h { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.d-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.d-acts .btn-green { grid-column: 1 / -1; }
+.alert { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 10px; font-size: 13px; color: var(--danger); background: color-mix(in srgb, var(--danger) 6%, var(--card)); }
+.alert .icon { margin-top: 2px; }
+.alert.ok { color: var(--green-ink); border-color: transparent; background: var(--green-soft); }
+.alert.warn { color: var(--amber); border-color: transparent; background: var(--amber-soft); }
+
+/* popovers, tour */
+.pop { position: absolute; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 40px -12px rgba(0,0,0,.25); animation: popin .16s cubic-bezier(.2,.8,.2,1); }
+@keyframes popin { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+.notif { top: 52px; right: 56px; width: 380px; max-width: calc(100vw - 32px); }
+.notif .card-h { padding: 12px 14px; }
+.n-item { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.n-item:last-child { border-bottom: 0; }
+.n-item .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--muted); flex: none; }
+.n-item .ic.g { background: var(--green-soft); color: var(--green-ink); }
+.n-item .ic.r { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.n-item b { font-weight: 500; display: block; }
+.n-item .unread { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; margin-top: 6px; }
+.acct { left: 10px; bottom: 64px; width: 270px; }
+.acct .head { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.acct a, .acct button.item { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 14px; font-size: 14px; text-decoration: none; border: 0; background: none; cursor: pointer; text-align: left; }
+.acct a:hover, .acct button.item:hover { background: var(--muted); }
+.acct .seg { padding: 8px 14px 10px; }
+.acct .out { color: var(--danger); border-top: 1px solid var(--border); }
+.tour-on { position: relative; z-index: 61; box-shadow: 0 0 0 3px var(--green), 0 0 0 9999px rgba(0,0,0,.55) !important; border-radius: 12px; transition: box-shadow .3s; }
+.tour-card { position: fixed; z-index: 62; right: 24px; bottom: 84px; width: 340px; max-width: calc(100vw - 32px); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.tour-card h3 { font-size: 16px; }
+.tour-card p { font-size: 14px; color: var(--muted-fg); }
+
+/* composer, planner */
+.studio { display: grid; grid-template-columns: 1fr 1.1fr 300px; gap: 20px; align-items: start; }
+.studio .img-card img { aspect-ratio: 1; object-fit: cover; width: 100%; border-radius: 12px 12px 0 0; }
+.vers { display: flex; gap: 6px; }
+.vers button { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 12px; cursor: pointer; text-align: left; }
+.vers button[aria-pressed="true"] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.vers small { display: block; color: var(--muted-fg); }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.slots button { padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 12px; cursor: pointer; text-align: left; }
+.slots button b { display: block; font-size: 13px; font-weight: 500; }
+.slots button[aria-pressed="true"] { background: var(--green-soft); border-color: transparent; color: var(--green-ink); }
+.phone { width: 100%; max-width: 280px; margin: 0 auto; border: 1px solid var(--border); border-radius: 30px; padding: 10px; background: var(--muted); }
+.phone-in { border-radius: 22px; overflow: hidden; background: var(--card); border: 1px solid var(--border); }
+.phone-in .ig-h { padding: 10px; }
+.phone-in img { aspect-ratio: 1; object-fit: cover; width: 100%; }
+.phone-in p { padding: 10px; font-size: 12px; line-height: 1.45; }
+.fb-acts { display: flex; justify-content: space-around; padding: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted-fg); }
+.planner { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+.gen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.gen { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); animation: rise .4s cubic-bezier(.2,.8,.2,1) both; }
+.gen img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+.gen div { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.gen b { font-size: 13px; }
+.gen.sk-card { min-height: 210px; background: linear-gradient(100deg, var(--muted) 30%, color-mix(in srgb, var(--fg) 4%, var(--muted)) 50%, var(--muted) 70%) 0 0 / 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.seg-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg-pick button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); cursor: pointer; text-align: left; font-size: 12px; }
+.seg-pick button b { display: block; font-size: 18px; font-weight: 600; }
+.seg-pick button[aria-pressed="true"] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+
+/* insights, billing, help, staff */
+.chart { width: 100%; height: 220px; }
+.chart .grid line { stroke: var(--border); }
+.chart text { fill: var(--muted-fg); font: 11px var(--mono); }
+.chart path.a { fill: var(--green-soft); }
+.chart path.l { fill: none; stroke: var(--green); stroke-width: 2; }
+.chart path.l2 { fill: none; stroke: var(--muted-fg); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.chart circle { fill: var(--green); stroke: var(--card); stroke-width: 2; }
+.hbar { display: flex; flex-direction: column; gap: 12px; }
+.hbar div { display: grid; grid-template-columns: 90px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+.hbar span.b { height: 10px; border-radius: 99px; background: var(--muted); overflow: hidden; }
+.hbar span.b i { display: block; height: 100%; background: var(--green); border-radius: 99px; }
+.grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+.grid2e { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.plan-hero { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.plan-hero .amt { font-size: 34px; }
+.wallet { padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.wallet .muted { color: color-mix(in srgb, var(--bg) 65%, transparent); }
+.wallet .btn-green { align-self: flex-start; }
+.split { display: grid; grid-template-columns: 320px 1fr; min-height: 620px; }
+.split > div:first-child { border-right: 1px solid var(--border); }
+.tlist a { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border); text-decoration: none; font-size: 13px; cursor: pointer; }
+.tlist a:hover { background: var(--muted); }
+.tlist a[aria-current="true"] { background: var(--muted); box-shadow: inset 2px 0 0 var(--green); }
+.tlist .t1 { display: flex; justify-content: space-between; gap: 8px; }
+.tlist b { font-weight: 500; font-size: 14px; }
+.thread { display: flex; flex-direction: column; }
+.msgs { padding: 20px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.msg { display: flex; gap: 10px; max-width: 78%; }
+.msg .bub { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); font-size: 14px; }
+.msg small { display: block; font-size: 11px; color: var(--muted-fg); margin-top: 4px; }
+.msg.me { margin-left: auto; flex-direction: row-reverse; }
+.msg.me .bub { background: var(--green-soft); border-color: transparent; }
+.msg.note .bub { background: var(--amber-soft); border-color: transparent; border-style: dashed; }
+.composer { border-top: 1px solid var(--border); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.inbox { display: grid; grid-template-columns: 340px 1fr 280px; min-height: 640px; }
+.inbox > div { border-right: 1px solid var(--border); min-width: 0; }
+.inbox > div:last-child { border-right: 0; }
+.prio { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+.p-crit { color: var(--danger); } .p-high { color: var(--amber); } .p-med, .p-low { color: var(--muted-fg); }
+.rail-sec { padding: 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.rail-sec h4 { font-size: 12px; font-weight: 500; color: var(--muted-fg); }
+.kv { display: flex; justify-content: space-between; gap: 8px; }
+.doc { aspect-ratio: 8.5 / 11; max-height: 520px; margin: 0 auto; border: 1px solid var(--border); border-radius: 8px; background: var(--card); padding: 28px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; box-shadow: 0 10px 30px -15px rgba(0,0,0,.25); position: relative; }
+.doc::after { content: "SAMPLE"; position: absolute; inset: 0; display: grid; place-items: center; font: 700 64px var(--font); color: color-mix(in srgb, var(--fg) 5%, transparent); transform: rotate(-24deg); pointer-events: none; }
+.doc h4 { text-align: center; font-size: 14px; letter-spacing: .02em; }
+.doc i { display: block; height: 7px; border-radius: 99px; background: var(--muted); }
+.sys { display: flex; flex-direction: column; }
+.sys div { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.sys div:last-child { border-bottom: 0; }
+.sys .badge { margin-left: auto; }
+.staff-side { background: #0a0a0a; color: #fafafa; }
+.staff-side .grp, .staff-side small { color: #a1a1aa; }
+.staff-side .menu a:hover, .staff-side .me:hover, .staff-side .biz:hover { background: rgba(255,255,255,.06); }
+.staff-side .menu a[aria-current="page"] { background: #1b1b1f; border-color: #27272a; box-shadow: none; }
+.staff-side .menu a[aria-current="page"] .icon { color: #5fd39a; }
+.staff-side .badge { background: #1b1b1f; border-color: #27272a; color: #fafafa; }
+.staff-side .avatar { background: #1b1b1f; color: #fafafa; }
+.staff-side .avatar.g { background: #5fd39a; color: #052e1c; }
+
+/* preview switcher */
+.switcher { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 70; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(10px); box-shadow: 0 8px 30px rgba(0,0,0,.14); max-width: calc(100vw - 24px); }
+.switcher .cur { padding: 0 10px; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.switcher .cur small { color: var(--muted-fg); font-weight: 400; margin-right: 6px; }
+
+/* responsive */
+@media (max-width: 1180px) {
+  .work, .studio, .grid2 { grid-template-columns: 1fr; }
+  .detail { position: static; }
+  .inbox { grid-template-columns: 300px 1fr; }
+  .inbox > div:last-child { display: none; }
+  .why-grid { grid-template-columns: 1fr 1fr; }
+  .why-grid > :first-child { grid-column: 1 / -1; }
+  .idx-grid { grid-template-columns: repeat(2, 1fr); }
+  .idx-card:nth-child(4n) { border-right: 1px solid var(--border); }
+  .idx-card:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 900px) {
+  .nav, .hide-md { display: none !important; }
+  .pad, .hero { padding-left: 24px; padding-right: 24px; }
+  .idx-head { padding: 40px 24px 28px; } .idx-group { padding: 18px 24px; }
+  .feat3, .steps, .prices, .integ, .contact, .faq, .grid2e, .planner, .two { grid-template-columns: 1fr; }
+  .feat3 > div { border-right: 0; border-bottom: 1px solid var(--border); }
+  .contact > div:first-child { border-right: 0; border-bottom: 1px solid var(--border); padding: 32px 24px; }
+  .contact form { padding: 32px 24px; }
+  .foot { grid-template-columns: 1fr 1fr; padding: 32px 24px; }
+  .copy { padding: 16px 24px; }
+  .cta-strip { grid-template-columns: 1fr; } .cta-strip > *:first-child, .cta-strip > *:last-child { display: none; } .cta-strip > * { border-right: 0; border-bottom: 1px solid var(--border); justify-content: center; }
+  .shell { grid-template-columns: 1fr; }
+  .side { display: none; position: fixed; inset: 0 auto 0 0; width: 268px; z-index: 50; background: var(--muted); border-right: 1px solid var(--border); }
+  .staff-side { background: #0a0a0a; }
+  .shell.nav-open .side { display: flex; }
+  .inset { margin: 0; border-radius: 0; border: 0; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .search { display: none; }
+  .auth { grid-template-columns: 1fr; } .auth-r { display: none; }
+  .set-row { grid-template-columns: 1fr; gap: 14px; }
+  .split, .inbox { grid-template-columns: 1fr; }
+  .split > div:first-child, .inbox > div:first-child { border-right: 0; border-bottom: 1px solid var(--border); }
+  .acct { bottom: auto; top: 52px; left: auto; right: 16px; }
+  .prefs-grid, .inbox { grid-template-columns: 1fr !important; }
+  .prefs-grid > nav { display: none; }
+  .inbox > div { border-right: 0 !important; border-bottom: 1px solid var(--border); }
+  .inbox > div:last-child { display: flex; }
+}
+@media (min-width: 901px) { .only-sm { display: none !important; } }
+@media (max-width: 640px) {
+  .shot-in { grid-template-columns: 1fr; }
+  .shot-main { border-right: 0; border-bottom: 1px solid var(--border); }
+  .lane, .gen-grid { grid-template-columns: 1fr 1fr; }
+  .lane .post:nth-child(3) { display: none; }
+  .why-grid, .voices { grid-template-columns: 1fr; }
+  .idx-grid { grid-template-columns: 1fr; } .idx-card { border-right: 0 !important; min-height: 0; }
+  .page { padding: 16px; }
+  .hide-xs { display: none !important; }
+  .contact form { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .slots, .seg-pick { grid-template-columns: 1fr 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-fb" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></symbol>
+  <symbol id="i-ig" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.4A4 4 0 1 1 12.6 8 4 4 0 0 1 16 11.4zM17.5 6.5h.01"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12v4"/><circle cx="16.5" cy="13.5" r="1.2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 28 28"><rect x="11" y="2" width="6" height="24" rx="2" fill="currentColor" stroke="none"/><rect x="9" y="9" width="10" height="2" rx="1" fill="var(--bg)" stroke="none"/><rect x="9" y="17" width="10" height="2" rx="1" fill="var(--bg)" stroke="none"/><path d="M17 8c4-1 7-3 8-6-4 0-7 2-8 5z" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<!-- ======================= SCREENS INDEX ======================= -->
+<div class="view" id="v-screens">
+  <div class="band"><div class="rail"><div class="spacer"></div><i class="px l"></i><i class="px r"></i></div></div>
+  <div class="band"><div class="rail idx-head dots">
+    <a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a>
+    <h1 style="margin-top:20px">Every screen, rebuilt with Efferd blocks</h1>
+    <p>Your current system in one place: neutral shadcn base, Efferd page frame and blocks, with green kept for the main action, active states and good news. Open any screen, then use the bar at the bottom to step through.</p>
+    <i class="px l"></i><i class="px r"></i>
+  </div></div>
+  <div id="idx"></div>
+  <div class="band"><div class="rail"><div class="spacer" style="height:96px"></div></div></div>
+</div>
+
+<!-- ======================= LANDING ======================= -->
+<div class="view" id="v-home">
+  <header class="hdr">
+    <div class="hdr-pill">
+      <a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a>
+      <nav class="nav" aria-label="Main"><a href="#l-features">Features</a><a href="#l-how">How it works</a><a href="#l-why">Why Kawayan</a><a href="#l-pricing">Pricing</a><a href="#l-faq">FAQ</a></nav>
+      <div class="hdr-end">
+        <button class="btn btn-ghost btn-icon btn-pill js-theme" type="button" aria-label="Toggle dark mode"><svg class="icon"><use href="#i-moon"/></svg></button>
+        <a class="btn btn-ghost btn-pill hide-xs" href="#login">Log in</a>
+        <a class="btn btn-green btn-pill" href="#signup">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="band"><div class="rail">
+    <div class="hero">
+      <a class="announce" href="#planner"><b>New</b>Plan a whole month in one click<svg class="icon" style="width:14px;height:14px"><use href="#i-right"/></svg></a>
+      <h1>Social Media <em>On Autopilot.</em></h1>
+      <p class="lead">Taglish captions, images and a posting schedule for your panaderia, all on one calendar. Kawayan posts to Facebook and Instagram at the time you pick.</p>
+      <div class="ctas"><a class="btn btn-green btn-lg" href="#signup">Start free trial<svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn btn-outline btn-lg" href="#l-how">See how it works</a></div>
+      <p class="fine">Create your first content calendar in minutes. No credit card required.</p>
+      <div class="shot"><div class="shot-in">
+        <div class="shot-main">
+          <div class="row-flex"><b style="font-size:15px">This week</b><span class="badge b-muted mono">Nov 1 – 7</span><span class="badge" style="margin-left:auto"><svg class="icon" style="width:12px;height:12px"><use href="#i-ig"/></svg>Instagram</span></div>
+          <div class="lane">
+            <article class="post"><img src="img/panaderia-1.jpg" alt="Fresh pandesal in a basket"><div><span class="badge b-green"><span class="dot"></span>Posted</span><b>Pandesal alert</b><small>Sun, Nov 1 · 6:00 AM</small></div></article>
+            <article class="post"><img src="img/panaderia-2.jpg" alt="Ube ensaymada on a tray"><div><span class="badge">9:00 AM</span><b>Ube ensaymada</b><small>Thu, Nov 5 · 9:00 AM</small></div></article>
+            <article class="post"><img src="img/panaderia-3.jpg" alt="Baker at the oven"><div><span class="badge b-dashed">Draft</span><b>Behind the oven</b><small>Sat, Nov 7 · 7:30 AM</small></div></article>
+          </div>
+        </div>
+        <div class="phone-side"><div class="ig"><div class="ig-h"><span>AN</span>alingnenasbakery</div><img src="img/panaderia-1.jpg" alt=""><p><b>alingnenasbakery</b> Pandesal alert! Mainit pa at bagong luto, 6 AM pa lang. Kita-kits sa tindahan!</p></div><small class="muted" style="font-size:12px">Image made by Kawayan AI</small></div>
+      </div></div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band"><div class="rail cloud">
+    <p>Made for every Filipino MSME</p>
+    <div class="marquee" aria-hidden="true"><div>
+      <span>Coffee Shop</span><span>Sari-sari Store</span><span>Milk Tea Kiosk</span><span>Panaderia</span><span>Carinderia</span><span>Ukay Boutique</span><span>Barbershop</span><span>Hardware Store</span><span>Lechon Manok Stall</span><span>Beauty Salon</span><span>Frozen Goods Reseller</span><span>Halamanan</span><span>Native Delicacies</span><span>Print &amp; Layout</span><span>Motoparts Supply</span><span>Poultry Farm</span>
+      <span>Coffee Shop</span><span>Sari-sari Store</span><span>Milk Tea Kiosk</span><span>Panaderia</span><span>Carinderia</span><span>Ukay Boutique</span><span>Barbershop</span><span>Hardware Store</span><span>Lechon Manok Stall</span><span>Beauty Salon</span><span>Frozen Goods Reseller</span><span>Halamanan</span><span>Native Delicacies</span><span>Print &amp; Layout</span><span>Motoparts Supply</span><span>Poultry Farm</span>
+    </div></div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <div class="band"><div class="rail"><div class="spacer"></div></div></div>
+
+  <section class="band" id="l-features"><div class="rail">
+    <div class="pad" style="padding-bottom:32px"><div class="sec-title" style="margin:0"><div><h2>Everything a small shop needs to post every week</h2><p>Write, design, schedule and publish in one place. No agency, no editing apps.</p></div></div></div>
+    <div class="feat3 top" style="border-top:1px solid var(--border)">
+      <div><span class="ic"><svg class="icon"><use href="#i-msg"/></svg></span><h3>Taglish, English or Filipino</h3><p>Captions follow your Brand DNA: how you talk, who you sell to, and what makes your shop yours.</p></div>
+      <div><span class="ic"><svg class="icon"><use href="#i-spark"/></svg></span><h3>Plan a whole month</h3><p>Kawayan reads the PH calendar, finds paydays and holidays, and writes up to 16 posts with images.</p></div>
+      <div><span class="ic"><svg class="icon"><use href="#i-cal"/></svg></span><h3>Posts on time</h3><p>Approve once. Kawayan publishes to your Page and Instagram while you're busy at the counter.</p></div>
+    </div>
+    <div class="feat3">
+      <div><span class="ic"><svg class="icon"><use href="#i-chart"/></svg></span><h3>Reach score on every draft</h3><p>A 0–100 score and one line on why, so you know which posts to keep before they go out.</p></div>
+      <div><span class="ic"><svg class="icon"><use href="#i-image"/></svg></span><h3>Images made for you</h3><p>Every post gets a picture. Don't like it? Make a new one or upload your own photo.</p></div>
+      <div><span class="ic"><svg class="icon"><use href="#i-wallet"/></svg></span><h3>Pay with GCash or Maya</h3><p>Start free. Upgrade to Pro when you need more posts, and pay the way you already do.</p></div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band why" id="l-why"><div class="rail pad">
+    <div class="why-grid">
+      <div>
+        <div class="word" aria-label="Kawayan">
+          <span class="k" aria-hidden="true"><span style="--i:0">K</span><span style="--i:1">a</span><span style="--i:2">w</span><span style="--i:3">a</span><span style="--i:4">y</span></span>
+          <span class="an-clip" aria-hidden="true"><span class="an">an</span></span>
+          <span class="brk b1"><span><em>kaway</em> · to wave hello</span></span>
+          <span class="brk b2"><span><em>kawayan</em> · bamboo</span></span>
+        </div>
+        <p style="margin-top:20px;max-width:44ch;color:#c4c4cc">One Tagalog word, two meanings. Both describe what we're building for Filipino businesses.</p>
+      </div>
+      <div class="why-card"><h3>Connection</h3><ul><li>Wave hello to customers every week</li><li>Captions that sound like your shop</li><li>Replies come back to your Page</li></ul></div>
+      <div class="why-card"><h3>Growth</h3><ul><li>Bamboo grows steady, joint by joint</li><li>Post on time, week after week</li><li>See what works in Insights</li></ul></div>
+    </div>
+    <p style="margin-top:36px;font-weight:500;color:#5fd39a">Grow local. Reach digital.</p>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band" id="l-how"><div class="rail pad">
+    <div class="sec-title"><div><h2>How it works</h2><p>From sign-up to your first scheduled post in an afternoon.</p></div></div>
+    <div class="cells steps">
+      <div class="step"><span class="mono">01</span><h3>Tell us about your shop</h3><p>Answer the Brand DNA survey once: what you sell, who buys, and how you talk.</p></div>
+      <div class="step"><span class="mono">02</span><h3>Get verified</h3><p>Upload your Mayor's Permit, DTI or SEC document. A person on our team checks it, usually within a day.</p></div>
+      <div class="step"><span class="mono">03</span><h3>Approve and it posts</h3><p>Generate your month, edit anything, and Kawayan publishes at the time you pick.</p></div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band"><div class="rail pad">
+    <div class="integ">
+      <div>
+        <h2 style="font-size:clamp(26px,2vw + 16px,34px)">Works with what you already use</h2>
+        <p class="muted" style="margin-top:8px;max-width:46ch">Connect your Page and Instagram once. Pay the way your customers pay you.</p>
+        <div class="int-list">
+          <div><svg class="icon green"><use href="#i-check"/></svg><span><b>Facebook Pages</b> · posts, photos and schedules</span></div>
+          <div><svg class="icon green"><use href="#i-check"/></svg><span><b>Instagram business</b> · feed posts with captions</span></div>
+          <div><svg class="icon green"><use href="#i-check"/></svg><span><b>GCash, Maya and cards</b> · through PayMongo</span></div>
+        </div>
+      </div>
+      <div class="hub" aria-hidden="true">
+        <svg class="lines"><line x1="50%" y1="50%" x2="18%" y2="18%"/><line x1="50%" y1="50%" x2="82%" y2="18%"/><line x1="50%" y1="50%" x2="18%" y2="82%"/><line x1="50%" y1="50%" x2="82%" y2="82%"/></svg>
+        <div class="node center" style="left:50%;top:50%"><span><svg><use href="#i-logo"/></svg></span></div>
+        <div class="node" style="left:18%;top:18%"><span><svg class="icon"><use href="#i-fb"/></svg></span>Facebook</div>
+        <div class="node" style="left:82%;top:18%"><span><svg class="icon"><use href="#i-ig"/></svg></span>Instagram</div>
+        <div class="node" style="left:18%;top:82%"><span class="mono" style="font-size:11px;font-weight:600">GCash</span></div>
+        <div class="node" style="left:82%;top:82%"><span class="mono" style="font-size:11px;font-weight:600">Maya</span></div>
+      </div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band"><div class="rail pad">
+    <div class="sec-title"><div><h2>Made by Kawayan AI</h2><p>Sample images from the generator, one for every post. Owners can always swap in their own photo.</p></div><a class="btn btn-outline" href="#planner">Try the month planner</a></div>
+    <div class="gallery">
+      <img src="img/panaderia-1.jpg" alt="Pandesal" loading="lazy"><img src="img/milktea-2.jpg" alt="Milk tea" loading="lazy"><img src="img/sarisari-1.jpg" alt="Sari-sari store shelf" loading="lazy"><img src="img/kakanin-2.jpg" alt="Bibingka" loading="lazy">
+      <img src="img/coffee-1.jpg" alt="Coffee" loading="lazy"><img src="img/carinderia-1.jpg" alt="Carinderia ulam" loading="lazy"><img src="img/panaderia-3.jpg" alt="Baker" loading="lazy"><img src="img/milktea-1.jpg" alt="Milk tea kiosk" loading="lazy">
+      <img src="img/kakanin-1.jpg" alt="Kakanin tray" loading="lazy"><img src="img/sarisari-3.jpg" alt="Store front" loading="lazy"><img src="img/coffee-2.jpg" alt="Iced latte" loading="lazy"><img src="img/carinderia-2.jpg" alt="Lunch combo" loading="lazy">
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band"><div class="rail pad">
+    <div class="sec-title"><div><h2>What shop owners say</h2><p class="note">[Sample quotes: replace with pilot feedback]</p></div></div>
+    <div class="wall">
+      <div class="card quote"><p>"I used to post only when I remembered. Now my November is already planned, and the captions sound like me."</p><div class="who"><span class="avatar round g">RD</span><div><b>Rosa D.</b><span class="muted">Panaderia, Parañaque</span></div></div></div>
+      <div class="card quote"><p>"The payday promos are my favorite. It knew the 15th and 30th before I did."</p><div class="who"><span class="avatar round">JM</span><div><b>Jun M.</b><span class="muted">Milk tea kiosk, QC</span></div></div></div>
+      <div class="card quote"><p>"Approving posts on my phone between customers takes two minutes."</p><div class="who"><span class="avatar round">LP</span><div><b>Lorna P.</b><span class="muted">Sari-sari store, Cavite</span></div></div></div>
+      <div class="card quote"><p>"I changed one word in the caption and hit schedule. That's it."</p><div class="who"><span class="avatar round">BC</span><div><b>Ben C.</b><span class="muted">Plant shop, Marikina</span></div></div></div>
+      <div class="card quote"><p>"The Tita voice is so funny, my regulars started commenting more."</p><div class="who"><span class="avatar round">GS</span><div><b>Grace S.</b><span class="muted">Carinderia, Pasig</span></div></div></div>
+      <div class="card quote"><p>"Paying with GCash made it easy to try Pro for a month."</p><div class="who"><span class="avatar round">AR</span><div><b>Arnel R.</b><span class="muted">Barbershop, Taguig</span></div></div></div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band" id="l-pricing"><div class="rail pad">
+    <div class="sec-title"><div><h2>Simple pricing in pesos</h2><p>Your quota resets on the 1st of every month. Drafts don't count.</p></div></div>
+    <div class="cells prices">
+      <div class="price"><h3>Free Trial</h3><div class="amt num">₱0 <small>forever</small></div><ul><li><svg class="icon"><use href="#i-check"/></svg>8 posts a month</li><li><svg class="icon"><use href="#i-check"/></svg>Taglish captions and images</li><li><svg class="icon"><use href="#i-check"/></svg>Facebook and Instagram</li></ul><a class="btn btn-outline" href="#signup">Start free</a></div>
+      <div class="price hl"><h3>Pro <span class="badge b-green">Most picked</span></h3><div class="amt num">₱499 <small>/ month</small></div><ul><li><svg class="icon"><use href="#i-check"/></svg>16 posts a month</li><li><svg class="icon"><use href="#i-check"/></svg>Insights and post comparison</li><li><svg class="icon"><use href="#i-check"/></svg>Extra posts at ₱150 each</li></ul><a class="btn btn-green" href="#signup">Upgrade to Pro</a></div>
+      <div class="price"><h3>Enterprise</h3><div class="amt">Custom</div><ul><li><svg class="icon"><use href="#i-check"/></svg>For chains and franchises</li><li><svg class="icon"><use href="#i-check"/></svg>Talk to us about volume</li></ul><a class="btn btn-outline" href="#l-contact">Talk to us</a></div>
+    </div>
+    <p class="note" style="margin-top:14px">GCash · Maya · Visa · Mastercard, through PayMongo</p>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band" id="l-contact"><div class="rail">
+    <div class="contact">
+      <div><h2>Running more than one branch?</h2><p class="muted">Tell us about your business and we'll set up Enterprise for you. Your message opens a help ticket, and a person replies by email.</p>
+        <dl><div><dt>Reply time</dt><dd>Within 1 working day</dd></div><div><dt>Email</dt><dd>hello@kawayan.ph</dd></div><div><dt>Office hours</dt><dd>Mon–Fri, 9 AM – 6 PM</dd></div></dl>
+      </div>
+      <form class="js-form" novalidate>
+        <div class="field"><label class="label" for="c-name">Your name</label><input class="input" id="c-name" placeholder="Rosa Dela Cruz"></div>
+        <div class="field"><label class="label" for="c-biz">Business name</label><input class="input" id="c-biz" placeholder="Panaderia ni Aling Rosa"></div>
+        <div class="field"><label class="label" for="c-email">Email</label><input class="input" id="c-email" type="email" placeholder="you@yourshop.ph"></div>
+        <div class="field"><label class="label" for="c-br">Branches</label><select class="select" id="c-br"><option>2–5</option><option>6–20</option><option>More than 20</option></select></div>
+        <div class="field full"><label class="label" for="c-msg">Message</label><textarea class="textarea" id="c-msg" placeholder="What do you need help with?"></textarea></div>
+        <button class="btn btn-green full" type="submit">Send message</button>
+      </form>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band" id="l-faq"><div class="rail pad faq">
+    <div><h2>Questions</h2><p class="muted" style="margin-top:10px">Still stuck? Open a help ticket after you sign up and someone from our team will answer.</p></div>
+    <div>
+      <details open><summary>Do I need to be good at social media?<svg class="icon"><use href="#i-plus"/></svg></summary><p>No. Answer a few questions about your shop and Kawayan writes the captions, makes the images and picks good times. You just approve.</p></details>
+      <details><summary>Can I edit what the AI writes?<svg class="icon"><use href="#i-plus"/></svg></summary><p>Yes. Edit any caption, regenerate it up to two times, or upload your own photo instead of the generated image.</p></details>
+      <details><summary>Which platforms does it post to?<svg class="icon"><use href="#i-plus"/></svg></summary><p>Facebook Pages and Instagram business accounts. You connect them once in Settings.</p></details>
+      <details><summary>What happens when I run out of posts?<svg class="icon"><use href="#i-plus"/></svg></summary><p>Your drafts stay safe. Buy one extra post for ₱150, upgrade to Pro, or wait for your quota to reset on the 1st.</p></details>
+      <details><summary>Why do you need my business permit?<svg class="icon"><use href="#i-plus"/></svg></summary><p>To keep Kawayan for real businesses. Your permit is stored privately and only our review team can open it.</p></details>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <section class="band"><div class="rail dots">
+    <div class="cta"><h2>Ready to go Viral?</h2><p>Set up your shop today and have next week's posts ready before dinner.</p>
+      <div class="cta-strip"><i></i><span>Free for 8 posts a month. No credit card.</span><a class="btn btn-outline" href="#login" style="border:0;box-shadow:none;border-radius:0;height:auto">Log in</a><a class="btn btn-green" href="#signup" style="border-radius:0;height:auto">Start free trial</a><i></i></div>
+    </div>
+    <i class="px l"></i><i class="px r"></i>
+  </div></section>
+
+  <footer><div class="rail">
+    <div class="foot">
+      <div style="display:flex;flex-direction:column;gap:12px"><a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a><p class="muted" style="font-size:14px">Grow local. Reach digital.</p></div>
+      <div><h4>Product</h4><ul><li><a href="#l-features">Features</a></li><li><a href="#l-pricing">Pricing</a></li><li><a href="#l-how">How it works</a></li></ul></div>
+      <div><h4>Help</h4><ul><li><a href="#help">Help desk</a></li><li><a href="#l-faq">FAQ</a></li><li><a href="#l-contact">Contact</a></li></ul></div>
+      <div><h4>Legal</h4><ul><li><a href="#home">Privacy notice</a></li><li><a href="#home">Terms</a></li></ul></div>
+    </div>
+    <div class="foot-big" aria-hidden="true">Kawayan</div>
+    <div class="copy"><span>© 2026 Kawayan · A capstone project</span><span>Made in the Philippines</span></div>
+  </div></footer>
+</div>
+
+<!-- ======================= LOG IN ======================= -->
+<div class="view" id="v-login">
+  <div class="auth">
+    <div class="auth-l">
+      <div class="auth-top"><a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a><div class="row-flex"><a class="btn btn-ghost btn-sm" href="#home"><svg class="icon"><use href="#i-left"/></svg>Home</a><button class="btn btn-outline btn-icon btn-sm js-theme" type="button" aria-label="Toggle dark mode"><svg class="icon"><use href="#i-moon"/></svg></button></div></div>
+      <form class="auth-form js-go" data-go="calendar" novalidate>
+        <div><h1>Welcome back</h1><p class="sub">New to Kawayan? <a href="#signup" class="green">Create an account</a></p></div>
+        <div class="field"><label class="label" for="li-email">Email address</label><input class="input" id="li-email" type="email" autocomplete="email" placeholder="you@yourshop.ph"></div>
+        <div class="field"><div class="field-row"><label class="label" for="li-pass">Password</label><a href="#reset">Forgot password?</a></div><div class="pw"><input class="input" id="li-pass" type="password" autocomplete="current-password"><button type="button" class="js-eye" data-for="li-pass" aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div></div>
+        <button class="btn btn-green btn-lg" type="submit">Sign in<svg class="icon"><use href="#i-arrow"/></svg></button>
+        <div class="or">Kept safe</div>
+        <ul class="trust"><li><svg class="icon"><use href="#i-lock"/></svg>Passwords are hashed, never stored as text</li><li><svg class="icon"><use href="#i-shield"/></svg>Business permits checked by hand</li><li><svg class="icon"><use href="#i-card"/></svg>No credit card to start</li></ul>
+        <a href="#admin" class="muted" style="font-size:13px;text-align:center">Staff sign in</a>
+      </form>
+    </div>
+    <div class="auth-r">
+      <div class="collage"><img src="img/panaderia-1.jpg" alt=""><img src="img/milktea-1.jpg" alt=""><img src="img/carinderia-1.jpg" alt=""></div>
+      <div class="card" style="padding:18px;display:flex;flex-direction:column;gap:12px"><p style="font-size:16px">"My whole November was planned before I opened the shop on Monday."</p><div class="who"><span class="avatar round g">RD</span><div><b>Rosa D.</b><span class="muted">Panaderia, Parañaque · sample quote</span></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SIGN UP ======================= -->
+<div class="view" id="v-signup">
+  <div class="auth">
+    <div class="auth-l">
+      <div class="auth-top"><a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a><a class="btn btn-ghost btn-sm" href="#login">Log in instead</a></div>
+      <form class="auth-form js-go" data-go="brand" novalidate style="max-width:420px">
+        <div class="stepper"><div class="on">1 · Account</div><div>2 · Brand DNA</div><div>3 · Verification</div></div>
+        <div><h1>Create your account</h1><p class="sub">Free for 8 posts a month. No credit card.</p></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field"><label class="label" for="su-name">Your name</label><input class="input" id="su-name" placeholder="Rosa Dela Cruz"></div>
+          <div class="field"><label class="label" for="su-biz">Business name</label><input class="input" id="su-biz" placeholder="Panaderia ni Aling Rosa"></div>
+        </div>
+        <div class="field"><label class="label" for="su-email">Email</label><input class="input" id="su-email" type="email" placeholder="you@yourshop.ph"></div>
+        <div class="field"><label class="label" for="su-mob">Mobile number</label><div style="display:flex;gap:8px"><span class="input" style="width:64px;display:grid;place-items:center;background:var(--muted)">+63</span><input class="input" id="su-mob" inputmode="tel" placeholder="917 555 0142"></div></div>
+        <div class="field"><label class="label" for="su-pass">Password</label><input class="input" id="su-pass" type="password" value="pandesal2026"><div class="meter"><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div><span class="hint">Good. Add a symbol to make it strong.</span></div>
+        <label class="check"><input type="checkbox" checked id="su-ok"><span class="muted">I agree to the <a href="#home">Terms</a> and the <a href="#home">Privacy notice</a>, and I allow Kawayan to process my data under RA 10173.</span></label>
+        <button class="btn btn-green btn-lg" type="submit">Continue to Brand DNA<svg class="icon"><use href="#i-arrow"/></svg></button>
+      </form>
+    </div>
+    <div class="auth-r" style="justify-content:center">
+      <h2 style="font-size:22px">What happens after you sign up</h2>
+      <div class="story">
+        <details open><summary><span><span class="mono">01</span>We check your business permit</span><svg class="icon"><use href="#i-plus"/></svg></summary><div class="body"><p>A person on our team reviews your Mayor's Permit, DTI or SEC document, then opens up the full app.</p><div class="mini-row"><svg class="icon"><use href="#i-file"/></svg>Mayors-Permit-2026.pdf<span class="badge b-green"><span class="dot"></span>Approved</span></div></div></details>
+        <details><summary><span><span class="mono">02</span>Kawayan plans your month</span><svg class="icon"><use href="#i-plus"/></svg></summary><div class="body"><p>Tell it about your shop once. It suggests a month of post ideas and writes up to 8 posts with Taglish captions and images.</p><div class="tiles3"><figure><img src="img/panaderia-1.jpg" alt="">Mon 3 · Pandesal alert</figure><figure><img src="img/panaderia-2.jpg" alt="">Wed 5 · Ube ensaymada</figure><figure><img src="img/panaderia-3.jpg" alt="">Fri 7 · Behind the oven</figure></div></div></details>
+        <details><summary><span><span class="mono">03</span>You approve, it posts</span><svg class="icon"><use href="#i-plus"/></svg></summary><div class="body"><p>Edit anything you like, then schedule to your Facebook Page and Instagram. Kawayan publishes at the time you pick.</p><div class="mini-row"><img src="img/panaderia-1.jpg" alt="" style="width:28px;height:28px;border-radius:6px;object-fit:cover">Pandesal alert<span class="badge b-green"><span class="dot"></span>Posted</span></div></div></details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= RESET ======================= -->
+<div class="view" id="v-reset">
+  <div class="center-card dots">
+    <form class="card js-go" data-go="login" novalidate style="width:100%;max-width:400px;padding:28px;display:flex;flex-direction:column;gap:18px">
+      <a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a>
+      <div><h1 style="font-size:24px">Reset your password</h1><p class="muted" style="font-size:14px;margin-top:4px">We'll email you a secure link to set a new one.</p></div>
+      <div class="field"><label class="label" for="rs-email">Email address</label><input class="input" id="rs-email" type="email" placeholder="you@yourshop.ph"></div>
+      <div class="alert ok"><svg class="icon"><use href="#i-check"/></svg><span>If an account uses this email, the link is on its way. It works for 60 minutes.</span></div>
+      <button class="btn btn-green" type="submit">Send reset link</button>
+      <a href="#login" class="muted" style="font-size:13px;text-align:center">← Back to sign in</a>
+    </form>
+  </div>
+</div>
+
+<!-- ======================= BRAND DNA ======================= -->
+<div class="view" id="v-brand">
+  <div class="ob-top"><div class="in"><a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a><div class="stepper hide-xs" style="flex:1;max-width:420px"><div class="on">1 · Account</div><div class="on">2 · Brand DNA</div><div>3 · Verification</div></div><a class="btn btn-ghost btn-sm" href="#help" style="margin-left:auto">Help desk</a></div></div>
+  <main class="ob-main">
+    <h1>Your Brand DNA</h1>
+    <p>Kawayan reads this before writing every caption. You can change it anytime in Settings.</p>
+    <div class="card set-rows">
+      <div class="set-row"><div><h3>Business type</h3><p class="d">Used to pick post ideas that fit your shop.</p></div><div class="stack"><select class="select" aria-label="Business type"><option>Panaderia</option><option>Sari-sari Store</option><option>Milk Tea Kiosk</option><option>Carinderia</option></select><div class="field"><label class="label" for="bd-loc">Where are you?</label><input class="input" id="bd-loc" value="Parañaque City"></div></div></div>
+      <div class="set-row"><div><h3>What you sell</h3><p class="d">Your best sellers and anything special about them.</p></div><textarea class="textarea" aria-label="What you sell">Pandesal, ube ensaymada, spanish bread. Baked fresh every morning from 3 AM. Pre-orders for parties.</textarea></div>
+      <div class="set-row"><div><h3>Who buys from you</h3><p class="d">Kawayan writes for these people.</p></div><div class="chips js-chips"><button type="button" class="chip-btn" aria-pressed="true">Families nearby</button><button type="button" class="chip-btn" aria-pressed="true">Office workers</button><button type="button" class="chip-btn" aria-pressed="false">Students</button><button type="button" class="chip-btn" aria-pressed="true">Party planners</button><button type="button" class="chip-btn" aria-pressed="false">Tourists</button></div></div>
+      <div class="set-row"><div><h3>Brand voice</h3><p class="d">Pick one and see how a caption sounds.</p></div><div class="voices" data-voice-root></div></div>
+      <div class="set-row"><div><h3>Language</h3><p class="d">Captions use this by default.</p></div><div class="tabs js-tabs" role="tablist" aria-label="Language"><button type="button" role="tab" aria-selected="true">Taglish</button><button type="button" role="tab" aria-selected="false">English</button><button type="button" role="tab" aria-selected="false">Filipino</button></div></div>
+      <div class="set-row"><div><h3>Content themes</h3><p class="d">Kawayan mixes these through your month.</p></div><div class="chips js-chips"><button type="button" class="chip-btn" aria-pressed="true">Promos</button><button type="button" class="chip-btn" aria-pressed="true">Behind the scenes</button><button type="button" class="chip-btn" aria-pressed="true">New products</button><button type="button" class="chip-btn" aria-pressed="false">Tips</button><button type="button" class="chip-btn" aria-pressed="true">Holidays</button><button type="button" class="chip-btn" aria-pressed="false">Customer stories</button></div></div>
+      <div class="set-row"><div><h3>Brand colours</h3><p class="d">Used as hints for generated images.</p></div><div class="swatches"><span style="background:#c8813a"></span><span style="background:#f3e3c3"></span><span style="background:#6b3e1f"></span><button class="btn btn-outline btn-icon btn-sm" type="button" aria-label="Add colour"><svg class="icon"><use href="#i-plus"/></svg></button></div></div>
+      <div class="set-foot"><a class="btn btn-outline" href="#signup">Back</a><a class="btn btn-green" href="#verify">Save and continue</a></div>
+    </div>
+  </main>
+</div>
+
+<!-- ======================= VERIFICATION ======================= -->
+<div class="view" id="v-verify">
+  <div class="ob-top"><div class="in"><a class="logo" href="#home"><svg><use href="#i-logo"/></svg>Kawayan</a><div class="stepper hide-xs" style="flex:1;max-width:420px"><div class="on">1 · Account</div><div class="on">2 · Brand DNA</div><div class="on">3 · Verification</div></div><a class="btn btn-outline btn-sm" href="#help" style="margin-left:auto">Help desk</a></div></div>
+  <main class="ob-main">
+    <span class="badge b-amber"><span class="dot"></span>Under review</span>
+    <h1 style="margin-top:12px;font-size:36px;letter-spacing:-0.035em">We're checking your business permit.</h1>
+    <p class="muted" style="margin-top:8px;max-width:58ch">An admin usually finishes within one working day. Your calendar, month planning and insights open as soon as you're approved.</p>
+    <div class="two">
+      <div class="stack" style="gap:24px">
+        <ol class="timeline" aria-label="Verification progress">
+          <li class="done"><span class="rail-dot"><span><svg class="icon" style="width:13px;height:13px"><use href="#i-check"/></svg></span><i></i></span><span class="txt"><b>Permit submitted</b><span class="muted">Sun, Nov 1 · 9:12 AM</span></span></li>
+          <li class="now" aria-current="step"><span class="rail-dot"><span></span><i></i></span><span class="txt"><b>Admin review</b><span class="muted">Matching the name and address on your DTI certificate</span></span></li>
+          <li><span class="rail-dot"><span></span></span><span class="txt"><b class="muted">Approved</b><span class="muted">We'll email rosa.panaderia@gmail.com and text +63 917 555 0142</span></span></li>
+        </ol>
+        <div class="card" style="display:flex;align-items:center;gap:14px;padding:16px;flex-wrap:wrap"><span class="avatar" style="width:40px;height:48px"><svg class="icon"><use href="#i-file"/></svg></span><span style="flex:1;min-width:200px"><b style="font-weight:500;display:block;overflow-wrap:anywhere">DTI-Certificate-Panaderia-ni-Aling-Rosa.pdf</b><span class="muted" style="font-size:13px">1.2 MB · uploaded Nov 1</span></span><button class="btn btn-outline btn-sm" type="button"><svg class="icon"><use href="#i-upload"/></svg>Replace file</button></div>
+      </div>
+      <div class="stack">
+        <h2 style="font-size:18px">While you wait</h2>
+        <a class="wait hl" href="#brand"><svg class="icon green" style="width:22px;height:22px"><use href="#i-spark"/></svg><span><b>Review your Brand DNA</b><span>Fine-tune how your posts will sound. Every caption follows it once you're approved.</span></span></a>
+        <div class="wait locked"><svg class="icon muted" style="width:22px;height:22px"><use href="#i-lock"/></svg><span><b>Opens after approval</b><span>Calendar, month planning, post studio, insights, billing and channel connections.</span></span></div>
+        <a class="wait" href="#help"><svg class="icon" style="width:22px;height:22px"><use href="#i-help"/></svg><span><b>Something wrong with my permit?</b><span>Open a help ticket and an admin replies here and by email.</span></span></a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ======================= OWNER APP SHELL ======================= -->
+<div class="view" id="v-app">
+  <div class="shell" id="app-shell">
+    <aside class="side" aria-label="Sidebar">
+      <a class="biz" href="#calendar"><span class="avatar g">PR</span><span style="flex:1;min-width:0"><b>Panaderia ni Aling Rosa</b><small>Pro plan · Parañaque</small></span><svg class="icon muted"><use href="#i-chev"/></svg></a>
+      <div class="grp">Plan</div>
+      <nav class="menu" data-nav>
+        <a href="#calendar" data-r="calendar" data-tour="nav"><svg class="icon"><use href="#i-cal"/></svg>Calendar</a>
+        <a href="#planner" data-r="planner"><svg class="icon"><use href="#i-spark"/></svg>Month planner</a>
+        <a href="#composer" data-r="composer"><svg class="icon"><use href="#i-pen"/></svg>Post studio<span class="badge b-muted num">3</span></a>
+        <a href="#insights" data-r="insights"><svg class="icon"><use href="#i-chart"/></svg>Insights</a>
+      </nav>
+      <div class="grp">Account</div>
+      <nav class="menu" data-nav>
+        <a href="#prefs" data-r="prefs"><svg class="icon"><use href="#i-gear"/></svg>Settings<span class="badge b-danger">1</span></a>
+        <a href="#billing" data-r="billing"><svg class="icon"><use href="#i-card"/></svg>Plan and billing</a>
+        <a href="#help" data-r="help"><svg class="icon"><use href="#i-help"/></svg>Help desk</a>
+      </nav>
+      <div class="card quota" data-tour="quota"><div style="display:flex;justify-content:space-between"><b style="font-weight:500">November posts</b><span class="num muted">7 / 16</span></div><div class="bar"><i style="width:44%"></i></div><span class="muted" style="font-size:12px">Resets Dec 1. Drafts don't count.</span></div>
+      <button class="me js-acct" type="button" aria-haspopup="menu" aria-expanded="false"><span class="avatar round">RD</span><span style="flex:1;min-width:0"><b>Rosa Dela Cruz</b><small>rosa.panaderia@gmail.com</small></span><svg class="icon muted"><use href="#i-chev"/></svg></button>
+      <div class="pop acct" id="acct" role="menu" hidden>
+        <div class="head"><div class="row-flex" style="justify-content:space-between"><b style="font-weight:600">Rosa Dela Cruz</b><span class="badge b-green">Pro</span></div><span class="muted" style="font-size:13px">rosa.panaderia@gmail.com</span></div>
+        <div style="padding:4px 0">
+          <a href="#prefs" role="menuitem"><svg class="icon"><use href="#i-gear"/></svg>Settings</a>
+          <a href="#billing" role="menuitem"><svg class="icon"><use href="#i-card"/></svg>Plan and billing</a>
+          <a href="#help" role="menuitem"><svg class="icon"><use href="#i-help"/></svg>Help desk</a>
+          <button class="item js-tour" type="button" role="menuitem"><svg class="icon"><use href="#i-map"/></svg>Take the tour</button>
+        </div>
+        <div class="seg"><div class="hint" style="margin-bottom:6px">Appearance</div><div class="tabs js-theme-seg" style="width:100%"><button type="button" data-t="light" style="flex:1">Light</button><button type="button" data-t="dark" style="flex:1">Dark</button><button type="button" data-t="system" style="flex:1" aria-selected="true">System</button></div></div>
+        <a href="#login" class="out" role="menuitem"><svg class="icon"><use href="#i-logout"/></svg>Log out</a>
+      </div>
+    </aside>
+    <main class="inset">
+      <div class="topbar">
+        <button class="btn btn-ghost btn-icon js-nav" type="button" aria-label="Toggle sidebar"><svg class="icon"><use href="#i-panel"/></svg></button>
+        <span class="vr"></span>
+        <div class="crumb"><span class="hide-xs">Panaderia ni Aling Rosa</span><svg class="icon hide-xs" style="width:14px;height:14px"><use href="#i-right"/></svg><b id="app-crumb">Calendar</b></div>
+        <div class="search"><svg class="icon"><use href="#i-search"/></svg>Search posts<span class="kbd">⌘K</span></div>
+        <button class="btn btn-ghost btn-icon bell js-bell" type="button" aria-label="Notifications, 3 unread" aria-expanded="false" data-tour="bell"><svg class="icon"><use href="#i-bell"/></svg><i></i></button>
+        <button class="btn btn-ghost btn-icon js-theme" type="button" aria-label="Toggle dark mode"><svg class="icon"><use href="#i-moon"/></svg></button>
+        <div class="pop notif" id="notif" hidden>
+          <div class="card-h"><b style="font-weight:600">Notifications</b><div class="tabs js-tabs" role="tablist"><button type="button" role="tab" aria-selected="true">Needs you</button><button type="button" role="tab" aria-selected="false">All</button></div></div>
+          <div>
+            <div class="n-item"><span class="ic r"><svg class="icon"><use href="#i-alert"/></svg></span><div style="flex:1"><b>Instagram access expired</b><span class="muted">Merienda combo on Nov 10 is held.</span><div style="margin-top:8px"><a class="btn btn-outline btn-sm" href="#prefs">Fix now</a></div></div><span class="unread"></span></div>
+            <div class="n-item"><span class="ic"><svg class="icon"><use href="#i-pen"/></svg></span><div style="flex:1"><b>3 drafts need approval</b><span class="muted">Bibingka season is due Nov 18.</span><div style="margin-top:8px"><a class="btn btn-outline btn-sm" href="#composer">Review</a></div></div><span class="unread"></span></div>
+            <div class="n-item"><span class="ic"><svg class="icon"><use href="#i-msg"/></svg></span><div style="flex:1"><b>Joel replied to #1043</b><span class="muted">"Try reconnecting from Settings…" · 12m</span></div><span class="unread"></span></div>
+            <div class="n-item"><span class="ic g"><svg class="icon"><use href="#i-check"/></svg></span><div style="flex:1"><b>Undas hours was posted</b><span class="muted">Facebook and Instagram · Nov 1, 6:00 AM</span></div></div>
+            <div class="n-item"><span class="ic g"><svg class="icon"><use href="#i-wallet"/></svg></span><div style="flex:1"><b>Payment received · ₱499</b><span class="muted">Pro plan for November · GCash</span></div></div>
+          </div>
+          <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between"><button class="btn btn-ghost btn-sm" type="button">Mark all as read</button><a class="btn btn-ghost btn-sm" href="#prefs">Settings</a></div>
+        </div>
+      </div>
+      <div class="page" id="app-page"></div>
+    </main>
+  </div>
+  <div class="card tour-card" id="tour" hidden role="dialog" aria-labelledby="tour-t">
+    <div class="row-flex" style="justify-content:space-between"><span class="mono muted" style="font-size:12px" id="tour-n">1 of 5</span><button class="btn btn-ghost btn-icon btn-sm js-tour-x" type="button" aria-label="Skip tour"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <h3 id="tour-t"></h3><p id="tour-p"></p>
+    <div class="row-flex" style="justify-content:space-between"><button class="btn btn-ghost btn-sm js-tour-x" type="button">Skip tour</button><div class="row-flex"><button class="btn btn-outline btn-sm js-tour-b" type="button">Back</button><button class="btn btn-green btn-sm js-tour-n" type="button">Next</button></div></div>
+  </div>
+</div>
+
+<!-- ======================= STAFF SHELL ======================= -->
+<div class="view" id="v-staff">
+  <div class="shell" id="staff-shell">
+    <aside class="side staff-side" aria-label="Staff sidebar">
+      <a class="biz" href="#admin"><span class="avatar g"><svg class="icon"><use href="#i-shield"/></svg></span><span style="flex:1"><b>Kawayan Console</b><small>Admin</small></span></a>
+      <div class="grp">Console</div>
+      <nav class="menu" data-nav>
+        <a href="#admin" data-r="admin"><svg class="icon"><use href="#i-grid"/></svg>Overview</a>
+        <a href="#admin-verify" data-r="admin-verify"><svg class="icon"><use href="#i-shield"/></svg>Verification<span class="badge num">6</span></a>
+        <a href="#support" data-r="support"><svg class="icon"><use href="#i-msg"/></svg>Help desk<span class="badge num">4</span></a>
+        <a href="#admin" data-r="x-users"><svg class="icon"><use href="#i-users"/></svg>Users</a>
+        <a href="#admin" data-r="x-pay"><svg class="icon"><use href="#i-wallet"/></svg>Payments<span class="badge num">3</span></a>
+        <a href="#admin" data-r="x-audit"><svg class="icon"><use href="#i-list"/></svg>Audit logs</a>
+        <a href="#admin" data-r="x-set"><svg class="icon"><use href="#i-gear"/></svg>Settings</a>
+      </nav>
+      <div style="margin-top:auto"></div>
+      <button class="me" type="button"><span class="avatar round">MS</span><span style="flex:1;min-width:0"><b>Mika Santos</b><small>Admin · 2FA on</small></span></button>
+    </aside>
+    <main class="inset">
+      <div class="topbar">
+        <button class="btn btn-ghost btn-icon js-nav" type="button" aria-label="Toggle sidebar"><svg class="icon"><use href="#i-panel"/></svg></button>
+        <span class="vr"></span>
+        <div class="crumb"><span class="hide-xs">Console</span><svg class="icon hide-xs" style="width:14px;height:14px"><use href="#i-right"/></svg><b id="staff-crumb">Overview</b></div>
+        <div class="search"><svg class="icon"><use href="#i-search"/></svg>Search businesses, tickets<span class="kbd">⌘K</span></div>
+        <span class="badge b-green hide-xs" style="margin-left:auto"><span class="dot"></span>System operational</span>
+        <button class="btn btn-ghost btn-icon js-theme" type="button" aria-label="Toggle dark mode"><svg class="icon"><use href="#i-moon"/></svg></button>
+      </div>
+      <div class="page" id="staff-page"></div>
+    </main>
+  </div>
+</div>
+
+<nav class="switcher" aria-label="Preview screens">
+  <a class="btn btn-ghost btn-sm btn-pill" href="#screens"><svg class="icon"><use href="#i-grid"/></svg><span class="hide-xs">All screens</span></a>
+  <a class="btn btn-ghost btn-icon btn-sm btn-pill" id="sw-prev" href="#screens" aria-label="Previous screen"><svg class="icon"><use href="#i-left"/></svg></a>
+  <span class="cur" id="sw-cur"></span>
+  <a class="btn btn-ghost btn-icon btn-sm btn-pill" id="sw-next" href="#home" aria-label="Next screen"><svg class="icon"><use href="#i-right"/></svg></a>
+</nav>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+  var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function ic(n, extra) { return '<svg class="icon"' + (extra ? ' style="' + extra + '"' : '') + '><use href="#i-' + n + '"/></svg>'; }
+
+  // ---------- routes ----------
+  var ROUTES = [
+    ['home', 'Landing page', 'Marketing', 'Header, Hero, Logo Cloud, Features, Integrations, Gallery, Pricing, Contact, FAQ, CTA, Footer', 'hero', 'public'],
+    ['login', 'Log in', 'Auth', 'Auth · split with image panel', 'form', 'public'],
+    ['signup', 'Sign up', 'Auth', 'Auth · stepper + side story', 'form', 'public'],
+    ['reset', 'Reset password', 'Auth', 'Auth · centered card', 'form', 'public'],
+    ['brand', 'Brand DNA survey', 'Onboarding', 'Settings rows + voice preview', 'rows', 'public'],
+    ['verify', 'Verification pending', 'Onboarding', 'Timeline + action cards', 'steps', 'public'],
+    ['calendar', 'Calendar', 'Owner app', 'Dashboard shell + stats + calendar', 'cal', 'app'],
+    ['composer', 'Post studio', 'Owner app', 'Editor + phone preview', 'cards', 'app'],
+    ['planner', 'Month planner', 'Owner app', 'Form + generated grid', 'cards', 'app'],
+    ['insights', 'Insights', 'Owner app', 'Stats + charts + table', 'chart', 'app'],
+    ['billing', 'Plan and billing', 'Owner app', 'Pricing + wallet + table', 'table', 'app'],
+    ['prefs', 'Settings', 'Owner app', 'Settings blocks', 'rows', 'app'],
+    ['help', 'Help desk', 'Owner app', 'Ticket list + chat thread', 'chat', 'app'],
+    ['admin', 'Admin overview', 'Staff', 'Stats + status + activity', 'chart', 'staff'],
+    ['admin-verify', 'Verification review', 'Staff', 'Queue + document viewer', 'table', 'staff'],
+    ['support', 'Support inbox', 'Staff', 'Three-pane inbox', 'chat', 'staff']
+  ];
+  var byKey = {}; ROUTES.forEach(function (r, i) { byKey[r[0]] = i; });
+
+  function sk(t) {
+    var L = function (w, c) { return '<i style="width:' + w + '%"' + (c ? ' class="' + c + '"' : '') + '></i>'; };
+    if (t === 'hero') return '<div class="sk" style="align-items:center">' + '<i class="p" style="width:30%"></i>' + L(70) + L(50) + '<div class="sk-row" style="width:60%"><i class="p g" style="width:auto"></i><i class="p" style="width:auto"></i></div></div>';
+    if (t === 'form') return '<div class="sk">' + L(45) + '<div class="box" style="height:22px"></div><div class="box" style="height:22px"></div><i class="p g" style="width:100%"></i></div>';
+    if (t === 'rows') return '<div class="sk">' + [70, 55, 80].map(function (w) { return '<div class="sk-row"><i style="max-width:30%"></i><i style="width:' + w + '%"></i></div>'; }).join('') + '<div class="sk-row" style="justify-content:flex-end"><i class="p g" style="max-width:30%"></i></div></div>';
+    if (t === 'steps') return '<div class="sk">' + '<div class="sk-row"><i class="g" style="max-width:10px;height:10px"></i><i style="width:60%"></i></div><div class="sk-row"><i style="max-width:10px;height:10px;background:#d9a43a"></i><i style="width:75%"></i></div><div class="sk-row"><i style="max-width:10px;height:10px"></i><i style="width:45%"></i></div></div>';
+    if (t === 'cal') { var c = ''; for (var i = 0; i < 28; i++) c += '<i' + ([3, 9, 12, 18, 24].indexOf(i) > -1 ? ' class="g"' : '') + '></i>'; return '<div class="sk"><div class="sk-grid">' + c + '</div></div>'; }
+    if (t === 'cards') return '<div class="sk"><div class="sk-row"><div class="box"></div><div class="box"></div><div class="box"></div></div>' + L(60) + '</div>';
+    if (t === 'chart') return '<div class="sk"><div class="sk-bars">' + [40, 55, 35, 70, 60, 85, 75].map(function (h, i) { return '<i style="height:' + h + '%"' + (i === 5 ? ' class="g"' : '') + '></i>'; }).join('') + '</div></div>';
+    if (t === 'table') return '<div class="sk">' + [1, 2, 3, 4].map(function (i) { return '<div class="sk-row"><i style="max-width:20%"></i><i></i><i style="max-width:18%"' + (i === 2 ? ' class="g"' : '') + '></i></div>'; }).join('') + '</div>';
+    if (t === 'chat') return '<div class="sk"><i style="width:55%;height:16px;border-radius:8px"></i><i class="g" style="width:45%;height:16px;border-radius:8px;margin-left:auto"></i><i style="width:65%;height:16px;border-radius:8px"></i></div>';
+    return '';
+  }
+
+  // screens index
+  (function () {
+    var groups = [];
+    ROUTES.forEach(function (r) { if (groups.indexOf(r[2]) < 0) groups.push(r[2]); });
+    $('#idx').innerHTML = groups.map(function (g) {
+      var items = ROUTES.filter(function (r) { return r[2] === g; });
+      return '<div class="band"><div class="rail idx-group"><span>' + g + '</span><span class="muted mono" style="font-size:12px">' + items.length + ' screen' + (items.length > 1 ? 's' : '') + '</span><i class="px l"></i><i class="px r"></i></div></div>' +
+        '<div class="band"><div class="rail"><div class="idx-grid">' + items.map(function (r) {
+          return '<a class="idx-card" href="#' + r[0] + '"><b>' + r[1] + '</b><small>' + r[3] + '</small>' + sk(r[4]) + '</a>';
+        }).join('') + '</div><i class="px l"></i><i class="px r"></i></div></div>';
+    }).join('');
+  })();
+
+  // ---------- shared data ----------
+  var posts = [
+    { d: 1,  t: '6:00', title: 'Undas hours', img: 'panaderia-1', s: 'posted', ch: ['fb', 'ig'], score: 64, cap: 'Bukas po kami ngayong Undas, 6 AM hanggang 2 PM. Pandesal at kape para sa biyahe!', why: 'Holiday hours get saved and shared.' },
+    { d: 3,  t: '6:00', title: 'Pandesal alert', img: 'panaderia-1', s: 'scheduled', ch: ['fb', 'ig'], score: 71, cap: 'Pandesal alert! Mainit pa at bagong luto, 6 AM pa lang. Kita-kits sa tindahan!', why: 'Morning food posts do well with your followers.' },
+    { d: 5,  t: '9:00', title: 'Ube ensaymada', img: 'panaderia-2', s: 'scheduled', ch: ['ig'], score: 76, cap: 'Ube ensaymada is back! Malambot, may keso sa ibabaw. Limited lang araw-araw.', why: 'Limited items create urgency.' },
+    { d: 7,  t: '7:30', title: 'Behind the oven', img: 'panaderia-3', s: 'scheduled', ch: ['fb'], score: 69, cap: 'Alas-tres pa lang ng madaling-araw, gising na si Aling Rosa. Ganito ginagawa ang pandesal mo.', why: 'Behind-the-scenes builds trust.' },
+    { d: 10, t: '15:00', title: 'Merienda combo', img: 'kakanin-1', s: 'held', ch: ['ig'], score: 68, cap: 'Merienda combo: 5 pandesal + kape, ₱75 lang. Hanggang 5 PM!', why: 'Price in the caption helps people decide.' },
+    { d: 12, t: '7:00', title: "Kape't pandesal", img: 'coffee-1', s: 'scheduled', ch: ['fb', 'ig'], score: 70, cap: 'Tag-ulan, tara kape! Libreng refill ng kape sa bawat 10 pandesal.', why: 'Rainy-day posts match the weather this week.' },
+    { d: 15, t: '8:00', title: 'Payday treat', img: 'panaderia-2', s: 'scheduled', ch: ['fb', 'ig'], score: 82, cap: 'Payday treat! 10% off sa lahat ng tinapay ngayong 15th. Tara na, suki!', why: 'Payday promos are your best posts so far.' },
+    { d: 18, t: '9:00', title: 'Bibingka season', img: 'kakanin-2', s: 'draft', ch: ['fb', 'ig'], score: 78, cap: 'Simbang gabi feels na! Bibingka at puto bumbong, pre-order na para sa weekend.', why: 'Holiday food posts get more shares in November.' },
+    { d: 21, t: '8:00', title: 'Weekend pre-order', img: 'kakanin-3', s: 'draft', ch: ['fb'], score: 66, cap: 'Weekend handaan? Pre-order na ng pandesal trays, 50 pcs pataas may libreng palaman.', why: 'Clear offer, but add a deadline to lift it.' },
+    { d: 24, t: '10:00', title: 'Ensaymada box', img: 'panaderia-2', s: 'draft', ch: ['ig'], score: 73, cap: 'Pang-regalo na ensaymada box, 6 pcs. Order by Friday for Saturday pickup.', why: 'Gift ideas trend before December.' },
+    { d: 27, t: '9:00', title: 'Noche Buena pre-order', img: 'kakanin-1', s: 'scheduled', ch: ['fb', 'ig'], score: 80, cap: 'Noche Buena pre-order is open! Ensaymada, bibingka at pandesal trays. Message us.', why: 'Early pre-orders get more saves.' },
+    { d: 30, t: '6:00', title: 'Bonifacio Day hours', img: 'panaderia-3', s: 'scheduled', ch: ['fb'], score: 60, cap: 'Bonifacio Day: bukas kami 6 AM hanggang 12 NN lang. Agahan ang pandesal!', why: 'Holiday hours help, though reach is modest.' }
+  ];
+  var tags = { 1: 'Undas', 2: 'Undas', 15: 'Payday', 30: 'Payday · Bonifacio' };
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var LBL = { posted: 'Posted', scheduled: 'Scheduled', draft: 'Draft', held: 'Held' };
+  var BDG = { posted: 'b-green', scheduled: '', draft: 'b-dashed', held: 'b-danger' };
+  var cal = { sel: 18, filter: 'all', view: 'month' };
+  function ampm(t) { var p = t.split(':'), h = +p[0]; return (h % 12 || 12) + ':' + p[1] + (h < 12 ? ' AM' : ' PM'); }
+  function when(p) { return DOW[(p.d - 1) % 7] + ', Nov ' + p.d + ' · ' + ampm(p.t); }
+  function chans(p) { return p.ch.map(function (c) { return '<span class="badge">' + ic(c, 'width:12px;height:12px') + (c === 'fb' ? 'Facebook' : 'Instagram') + '</span>'; }).join(''); }
+  function status(s) { return '<span class="badge ' + BDG[s] + '">' + (s === 'posted' || s === 'held' ? '<span class="dot"></span>' : '') + LBL[s] + '</span>'; }
+  function spark(vals) {
+    var w = 120, h = 34, mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+    var pts = vals.map(function (v, i) { return [i * w / (vals.length - 1), h - 3 - (v - mn) / (mx - mn || 1) * (h - 8)]; });
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+    return '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true"><path class="a" d="' + d + ' L' + w + ' ' + h + ' L0 ' + h + 'Z"/><path class="l" d="' + d + '"/></svg>';
+  }
+
+  var VOICES = [
+    ['Professional & Trustworthy', 'Now taking orders for the week at {name}. Quality you can count on, ready on time. Send us a message to reserve yours.'],
+    ['Makulit & Fun (Kwelang Pinoy)', 'Sino\'ng gutom diyan? Bawal ang sad today, may bago kami sa {name}! Comment "GUTOM" at chika tayo.'],
+    ['Inspirational (Hugot)', 'Hindi lahat ng bagay kailangang madaliin. Pero yung order mo sa {name}? Ready na agad, para sa\'yo.'],
+    ['Premium & Minimalist', 'New this week at {name}. Made in small batches. Limited.'],
+    ['Friendly Tita', 'Mga anak, kumain na ba kayo? May bagong luto dito sa {name}. Dalhan niyo rin si nanay, ha!']
+  ];
+  var voiceSel = 4;
+  function voiceHTML() {
+    var s = VOICES[voiceSel][1].replace('{name}', 'Panaderia ni Aling Rosa');
+    return '<div class="voice-list" role="radiogroup" aria-label="Brand voice">' + VOICES.map(function (v, i) { return '<button type="button" class="voice" role="radio" data-voice="' + i + '" aria-checked="' + (i === voiceSel) + '">' + esc(v[0]) + '</button>'; }).join('') + '<button type="button" class="voice" role="radio" aria-checked="false">Write my own</button></div>' +
+      '<div class="vp"><span class="hint">Sample caption</span><div class="vp-post"><div class="row-flex"><span class="avatar round g" style="width:26px;height:26px;font-size:11px">P</span><b style="font-size:13px">Panaderia ni Aling Rosa</b></div><p style="animation:rise .3s both">' + esc(s) + '</p></div><span class="hint">Written for <b style="color:var(--fg)">families nearby and office workers</b>. Kawayan writes a fresh caption for every post.</span></div>';
+  }
+  function paintVoices() { $$('[data-voice-root]').forEach(function (el) { el.innerHTML = voiceHTML(); }); }
+
+  // ---------- owner screens ----------
+  var APP = {};
+  APP.calendar = function () {
+    return '<div class="page-h"><div><h1>November 2026</h1><p>3 drafts need your approval before they can post.</p></div><div class="row-flex"><a class="btn btn-outline" href="#composer">' + ic('plus') + 'New post</a><a class="btn btn-green" href="#planner" data-tour="gen">' + ic('spark') + 'Plan December</a></div></div>' +
+      '<div class="stats" data-tour="stats">' +
+        '<div class="card stat"><div class="stat-h">Posts this month' + ic('cal') + '</div><b class="num">7 <span class="muted" style="font-size:16px;font-weight:500">/ 16</span></b><small>9 left on Pro</small></div>' +
+        '<div class="card stat"><div class="stat-h">Drafts to approve' + ic('pen') + '</div><b class="num">3</b><small>Next one due Nov 18</small></div>' +
+        '<div class="card stat"><div class="stat-h">Needs attention' + ic('alert') + '</div><b class="num" style="color:var(--danger)">1</b><small>Instagram access expired</small></div>' +
+        '<div class="card stat"><div class="stat-h">Avg reach score' + ic('chart') + '</div><b class="num">72</b><small><span class="up">+6</span> from October</small></div>' +
+      '</div>' +
+      '<div class="alert warn"><svg class="icon"><use href="#i-alert"/></svg><span style="flex:1">Instagram access expired, so <b>Merienda combo</b> on Nov 10 is held. Reconnect to send it.</span><a class="btn btn-outline btn-sm" href="#prefs">Reconnect</a></div>' +
+      '<div class="work"><div class="card" style="overflow:hidden" data-tour="cal">' +
+        '<div class="cal-tools"><h2>November</h2><button class="btn btn-outline btn-icon btn-sm" type="button" aria-label="Previous month">' + ic('left') + '</button><button class="btn btn-outline btn-sm" type="button">Today</button><button class="btn btn-outline btn-icon btn-sm" type="button" aria-label="Next month">' + ic('right') + '</button>' +
+          '<div class="push"><select class="select" id="chan" aria-label="Channel filter"><option value="all">All channels</option><option value="fb">Facebook</option><option value="ig">Instagram</option></select>' +
+          '<div class="tabs" role="tablist" aria-label="Calendar view"><button type="button" role="tab" data-cv="month" aria-selected="true">Month</button><button type="button" role="tab" data-cv="timeline" aria-selected="false">Timeline</button><button type="button" role="tab" data-cv="list" aria-selected="false">List</button></div></div></div>' +
+        '<div id="cal-body" class="scroll-x"></div>' +
+        '<div class="legend"><span><i style="background:var(--green-soft);border-color:transparent"></i>Posted</span><span><i></i>Scheduled</span><span><i style="border-style:dashed"></i>Draft</span><span><i style="border-color:var(--danger)"></i>Held</span><span class="mono green" style="font-size:11px">PAYDAY · HOLIDAY</span></div>' +
+      '</div><aside class="card detail" id="detail" aria-live="polite"></aside></div>';
+  };
+  function paintCal() {
+    var list = posts.filter(function (p) { return cal.filter === 'all' || p.ch.indexOf(cal.filter) > -1; });
+    var chip = function (p) { return '<button type="button" class="pchip ' + p.s + '" data-d="' + p.d + '" aria-pressed="' + (p.d === cal.sel) + '"><img src="img/' + p.img + '.jpg" alt=""><span>' + esc(p.title) + '</span><time>' + p.t + '</time></button>'; };
+    var html = '';
+    if (cal.view === 'month') {
+      html = '<div class="cal">' + DOW.map(function (d) { return '<div class="dow">' + d + '</div>'; }).join('');
+      for (var i = 0; i < 35; i++) {
+        var n = i + 1, out = n > 30;
+        html += '<div class="day' + (out ? ' out' : '') + (!out && n === 2 ? ' today' : '') + '"' + (!out && n === 2 ? ' aria-current="date"' : '') + '><div class="day-h"><span class="dn num">' + (out ? n - 30 : n) + '</span>' + (!out && tags[n] ? '<span class="tag">' + tags[n] + '</span>' : '') + '</div>' + (out ? '' : list.filter(function (p) { return p.d === n; }).map(chip).join('')) + '</div>';
+      }
+      html += '</div>';
+    } else if (cal.view === 'timeline') {
+      html = '<div class="tl"><div class="hd">Week of Nov 1</div>' + [1, 2, 3, 4, 5, 6, 7].map(function (d) { return '<div class="hd">' + DOW[d - 1] + ' ' + d + (d === 2 ? ' · today' : '') + '</div>'; }).join('');
+      [['fb', 'Facebook'], ['ig', 'Instagram']].forEach(function (c) {
+        html += '<div class="ch">' + ic(c[0]) + c[1] + '</div>';
+        for (var d = 1; d <= 7; d++) html += '<div>' + list.filter(function (p) { return p.d === d && p.ch.indexOf(c[0]) > -1; }).map(chip).join('') + '</div>';
+      });
+      html += '</div>';
+    } else {
+      html = '<table class="tbl"><thead><tr><th>Post</th><th>When</th><th>Channels</th><th>Status</th><th class="num">Reach</th></tr></thead><tbody>' + list.map(function (p) {
+        return '<tr data-d="' + p.d + '" style="cursor:pointer"><td><span class="row-flex" style="flex-wrap:nowrap"><img src="img/' + p.img + '.jpg" alt="" style="width:30px;height:30px;border-radius:6px;object-fit:cover"><b style="font-weight:500">' + esc(p.title) + '</b></span></td><td class="num" style="white-space:nowrap">' + when(p) + '</td><td><div class="row-flex">' + chans(p) + '</div></td><td>' + status(p.s) + '</td><td class="num">' + p.score + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+    $('#cal-body').innerHTML = html;
+    var p = posts.filter(function (x) { return x.d === cal.sel; })[0];
+    var acts = p.s === 'draft' ? '<a class="btn btn-green" href="#composer">' + ic('check') + 'Approve and schedule</a><a class="btn btn-outline" href="#composer">' + ic('pen') + 'Edit</a><button class="btn btn-outline" type="button">' + ic('redo') + 'Regenerate</button>'
+      : p.s === 'held' ? '<a class="btn btn-green" href="#prefs">' + ic('link') + 'Reconnect Instagram</a><button class="btn btn-outline" type="button">Move date</button><button class="btn btn-outline" type="button">Retry</button>'
+      : p.s === 'posted' ? '<button class="btn btn-green" type="button">View on Facebook</button><a class="btn btn-outline" href="#insights">Insights</a><button class="btn btn-outline" type="button">Duplicate</button>'
+      : '<a class="btn btn-green" href="#composer">' + ic('pen') + 'Edit post</a><button class="btn btn-outline" type="button">Move date</button><button class="btn btn-outline" type="button">Unschedule</button>';
+    $('#detail').innerHTML = '<img src="img/' + p.img + '.jpg" alt="Post image for ' + esc(p.title) + '"><div class="d-body"><div class="d-top"><div><h3>' + esc(p.title) + '</h3><p class="num">' + when(p) + '</p></div>' + status(p.s) + '</div>' +
+      (p.s === 'held' ? '<div class="alert">' + ic('alert') + '<span>Instagram access expired, so this post was held.</span></div>' : '') +
+      '<div class="row-flex">' + chans(p) + '</div><div class="stack" style="gap:6px"><div class="ver"><span>Caption</span><span class="num">Version 1 of 3</span></div><div class="caption">' + esc(p.cap) + '</div></div>' +
+      '<div><div class="score-h"><span>Reach score</span><b class="num">' + p.score + ' / 100</b></div><div class="bar"><i style="width:' + p.score + '%"></i></div><p class="hint" style="margin-top:6px">' + esc(p.why) + '</p></div><hr class="sep"><div class="d-acts">' + acts + '</div></div>';
+  }
+
+  APP.composer = function () {
+    return '<div class="page-h"><div><h1>Bibingka season</h1><p>Draft · Wed, Nov 18 · 9:00 AM · Facebook and Instagram</p></div><div class="row-flex"><a class="btn btn-outline" href="#calendar">Save draft</a><a class="btn btn-green" href="#calendar">' + ic('check') + 'Approve and schedule</a></div></div>' +
+      '<div class="studio">' +
+        '<div class="card img-card"><img src="img/kakanin-2.jpg" alt="Bibingka on banana leaves"><div class="card-b stack"><div class="row-flex" style="justify-content:space-between"><span class="hint">Image made by Kawayan AI</span><span class="badge b-muted">1 of 2 images</span></div><div class="row-flex"><button class="btn btn-outline btn-sm" type="button" style="flex:1">' + ic('redo') + 'New image</button><button class="btn btn-outline btn-sm" type="button" style="flex:1">' + ic('upload') + 'Upload my own photo</button></div></div></div>' +
+        '<div class="card"><div class="card-h"><h3>Caption</h3><span class="hint num">96 / 2,200</span></div><div class="card-b stack" style="gap:16px">' +
+          '<div class="vers"><button type="button" aria-pressed="true">Version 1<small>Original</small></button><button type="button" aria-pressed="false">Version 2<small>More Taglish</small></button><button type="button" aria-pressed="false" disabled style="opacity:.5">Version 3<small>1 left</small></button></div>' +
+          '<textarea class="textarea" aria-label="Caption" style="min-height:120px">Simbang gabi feels na! Bibingka at puto bumbong, pre-order na para sa weekend. Message us para ma-reserve.</textarea>' +
+          '<div class="field"><span class="label">Quick tweaks</span><div class="chips"><button type="button" class="chip-btn">Shorter</button><button type="button" class="chip-btn">More Taglish</button><button type="button" class="chip-btn">More playful</button><button type="button" class="chip-btn">More polished</button><button type="button" class="chip-btn">Fresh hashtags</button><button type="button" class="chip-btn">Add a call to action</button></div></div>' +
+          '<div class="field"><span class="label">Hashtags</span><div class="chips"><span class="badge b-muted">#Bibingka</span><span class="badge b-muted">#SimbangGabi</span><span class="badge b-muted">#Parañaque</span><span class="badge b-muted">#PanaderiaNiAlingRosa</span></div></div>' +
+          '<div><div class="score-h"><span>Reach score</span><b class="num">78 / 100</b></div><div class="bar"><i style="width:78%"></i></div><p class="hint" style="margin-top:6px">Holiday food posts get more shares in November.</p></div>' +
+          '<hr class="sep"><div class="field"><span class="label">When</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input class="input" type="date" value="2026-11-18" aria-label="Date"><input class="input" type="time" value="09:00" aria-label="Time"></div><div class="slots"><button type="button" aria-pressed="false"><b>Lunch break</b>12:00 PM</button><button type="button" aria-pressed="false"><b>After work</b>6:00 PM</button><button type="button" aria-pressed="true"><b>Prime time</b>9:00 AM</button></div></div>' +
+          '<div class="field"><span class="label">Post to</span><div class="stack" style="gap:8px"><div class="row-flex" style="justify-content:space-between"><span class="row-flex">' + ic('fb') + 'Panaderia ni Aling Rosa</span><button type="button" class="switch-ui" role="switch" aria-checked="true" aria-label="Facebook"></button></div><div class="row-flex" style="justify-content:space-between"><span class="row-flex">' + ic('ig') + '@alingrosabakery <span class="badge b-danger">Reconnect</span></span><button type="button" class="switch-ui" role="switch" aria-checked="true" aria-label="Instagram"></button></div></div></div>' +
+        '</div></div>' +
+        '<div class="stack"><div class="tabs js-tabs" role="tablist" style="align-self:center"><button type="button" role="tab" aria-selected="true">Facebook</button><button type="button" role="tab" aria-selected="false">Instagram</button></div>' +
+          '<div class="phone"><div class="phone-in"><div class="ig-h"><span>P</span><div><div>Panaderia ni Aling Rosa</div><div class="muted" style="font-weight:400;font-size:11px">Wed 9:00 AM · Public</div></div></div><p style="padding-top:0">Simbang gabi feels na! Bibingka at puto bumbong, pre-order na para sa weekend. Message us para ma-reserve.</p><img src="img/kakanin-2.jpg" alt=""><div class="fb-acts"><span>Like</span><span>Comment</span><span>Share</span></div></div></div><p class="hint" style="text-align:center">Preview only. The real post may crop slightly.</p></div>' +
+      '</div>';
+  };
+
+  APP.planner = function () {
+    var gen = [['kakanin-2', 'Mon 1', 'Bibingka season', 'Draft', 78], ['panaderia-1', 'Wed 3', 'Pandesal alert', 'Draft', 71], ['coffee-2', 'Fri 5', 'Kape at ensaymada', 'Draft', 69], ['panaderia-2', 'Tue 15', 'Payday treat', 'Draft', 82], ['kakanin-1', 'Sat 19', 'Pre-order trays', 'Draft', 74], ['kakanin-3', 'Thu 24', 'Noche Buena', 'Draft', 80]];
+    return '<div class="page-h"><div><h1>Plan December</h1><p>Kawayan writes your month. You review everything before it posts.</p></div><span class="badge b-muted num">16 posts left in December on Pro</span></div>' +
+      '<div class="planner"><div class="card"><div class="card-h"><h3>Your month</h3></div><div class="card-b stack" style="gap:18px">' +
+        '<div class="field"><label class="label" for="pl-m">Month</label><select class="select" id="pl-m"><option>December 2026</option><option>January 2027</option></select></div>' +
+        '<div class="field"><span class="label">How many posts?</span><div class="seg-pick"><button type="button" aria-pressed="false"><b>8</b>Twice a week</button><button type="button" aria-pressed="false"><b>12</b>3 a week</button><button type="button" aria-pressed="true"><b>16</b>4 a week</button></div></div>' +
+        '<div class="field"><span class="label">Formats</span><div class="chips"><button type="button" class="chip-btn" aria-pressed="true">Single photo</button><button type="button" class="chip-btn" aria-pressed="true">Promo</button><button type="button" class="chip-btn" aria-pressed="false">Carousel</button><button type="button" class="chip-btn" aria-pressed="false">Quote</button></div></div>' +
+        '<div class="field"><span class="label">Dates Kawayan found</span><div class="stack" style="gap:6px;font-size:13px"><label class="check"><input type="checkbox" checked>Dec 8 · Immaculate Conception</label><label class="check"><input type="checkbox" checked>Dec 15 · Payday</label><label class="check"><input type="checkbox" checked>Dec 16 · Simbang Gabi starts</label><label class="check"><input type="checkbox" checked>Dec 24–25 · Christmas</label><label class="check"><input type="checkbox">Dec 30 · Rizal Day + payday</label></div></div>' +
+        '<div class="field"><label class="label" for="pl-n">Anything special this month?</label><textarea class="textarea" id="pl-n" style="min-height:72px">Noche Buena trays, ensaymada gift boxes. Closed Dec 25.</textarea></div>' +
+        '<button class="btn btn-green" type="button">' + ic('spark') + 'Generate 16 posts</button><p class="hint">Failed AI calls never use up your posts or regenerations.</p>' +
+      '</div></div>' +
+      '<div class="card"><div class="card-h"><h3>Generating</h3><span class="row-flex hint num">6 of 16 ready<span class="bar" style="width:120px"><i style="width:38%"></i></span></span></div><div class="card-b"><div class="gen-grid">' +
+        gen.map(function (g, i) { return '<div class="gen" style="animation-delay:' + (i * 80) + 'ms"><img src="img/' + g[0] + '.jpg" alt=""><div><span class="row-flex" style="justify-content:space-between"><span class="mono muted">' + g[1] + '</span><span class="badge b-dashed">' + g[3] + '</span></span><b>' + g[2] + '</b><span class="muted">Reach ' + g[4] + '</span></div></div>'; }).join('') +
+        '<div class="gen sk-card"></div><div class="gen sk-card"></div><div class="gen sk-card"></div>' +
+      '</div><div class="row-flex" style="justify-content:flex-end;margin-top:16px"><button class="btn btn-outline" type="button">Cancel</button><a class="btn btn-green" href="#calendar">Add to calendar</a></div></div></div></div>';
+  };
+
+  APP.insights = function () {
+    var reach = [420, 510, 480, 620, 590, 700, 660, 640, 720, 810, 760, 690, 740, 880, 930, 870, 820, 790, 860, 910, 1020, 980, 940, 1010, 1100, 1060, 990, 1080, 1150, 1210];
+    var prev = reach.map(function (v, i) { return Math.round(v * 0.82 + Math.sin(i) * 40); });
+    var W = 640, H = 220, pl = 40, pb = 24, mx = 1400;
+    var x = function (i) { return pl + i * (W - pl - 10) / 29; }, y = function (v) { return H - pb - v / mx * (H - pb - 10); };
+    var line = function (a) { return a.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' '); };
+    var grid = [0, 350, 700, 1050, 1400].map(function (v) { return '<line x1="' + pl + '" x2="' + (W - 10) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="' + (pl - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + (v >= 1000 ? (v / 1000) + 'k' : v) + '</text>'; }).join('');
+    var xl = [0, 7, 14, 21, 29].map(function (i) { return '<text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle">Oct ' + (i + 2) + '</text>'; }).join('');
+    var chart = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Daily reach, last 30 days, rising from 420 to 1,210"><g class="grid">' + grid + '</g>' + xl + '<path class="a" d="' + line(reach) + ' L' + x(29) + ' ' + y(0) + ' L' + x(0) + ' ' + y(0) + 'Z"/><path class="l2" d="' + line(prev) + '"/><path class="l" d="' + line(reach) + '"/><circle cx="' + x(29) + '" cy="' + y(1210) + '" r="4"/></svg>';
+    var rows = [['panaderia-2', 'Payday treat', 'Oct 15', 3420, 312, 82], ['kakanin-1', 'Undas pre-order', 'Oct 28', 2980, 264, 77], ['panaderia-1', 'Pandesal alert', 'Oct 6', 2410, 198, 71], ['coffee-1', "Kape't pandesal", 'Oct 20', 1870, 141, 68], ['panaderia-3', 'Behind the oven', 'Oct 10', 1520, 176, 69]];
+    return '<div class="page-h"><div><h1>Insights</h1><p>How your pages are growing and which posts work best.</p></div><div class="row-flex"><select class="select" aria-label="Date range" style="width:auto"><option>Last 30 days</option><option>Last 7 days</option><option>This year</option></select><button class="btn btn-outline" type="button">Export CSV</button></div></div>' +
+      '<div class="stats">' +
+        '<div class="card stat"><div class="stat-h">Followers' + ic('users') + '</div><b class="num">1,284</b><small><span class="up">+86</span> this month</small>' + spark([1180, 1192, 1201, 1215, 1230, 1248, 1260, 1284]) + '</div>' +
+        '<div class="card stat"><div class="stat-h">Reach' + ic('eye') + '</div><b class="num">18.4k</b><small><span class="up">+12%</span> vs Sept</small>' + spark(reach) + '</div>' +
+        '<div class="card stat"><div class="stat-h">Interactions' + ic('heart') + '</div><b class="num">942</b><small><span class="up">+8%</span> vs Sept</small>' + spark([20, 28, 25, 33, 30, 38, 41, 39]) + '</div>' +
+        '<div class="card stat"><div class="stat-h">Avg reach score' + ic('chart') + '</div><b class="num">72</b><small><span class="up">+6</span> vs Sept</small>' + spark([62, 64, 66, 65, 68, 70, 71, 72]) + '</div>' +
+      '</div>' +
+      '<div class="grid2"><div class="card"><div class="card-h"><h3>Daily reach</h3><span class="row-flex hint"><span class="row-flex"><i style="width:14px;height:2px;background:var(--green)"></i>October</span><span class="row-flex"><i style="width:14px;height:0;border-top:2px dashed var(--muted-fg)"></i>September</span></span></div><div class="card-b">' + chart + '</div></div>' +
+        '<div class="card"><div class="card-h"><h3>By platform</h3></div><div class="card-b stack" style="gap:20px"><div class="hbar"><div><span class="row-flex">' + ic('fb') + 'Facebook</span><span class="b"><i style="width:64%"></i></span><span class="num">11.8k</span></div><div><span class="row-flex">' + ic('ig') + 'Instagram</span><span class="b"><i style="width:36%"></i></span><span class="num">6.6k</span></div></div><hr class="sep"><div class="stack" style="gap:6px"><span class="label">Best time to post</span><p class="muted" style="font-size:14px">Weekdays at <b style="color:var(--fg)">6–9 AM</b>. Your followers check Facebook before work.</p></div></div></div></div>' +
+      '<div class="card"><div class="card-h"><h3>Post performance</h3><div class="row-flex"><span class="hint">Pick 2 to compare</span><button class="btn btn-outline btn-sm" type="button">Compare</button></div></div><div class="scroll-x"><table class="tbl"><thead><tr><th style="width:36px"></th><th>Post</th><th>Posted</th><th class="num">Reach</th><th class="num">Interactions</th><th class="num">Score</th></tr></thead><tbody>' +
+        rows.map(function (r, i) { return '<tr><td><input type="checkbox" aria-label="Compare ' + r[1] + '" ' + (i < 2 ? 'checked' : '') + ' style="accent-color:var(--green)"></td><td><span class="row-flex" style="flex-wrap:nowrap"><img src="img/' + r[0] + '.jpg" alt="" style="width:30px;height:30px;border-radius:6px;object-fit:cover"><b style="font-weight:500">' + r[1] + '</b></span></td><td class="num">' + r[2] + '</td><td class="num">' + r[3].toLocaleString() + '</td><td class="num">' + r[4] + '</td><td class="num"><span class="badge ' + (r[5] >= 75 ? 'b-green' : '') + '">' + r[5] + '</span></td></tr>'; }).join('') +
+      '</tbody></table></div></div><p class="note">Demo data, generated for each account</p>';
+  };
+
+  APP.billing = function () {
+    return '<div class="page-h"><div><h1>Plan and billing</h1><p>Your plan, wallet balance and payment history.</p></div></div>' +
+      '<div class="grid2e"><div class="card plan-hero"><div class="row-flex" style="justify-content:space-between"><span class="label">Current plan</span><span class="badge b-green"><span class="dot"></span>Active</span></div><div class="amt num">Pro · ₱499 <small>/ month</small></div><div><div class="score-h"><span>November posts</span><b class="num">7 of 16</b></div><div class="bar"><i style="width:44%"></i></div></div><p class="hint">Renews Dec 1 with GCash •••• 0142. Extra posts are ₱150 each.</p><div class="row-flex"><button class="btn btn-outline btn-sm" type="button">Buy 1 extra post · ₱150</button><button class="btn btn-ghost btn-sm" type="button">Cancel at the end of the month</button></div></div>' +
+        '<div class="card wallet"><div class="row-flex" style="justify-content:space-between"><span class="row-flex">' + ic('wallet') + 'Wallet balance</span><span class="muted" style="font-size:12px">PayMongo</span></div><div class="amt num">₱300.00</div><p class="muted" style="font-size:13px">Use it for extra posts or next month\'s plan.</p><button class="btn btn-green btn-sm" type="button">' + ic('plus') + 'Add funds</button></div></div>' +
+      '<div class="cells prices"><div class="price"><h3>Free Trial</h3><div class="amt num" style="font-size:30px">₱0</div><ul><li>' + ic('check') + '8 posts a month</li><li>' + ic('check') + 'Captions and images</li></ul><button class="btn btn-outline" type="button">Switch to Free</button></div><div class="price hl"><h3>Pro <span class="badge b-green">Your plan</span></h3><div class="amt num" style="font-size:30px">₱499</div><ul><li>' + ic('check') + '16 posts a month</li><li>' + ic('check') + 'Insights and comparison</li></ul><button class="btn btn-outline" type="button" disabled>Current plan</button></div><div class="price"><h3>Enterprise</h3><div class="amt" style="font-size:30px">Custom</div><ul><li>' + ic('check') + 'For chains and franchises</li></ul><a class="btn btn-outline" href="#help">Talk to us</a></div></div>' +
+      '<div class="card"><div class="card-h"><h3>Payment history</h3><button class="btn btn-ghost btn-sm" type="button">Download all</button></div><div class="scroll-x"><table class="tbl"><thead><tr><th>Date</th><th>Description</th><th>Method</th><th class="num">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>' +
+        [['Nov 1, 2026', 'Pro plan · November', 'GCash', '₱499.00', 'Paid'], ['Oct 22, 2026', 'Wallet top-up', 'Maya', '₱300.00', 'Paid'], ['Oct 14, 2026', 'Extra post', 'GCash', '₱150.00', 'Paid'], ['Oct 1, 2026', 'Pro plan · October', 'Card •••• 4242', '₱499.00', 'Failed'], ['Oct 1, 2026', 'Pro plan · October', 'GCash', '₱499.00', 'Paid']].map(function (r) { return '<tr><td class="num" style="white-space:nowrap">' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="num">' + r[3] + '</td><td><span class="badge ' + (r[4] === 'Paid' ? 'b-green' : 'b-danger') + '"><span class="dot"></span>' + r[4] + '</span></td><td>' + (r[4] === 'Paid' ? '<a href="#billing" class="muted">View</a>' : '<button class="btn btn-outline btn-sm" type="button">Retry</button>') + '</td></tr>'; }).join('') +
+      '</tbody></table></div></div>';
+  };
+
+  APP.prefs = function () {
+    var row = function (t, d, c) { return '<div class="set-row"><div><h3>' + t + '</h3><p class="d">' + d + '</p></div><div>' + c + '</div></div>'; };
+    var sec = function (id, t, rows, foot) { return '<section class="card" id="' + id + '"><div class="card-h"><h3 style="font-size:16px">' + t + '</h3></div>' + rows + (foot === false ? '' : '<div class="set-foot"><button class="btn btn-green btn-sm" type="button">Save changes</button></div>') + '</section>'; };
+    return '<div class="page-h"><div><h1>Settings</h1><p>Your business, voice, channels and account.</p></div></div>' +
+      '<div style="display:grid;grid-template-columns:200px 1fr;gap:28px;align-items:start" class="prefs-grid">' +
+        '<nav class="menu" style="position:sticky;top:16px" aria-label="Settings sections"><a href="#prefs" aria-current="page">' + ic('map') + 'Business</a><a href="#prefs">' + ic('msg') + 'Voice & audience</a><a href="#prefs">' + ic('link') + 'Channels<span class="badge b-danger">1</span></a><a href="#prefs">' + ic('moon') + 'Appearance</a><a href="#prefs">' + ic('lock') + 'Login & security</a><a href="#billing">' + ic('card') + 'Payments & plans</a><a href="#prefs">' + ic('eye') + 'Accessibility</a></nav>' +
+        '<div class="stack" style="gap:20px">' +
+          sec('s-biz', 'Business', row('Business name', 'Shown on your posts and receipts.', '<input class="input" value="Panaderia ni Aling Rosa" aria-label="Business name">') + row('Contact details', 'Customers see these when they message you.', '<div class="stack" style="gap:8px"><input class="input" value="+63 917 555 0142" aria-label="Phone"><input class="input" value="12 Dr. A. Santos Ave, Parañaque" aria-label="Address"></div>') + row('Verification', 'Approved permits unlock the full app.', '<span class="badge b-green"><span class="dot"></span>Approved Nov 2</span>')) +
+          sec('s-voice', 'Voice & audience', row('Brand voice', 'Every caption follows this voice.', '<div class="voices" data-voice-root></div>') + row('Audience', 'Who Kawayan writes for.', '<input class="input" value="Families nearby and office workers" aria-label="Audience">')) +
+          sec('s-chan', 'Channels', row('Connected accounts', 'Kawayan posts here through Zernio.', '<div class="stack" style="gap:8px"><div class="mini-row">' + ic('fb') + '<span><b style="font-weight:500">Panaderia ni Aling Rosa</b><br><span class="hint">Facebook Page</span></span><span class="badge b-green"><span class="dot"></span>Connected</span></div><div class="mini-row" style="border-color:color-mix(in srgb,var(--danger) 40%,transparent)">' + ic('ig') + '<span><b style="font-weight:500">@alingrosabakery</b><br><span class="hint">Access expired Nov 9</span></span><button class="btn btn-green btn-sm" type="button" style="margin-left:auto">Reconnect</button></div></div>'), false) +
+          sec('s-app', 'Appearance', row('Theme', 'Saved to your account, so it follows you.', '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' + [['Light', '#fafafa', '#fff'], ['Dark', '#09090b', '#1b1b1f'], ['System', 'linear-gradient(90deg,#fafafa 50%,#09090b 50%)', '#ccc']].map(function (t, i) { return '<button type="button" class="voice" style="flex-direction:column;align-items:stretch;padding:8px" aria-checked="' + (i === 2) + '" role="radio"><span style="height:54px;border-radius:6px;border:1px solid var(--border);background:' + t[1] + '"></span><span style="font-size:13px">' + t[0] + '</span></button>'; }).join('') + '</div>')) +
+          sec('s-sec', 'Login & security', row('Two-factor sign-in', 'Ask for a code from your phone when you log in.', '<button type="button" class="switch-ui" role="switch" aria-checked="false" aria-label="Two-factor sign-in"></button>') + row('Your data', 'Download everything, or delete your account under RA 10173.', '<div class="row-flex"><button class="btn btn-outline btn-sm" type="button">Export my data</button><button class="btn btn-danger btn-sm" type="button">Delete account</button></div>'), false) +
+        '</div></div>';
+  };
+
+  APP.help = function () {
+    return '<div class="page-h"><div><h1>Help desk</h1><p>Ask a question or report a problem. A person replies here and by email.</p></div><button class="btn btn-green" type="button">' + ic('plus') + 'New ticket</button></div>' +
+      '<div class="card" style="overflow:hidden"><div class="split"><div><div style="padding:12px"><input class="input" placeholder="Search your tickets" aria-label="Search tickets"></div><div class="tlist">' +
+        '<a aria-current="true"><span class="t1"><b>Instagram won\'t reconnect</b><span class="badge b-amber">Open</span></span><span class="muted">#1043 · Joel replied 12m ago</span></a>' +
+        '<a><span class="t1"><b>Can I post to TikTok?</b><span class="badge b-green">Resolved</span></span><span class="muted">#1031 · Oct 21</span></a>' +
+        '<a><span class="t1"><b>Payment not showing</b><span class="badge b-green">Resolved</span></span><span class="muted">#1019 · Oct 2</span></a>' +
+      '</div><div class="card" style="margin:12px;padding:14px;display:flex;flex-direction:column;gap:8px"><b style="font-size:14px">' + ic('spark', 'color:var(--green-ink);vertical-align:-3px') + ' Ask the assistant</b><p class="hint">Quick answers about using Kawayan. It can\'t see your account.</p><input class="input" placeholder="How do I change my posting time?" aria-label="Ask the assistant a question"></div></div>' +
+      '<div class="thread"><div class="card-h"><div><h3>Instagram won\'t reconnect</h3><span class="hint">#1043 · opened Nov 9 · Medium</span></div><button class="btn btn-outline btn-sm" type="button">Mark resolved</button></div><div class="msgs">' +
+        '<div class="msg me"><span class="avatar round g">RD</span><div><div class="bub">Hi po, my Instagram says expired. I tried Reconnect pero bumabalik lang sa Settings.</div><small>You · Nov 9, 4:12 PM</small></div></div>' +
+        '<div class="msg"><span class="avatar round">JR</span><div><div class="bub">Hi Rosa! Instagram asks you to log in again every 60 days. Please open Settings › Channels, tap Reconnect, and choose "Continue as Panaderia ni Aling Rosa" on the Facebook screen.</div><small>Joel · Support · 12m ago</small></div></div>' +
+        '<div class="msg"><span class="avatar round">JR</span><div><div class="bub">Your held post (Merienda combo) will send by itself once it\'s connected.</div><small>Joel · Support · 11m ago</small></div></div>' +
+      '</div><div class="composer"><textarea class="textarea" style="min-height:70px" placeholder="Write a reply…" aria-label="Reply"></textarea><div class="row-flex" style="justify-content:space-between"><button class="btn btn-ghost btn-sm" type="button">' + ic('upload') + 'Attach screenshot</button><button class="btn btn-green btn-sm" type="button">Send reply</button></div></div></div></div></div>';
+  };
+
+  // ---------- staff screens ----------
+  var STAFF = {};
+  STAFF.admin = function () {
+    var bars = [12, 18, 9, 22, 16, 25, 19, 28, 21, 31, 24, 34, 27, 30];
+    return '<div class="page-h"><div><h1>Good morning, Mika</h1><p>Monday, Nov 2 · 6 permits and 4 tickets waiting.</p></div><a class="btn btn-green" href="#admin-verify">' + ic('shield') + 'Review permits</a></div>' +
+      '<div class="stats"><div class="card stat"><div class="stat-h">Businesses' + ic('users') + '</div><b class="num">248</b><small><span class="up">+31</span> this month</small></div><div class="card stat"><div class="stat-h">Permits to review' + ic('shield') + '</div><b class="num">6</b><small>Oldest 19h ago</small></div><div class="card stat"><div class="stat-h">Payments to verify' + ic('wallet') + '</div><b class="num">3</b><small>₱1,147 total</small></div><div class="card stat"><div class="stat-h">Open tickets' + ic('msg') + '</div><b class="num">4</b><small>1 critical</small></div></div>' +
+      '<div class="grid2"><div class="card"><div class="card-h"><h3>Sign-ups, last 14 days</h3><span class="hint num">316 total</span></div><div class="card-b"><div style="display:flex;align-items:flex-end;gap:6px;height:180px">' + bars.map(function (b, i) { return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><span class="num muted" style="font-size:10px">' + b + '</span><i style="display:block;width:100%;height:' + (b / 34 * 140) + 'px;border-radius:4px 4px 0 0;background:' + (i === bars.length - 1 ? 'var(--green)' : 'color-mix(in srgb,var(--fg) 12%,transparent)') + '"></i></div>'; }).join('') + '</div><div class="row-flex mono muted" style="justify-content:space-between;font-size:11px;margin-top:6px"><span>Oct 20</span><span>Nov 2</span></div></div></div>' +
+        '<div class="card"><div class="card-h"><h3>System status</h3><span class="badge b-green"><span class="dot"></span>Operational</span></div><div class="sys"><div>' + ic('grid') + 'API<span class="badge b-green">Up · 120ms</span></div><div>' + ic('list') + 'Database<span class="badge b-green">Up</span></div><div>' + ic('spark') + 'AI generation<span class="badge b-green">Up</span></div><div>' + ic('link') + 'Zernio publishing<span class="badge b-green">Up</span></div><div>' + ic('card') + 'PayMongo<span class="badge b-amber">Slow</span></div><div><label class="check" style="flex:1"><span>Allow registrations</span></label><button type="button" class="switch-ui" role="switch" aria-checked="true" aria-label="Allow registrations"></button></div></div></div></div>' +
+      '<div class="card"><div class="card-h"><h3>Recent activity</h3><button class="btn btn-ghost btn-sm" type="button">All audit logs</button></div><div class="scroll-x"><table class="tbl"><tbody>' +
+        [['check', 'Verification approved', 'Panaderia ni Aling Rosa', 'Mika Santos', '9:40 AM'], ['file', 'Document submitted', 'Kusina ni Lola', 'System', '9:12 AM'], ['wallet', 'Plan upgraded', 'Tea Tayo · Pro', 'System', '8:55 AM'], ['msg', 'Ticket claimed', '#1043 Instagram won\'t reconnect', 'Joel Ramos', '8:31 AM'], ['alert', 'Scheduled post failed', 'Barako Brew · Instagram', 'System', '7:02 AM']].map(function (r) { return '<tr><td style="width:40px">' + ic(r[0]) + '</td><td><b style="font-weight:500">' + r[1] + '</b></td><td>' + esc(r[2]) + '</td><td class="muted">' + r[3] + '</td><td class="num muted" style="white-space:nowrap">' + r[4] + '</td></tr>'; }).join('') +
+      '</tbody></table></div></div>';
+  };
+
+  STAFF['admin-verify'] = function () {
+    var q = [['Kusina ni Lola', 'DTI', '19h ago', true], ['Tea Tayo', 'Mayor\'s Permit', '14h ago'], ['Barako Brew', 'SEC', '9h ago'], ['Gupit Kanto', 'DTI', '6h ago'], ['Ukay Finds QC', 'Mayor\'s Permit', '2h ago'], ['Halaman ni Mang Ben', 'DTI', '40m ago']];
+    return '<div class="page-h"><div><h1>Verification</h1><p>Check each permit matches the business before approving.</p></div><div class="tabs js-tabs" role="tablist"><button type="button" role="tab" aria-selected="true">Pending · 6</button><button type="button" role="tab" aria-selected="false">Approved</button><button type="button" role="tab" aria-selected="false">Sent back</button></div></div>' +
+      '<div class="card" style="overflow:hidden"><div class="inbox" style="grid-template-columns:300px 1fr 320px"><div class="tlist">' +
+        q.map(function (r) { return '<a' + (r[3] ? ' aria-current="true"' : '') + '><span class="t1"><b>' + esc(r[0]) + '</b><span class="hint">' + r[2] + '</span></span><span class="muted">' + r[1] + '</span></a>'; }).join('') +
+      '</div><div style="padding:24px;background:var(--muted)"><div class="row-flex" style="justify-content:space-between;margin-bottom:12px"><span class="row-flex" style="font-size:13px">' + ic('file') + 'DTI-Kusina-ni-Lola.pdf · 1 page</span><span class="row-flex"><button class="btn btn-outline btn-sm" type="button">Zoom</button><button class="btn btn-outline btn-sm" type="button">Open</button></span></div>' +
+        '<div class="doc"><span class="mono muted" style="text-align:center;font-size:10px">REPUBLIC OF THE PHILIPPINES · DEPARTMENT OF TRADE AND INDUSTRY</span><h4>CERTIFICATE OF BUSINESS NAME REGISTRATION</h4><i style="width:60%;margin:0 auto"></i><p style="text-align:center;font-size:18px;font-weight:600;margin:10px 0">KUSINA NI LOLA</p><i></i><i style="width:85%"></i><i style="width:70%"></i><div style="margin-top:auto;display:flex;justify-content:space-between"><i style="width:30%"></i><i style="width:30%"></i></div><span class="mono muted" style="font-size:10px">Sample document for the preview</span></div></div>' +
+      '<div style="display:flex;flex-direction:column"><div class="rail-sec"><h4>Business</h4><b style="font-size:15px">Kusina ni Lola</b><span class="muted">Carinderia · Pasig City</span><span class="muted">Owner: Lourdes Bautista · signed up Nov 1</span></div>' +
+        '<div class="rail-sec"><h4>Checks</h4><label class="check"><input type="checkbox" checked>Business name matches</label><label class="check"><input type="checkbox" checked>Owner name matches</label><label class="check"><input type="checkbox">Address matches sign-up</label><label class="check"><input type="checkbox" checked>Not expired (valid to 2030)</label></div>' +
+        '<div class="rail-sec"><h4>If sending back</h4><select class="select" aria-label="Reason"><option>Pick a reason…</option><option>Photo is blurry</option><option>Name doesn\'t match</option><option>Document expired</option></select><textarea class="textarea" style="min-height:64px" placeholder="Note to the owner (optional)" aria-label="Note to the owner"></textarea></div>' +
+        '<div class="rail-sec" style="border-bottom:0;margin-top:auto"><button class="btn btn-green" type="button">' + ic('check') + 'Approve</button><button class="btn btn-danger" type="button">Send back</button></div></div>' +
+      '</div></div>';
+  };
+
+  STAFF.support = function () {
+    var t = [['#1045', 'Critical', 'p-crit', 'Charged twice for Pro', 'Tea Tayo', 'Reply due in 12m', true], ['#1044', 'High', 'p-high', 'Posts stuck on publishing', 'Barako Brew', 'Reply due in 1h 20m'], ['#1043', 'Medium', 'p-med', 'Instagram won\'t reconnect', 'Panaderia ni Aling Rosa', 'Waiting on owner'], ['#1042', 'Low', 'p-low', 'How to change voice?', 'Gupit Kanto', 'Reply due in 6h']];
+    return '<div class="page-h"><div><h1>Help desk</h1><p>4 open · 1 past its reply target</p></div><div class="row-flex"><div class="tabs js-tabs" role="tablist"><button type="button" role="tab" aria-selected="false">Mine · 2</button><button type="button" role="tab" aria-selected="false">Unassigned · 1</button><button type="button" role="tab" aria-selected="true">All · 4</button></div></div></div>' +
+      '<div class="card" style="overflow:hidden"><div class="inbox"><div><div style="padding:12px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--border)"><input class="input" placeholder="Search number, business, email" aria-label="Search tickets"><div class="tabs js-tabs" role="tablist" style="width:100%"><button type="button" role="tab" aria-selected="true" style="flex:1">Open</button><button type="button" role="tab" aria-selected="false" style="flex:1">Waiting</button><button type="button" role="tab" aria-selected="false" style="flex:1">Snoozed</button><button type="button" role="tab" aria-selected="false" style="flex:1">Resolved</button></div></div><div class="tlist">' +
+        t.map(function (r) { return '<a' + (r[6] ? ' aria-current="true"' : '') + '><span class="t1"><span class="prio ' + r[2] + '">' + r[1] + '</span><span class="mono muted">' + r[0] + '</span></span><b>' + esc(r[3]) + '</b><span class="t1"><span class="muted">' + esc(r[4]) + '</span><span class="' + (r[6] ? 'p-crit' : 'muted') + '" style="font-size:12px">' + r[5] + '</span></span></a>'; }).join('') +
+      '</div></div>' +
+      '<div class="thread"><div class="card-h"><div><h3>Charged twice for Pro</h3><span class="hint">#1045 · Tea Tayo · opened 18m ago</span></div><div class="row-flex"><button class="btn btn-outline btn-sm" type="button">Claim</button><button class="btn btn-outline btn-sm" type="button">Snooze</button><button class="btn btn-outline btn-sm" type="button">Resolve</button></div></div><div class="msgs">' +
+        '<div class="msg"><span class="avatar round">JT</span><div><div class="bub">Good morning! I paid ₱499 with GCash and it went through twice. Screenshot attached. Pa-refund po sana yung isa.</div><small>Jun Torres · owner · 18m ago</small></div></div>' +
+        '<div class="msg note"><span class="avatar round">MS</span><div><div class="bub">Internal: PayMongo shows two checkout sessions, only one webhook marked paid. Second one may be pending. Checking dashboard.</div><small>Mika · internal note · 6m ago</small></div></div>' +
+      '</div><div class="composer"><div class="tabs js-tabs" role="tablist" style="align-self:flex-start"><button type="button" role="tab" aria-selected="true">Reply to owner</button><button type="button" role="tab" aria-selected="false">Internal note</button></div><textarea class="textarea" style="min-height:70px" placeholder="Write a reply…" aria-label="Reply"></textarea><div class="row-flex" style="justify-content:space-between"><select class="select" style="width:auto;height:32px;font-size:13px" aria-label="Saved replies"><option>Saved replies</option><option>Refund in progress</option><option>Reconnect Instagram</option></select><div class="row-flex"><span class="hint hide-xs"><span class="kbd">R</span> reply <span class="kbd">E</span> resolve</span><button class="btn btn-green btn-sm" type="button">Send reply</button></div></div></div></div>' +
+      '<div><div class="rail-sec"><h4>Business</h4><b style="font-size:15px">Tea Tayo</b><span class="muted">Milk Tea Kiosk · QC</span><div class="kv"><span class="muted">Plan</span><span class="badge b-green">Pro</span></div><div class="kv"><span class="muted">Verification</span><span>Approved</span></div><div class="kv"><span class="muted">Channels</span><span>FB ✓ · IG ✓</span></div></div><div class="rail-sec"><h4>Ticket</h4><div class="kv"><span class="muted">Priority</span><span class="prio p-crit">Critical</span></div><div class="kv"><span class="muted">First reply target</span><span>30 min</span></div><div class="kv"><span class="muted">Assignee</span><span>Unassigned</span></div><div class="kv"><span class="muted">Labels</span><span class="badge b-muted">billing</span></div></div><div class="rail-sec" style="border-bottom:0"><h4>Other tickets</h4><span>#1012 · Logo upload · <span class="muted">Resolved</span></span><span>#0988 · Change email · <span class="muted">Resolved</span></span></div></div>' +
+      '</div></div>';
+  };
+
+  // ---------- router ----------
+  function route() {
+    var h = location.hash.slice(1) || 'screens';
+    var landingAnchor = h.indexOf('l-') === 0;
+    var key = landingAnchor ? 'home' : (byKey[h] !== undefined || h === 'screens' ? h : 'screens');
+    var r = ROUTES[byKey[key]];
+    var shell = r ? r[5] : 'public';
+    var viewId = shell === 'app' ? 'v-app' : shell === 'staff' ? 'v-staff' : 'v-' + key;
+    $$('.view').forEach(function (el) { el.classList.toggle('on', el.id === viewId); });
+    closePops(); endTour();
+    if (shell === 'app') {
+      $('#app-page').innerHTML = APP[key]();
+      $('#app-crumb').textContent = r[1];
+      if (key === 'calendar') paintCal();
+    }
+    if (shell === 'staff') {
+      $('#staff-page').innerHTML = STAFF[key]();
+      $('#staff-crumb').textContent = r[1];
+    }
+    $$('[data-nav] a').forEach(function (a) { if (a.dataset.r === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    $$('.shell').forEach(function (s) { s.classList.remove('nav-open'); });
+    paintVoices();
+    var i = key === 'screens' ? -1 : byKey[key];
+    $('#sw-cur').innerHTML = key === 'screens' ? '<small>Preview</small>16 screens' : '<small class="num">' + (i + 1) + '/16 · ' + r[2] + '</small>' + r[1];
+    $('#sw-prev').href = '#' + (i <= 0 ? 'screens' : ROUTES[i - 1][0]);
+    $('#sw-next').href = '#' + (i >= ROUTES.length - 1 ? 'screens' : ROUTES[i + 1][0]);
+    if (landingAnchor) { var t = document.getElementById(h); if (t) t.scrollIntoView(); } else window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+
+  // ---------- popovers + tour ----------
+  function closePops() { ['#notif', '#acct'].forEach(function (s) { var p = $(s); if (p) p.hidden = true; }); $$('.js-bell, .js-acct').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); }); }
+  var TOUR = [
+    ['stats', 'Your month at a glance', 'Posts used, drafts waiting and anything that needs you, right at the top.'],
+    ['cal', 'Drag a post to move it', 'Click any post to see it on the right. Drag it to another day to reschedule.'],
+    ['gen', 'Plan a whole month', 'Kawayan writes your next month in one go. You approve before anything posts.'],
+    ['bell', 'Updates in one place', 'Held posts, replies from the help desk and payments show up here.'],
+    ['quota', 'Your posts this month', 'It resets on the 1st. Free gives you 8 a month and Pro gives you 16; extra posts are ₱150 each.']
+  ];
+  var tourI = -1;
+  function endTour() { tourI = -1; $$('.tour-on').forEach(function (e) { e.classList.remove('tour-on'); }); var c = $('#tour'); if (c) c.hidden = true; }
+  function showTour(i) {
+    if (location.hash !== '#calendar') { location.hash = 'calendar'; setTimeout(function () { showTour(i); }, 30); return; }
+    tourI = i; $$('.tour-on').forEach(function (e) { e.classList.remove('tour-on'); });
+    var s = TOUR[i], t = $('[data-tour="' + s[0] + '"]');
+    if (t) { t.classList.add('tour-on'); t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    $('#tour-n').textContent = (i + 1) + ' of ' + TOUR.length; $('#tour-t').textContent = s[1]; $('#tour-p').textContent = s[2];
+    $('.js-tour-n').textContent = i === TOUR.length - 1 ? 'Done' : 'Next';
+    $('.js-tour-b').disabled = i === 0;
+    $('#tour').hidden = false; $('.js-tour-n').focus();
+  }
+
+  // ---------- events ----------
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('button, a, [data-d]');
+    if (!el) { if (!e.target.closest('.pop')) closePops(); return; }
+    if (el.classList.contains('js-theme')) {
+      var dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'light' : 'dark'; return;
+    }
+    if (el.dataset.t) { if (el.dataset.t === 'system') delete root.dataset.theme; else root.dataset.theme = el.dataset.t; $$('.js-theme-seg button').forEach(function (b) { b.setAttribute('aria-selected', b === el); }); return; }
+    if (el.classList.contains('js-nav')) { el.closest('.shell').classList.toggle('nav-open'); return; }
+    if (el.classList.contains('js-bell')) { var n = $('#notif'), o = n.hidden; closePops(); n.hidden = !o; el.setAttribute('aria-expanded', String(o)); return; }
+    if (el.classList.contains('js-acct')) { var a = $('#acct'), o2 = a.hidden; closePops(); a.hidden = !o2; el.setAttribute('aria-expanded', String(o2)); return; }
+    if (el.classList.contains('js-tour')) { closePops(); showTour(0); return; }
+    if (el.classList.contains('js-tour-x')) { endTour(); return; }
+    if (el.classList.contains('js-tour-n')) { if (tourI >= TOUR.length - 1) endTour(); else showTour(tourI + 1); return; }
+    if (el.classList.contains('js-tour-b')) { if (tourI > 0) showTour(tourI - 1); return; }
+    if (el.classList.contains('js-eye')) { var p = document.getElementById(el.dataset.for), sh = p.type === 'password'; p.type = sh ? 'text' : 'password'; el.setAttribute('aria-label', sh ? 'Hide password' : 'Show password'); return; }
+    if (el.dataset.voice) { voiceSel = +el.dataset.voice; paintVoices(); return; }
+    if (el.dataset.d) { cal.sel = +el.dataset.d; paintCal(); if (innerWidth < 1180) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (el.dataset.cv) { cal.view = el.dataset.cv; $$('[data-cv]').forEach(function (b) { b.setAttribute('aria-selected', b === el); }); paintCal(); return; }
+    if (el.getAttribute('role') === 'tab' && el.closest('.tabs')) { $$('button', el.closest('.tabs')).forEach(function (b) { b.setAttribute('aria-selected', b === el); }); return; }
+    if (el.getAttribute('role') === 'switch') { el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'); return; }
+    if (el.getAttribute('role') === 'radio') { $$('[role="radio"]', el.parentNode).forEach(function (b) { b.setAttribute('aria-checked', b === el); }); return; }
+    if (el.hasAttribute('aria-pressed') && el.tagName === 'BUTTON') {
+      var single = el.closest('.vers, .slots, .seg-pick');
+      if (single) $$('button', single).forEach(function (b) { b.setAttribute('aria-pressed', b === el); });
+      else el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') !== 'true');
+      return;
+    }
+  });
+  document.addEventListener('change', function (e) { if (e.target.id === 'chan') { cal.filter = e.target.value; paintCal(); } });
+  document.addEventListener('submit', function (e) { e.preventDefault(); var f = e.target; if (f.dataset.go) location.hash = f.dataset.go; });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closePops(); endTour(); } });
+
+  route();
+})();
+</script>
+</body>
+</html>

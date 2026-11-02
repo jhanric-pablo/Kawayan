@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business-Type Roller Ideas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,900&display=swap">
+<style>
+/* Layout idea: four framed demos stacked top to bottom, each showing one home-page spot for the moving business-type pills. */
+:root {
+  --bg: #fafafa;
+  --card: #ffffff;
+  --fg: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-fg: #6b6b73;
+  --border: #e4e4e7;
+  --green: #0b7a4e;
+  --green-fg: #ffffff;
+  --green-soft: #e6f3ec;
+  --green-ink: #0a5c3b;
+  --dot: rgba(10,10,10,.08);
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "Fraunces", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #09090b; --card: #111113; --fg: #fafafa; --muted: #1b1b1f; --muted-fg: #a1a1aa; --border: #27272a;
+    --green: #34d399; --green-fg: #052e1c; --green-soft: rgba(52,211,153,.12); --green-ink: #6ee7b7; --dot: rgba(255,255,255,.07); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #09090b; --card: #111113; --fg: #fafafa; --muted: #1b1b1f; --muted-fg: #a1a1aa; --border: #27272a;
+  --green: #34d399; --green-fg: #052e1c; --green-soft: rgba(52,211,153,.12); --green-ink: #6ee7b7; --dot: rgba(255,255,255,.07); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; display: block; }
+h1, h2, h3 { margin: 0; letter-spacing: -0.025em; font-weight: 600; text-wrap: balance; }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 6px; }
+.icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 48px 24px 80px; display: flex; flex-direction: column; gap: 40px; }
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+.top h1 { font-size: clamp(28px, 2.5vw + 16px, 40px); letter-spacing: -0.04em; }
+.top p { color: var(--muted-fg); margin-top: 6px; max-width: 60ch; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 999px; font: 500 14px var(--font); border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.btn:hover { background: var(--muted); }
+.btn-green { background: var(--green); color: var(--green-fg); border-color: transparent; }
+.btn-green:hover { background: var(--green); opacity: .9; }
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--green-soft); color: var(--green-ink); }
+
+/* option frame */
+.opt { border: 1px solid var(--border); border-radius: 16px; background: var(--card); overflow: hidden; }
+.opt-h { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.opt-h .n { font: 500 12px var(--mono); color: var(--muted-fg); }
+.opt-h h2 { font-size: 17px; }
+.opt-h p { flex-basis: 100%; font-size: 14px; color: var(--muted-fg); }
+.stage { position: relative; background: var(--bg); overflow: hidden; }
+
+/* pills */
+.pill { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--fg); font: 500 12px var(--font); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; flex: none; transition: background .2s, color .2s, border-color .2s, transform .2s; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted-fg); opacity: .5; }
+.pill.has { cursor: pointer; }
+.pill.has::before { background: var(--green); opacity: 1; }
+.pill.has:hover { border-color: var(--green); transform: translateY(-1px); }
+.pill.on { background: var(--green); color: var(--green-fg); border-color: var(--green); }
+.pill.on::before { background: var(--green-fg); }
+button.pill { font: 500 12px var(--font); }
+
+.marquee { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.track { display: flex; gap: 10px; width: max-content; animation: slide var(--dur, 60s) linear infinite; padding: 2px 0; }
+.track.rev { animation-direction: reverse; }
+.track .set { display: flex; gap: 10px; }
+.marquee:hover .track, .marquee:focus-within .track { animation-play-state: paused; }
+@keyframes slide { to { transform: translateX(calc(-50% - 5px)); } }
+
+/* option 1: hero + strip */
+.mini-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: center; padding: 40px 40px 28px; position: relative; }
+.mini-hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; -webkit-mask-image: radial-gradient(ellipse 60% 70% at 30% 40%, #000 20%, transparent 75%); mask-image: radial-gradient(ellipse 60% 70% at 30% 40%, #000 20%, transparent 75%); }
+.mini-hero > * { position: relative; }
+.mini-hero h3 { font-size: clamp(30px, 3vw + 14px, 46px); line-height: 1.04; letter-spacing: -0.045em; }
+.mini-hero h3 em { font-style: normal; color: var(--green-ink); }
+.mini-hero .lead { margin-top: 12px; color: var(--muted-fg); max-width: 44ch; }
+.shopname { color: var(--fg); font-weight: 600; }
+.week { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; max-width: 420px; }
+.week figure { margin: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); font-size: 12px; }
+.week img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+.week figcaption { padding: 6px 8px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone { width: 100%; max-width: 270px; margin-left: auto; border: 1px solid var(--border); border-radius: 28px; padding: 9px; background: var(--muted); }
+.phone-in { border-radius: 20px; overflow: hidden; background: var(--card); border: 1px solid var(--border); }
+.ig-h { display: flex; align-items: center; gap: 8px; padding: 9px 10px; font-size: 12px; font-weight: 600; }
+.ig-h span { width: 24px; height: 24px; border-radius: 50%; background: var(--green); color: var(--green-fg); display: grid; place-items: center; font-size: 10px; flex: none; }
+.phone-in img { aspect-ratio: 1; object-fit: cover; width: 100%; }
+.phone-in p { padding: 9px 10px 12px; font-size: 12px; line-height: 1.45; min-height: 70px; }
+.fade { animation: fadein .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
+.strip { border-top: 1px solid var(--border); padding: 22px 0 18px; display: flex; flex-direction: column; gap: 10px; background: var(--card); }
+.strip-label { display: flex; justify-content: space-between; gap: 12px; padding: 0 24px 4px; font-size: 13px; color: var(--muted-fg); flex-wrap: wrap; }
+.strip-label b { color: var(--fg); font-weight: 500; }
+
+/* option 2: headline roller */
+.headline { padding: 64px 32px; text-align: center; position: relative; }
+.headline::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; -webkit-mask-image: radial-gradient(ellipse 55% 70% at 50% 50%, #000 20%, transparent 75%); mask-image: radial-gradient(ellipse 55% 70% at 50% 50%, #000 20%, transparent 75%); }
+.headline > * { position: relative; }
+.headline h3 { font-size: clamp(34px, 4.5vw + 12px, 64px); line-height: 1.06; letter-spacing: -0.045em; }
+.roll { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .08em; }
+.roll span { display: inline-block; color: var(--green-ink); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 8px; text-decoration-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.roll span.in { animation: rollin .5s cubic-bezier(.2,.8,.2,1) both; }
+.roll span.out { animation: rollout .3s cubic-bezier(.4,0,1,1) both; }
+@keyframes rollin { from { transform: translateY(100%); opacity: 0; } }
+@keyframes rollout { to { transform: translateY(-100%); opacity: 0; } }
+.headline p { margin: 16px auto 0; max-width: 50ch; color: var(--muted-fg); }
+.headline .ctas { margin-top: 24px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* option 3: dark why kawayan */
+.dark { background: #0d1a14; color: #fafafa; padding: 72px 32px; position: relative; overflow: hidden; }
+.dark::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 56px 56px; pointer-events: none; }
+.tilt { position: absolute; left: -10%; right: -10%; top: 50%; transform: translateY(-50%) rotate(-7deg); display: flex; flex-direction: column; gap: 14px; opacity: .55; }
+.tilt .marquee { -webkit-mask-image: none; mask-image: none; }
+.dark .pill { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.12); color: rgba(255,255,255,.55); }
+.dark .pill::before { background: #9fc49a; opacity: .8; }
+.dark-in { position: relative; z-index: 2; text-align: center; }
+.word { display: inline-flex; font: 900 clamp(64px, 7vw + 30px, 128px)/1.1 var(--display); letter-spacing: -0.02em; text-shadow: 0 6px 40px #0d1a14, 0 0 20px #0d1a14; }
+.word .k { display: inline-flex; color: #eef5e6; }
+.word .k span { display: inline-block; transform-origin: 50% 90%; animation: wave 4.2s ease-in-out infinite; animation-delay: calc(.5s + var(--i) * .09s); }
+.word .an { color: #5fd39a; }
+@keyframes wave { 0%, 26%, 100% { transform: none; } 8% { transform: translateY(-.14em) rotate(-5deg); } 17% { transform: translateY(.02em) rotate(2deg); } }
+.dark-in p { margin: 10px auto 0; max-width: 44ch; color: #c4cdc7; }
+.veil { position: absolute; inset: 0; z-index: 1; background: radial-gradient(ellipse 40% 55% at 50% 50%, #0d1a14 30%, transparent 75%); pointer-events: none; }
+
+/* option 4: CTA */
+.cta { padding: 80px 32px; text-align: center; position: relative; overflow: hidden; }
+.drift { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px; opacity: .7; -webkit-mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, transparent 35%, #000 80%); mask-image: radial-gradient(ellipse 45% 60% at 50% 50%, transparent 35%, #000 80%); }
+.drift .marquee { -webkit-mask-image: none; mask-image: none; }
+.cta-in { position: relative; }
+.cta h3 { font-size: clamp(32px, 3.5vw + 14px, 52px); letter-spacing: -0.045em; }
+.cta p { margin: 10px auto 0; max-width: 42ch; color: var(--muted-fg); }
+.cta .ctas { margin-top: 24px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* option 5: tilted band behind the light hero */
+.hero5 { padding: 88px 24px 80px; text-align: center; position: relative; overflow: hidden; }
+.hero5::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
+.hero5 .tilt { opacity: 1; gap: 16px; }
+.hero5 .pill { background: color-mix(in srgb, var(--card) 75%, transparent); color: color-mix(in srgb, var(--muted-fg) 80%, transparent); }
+.veil5 { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 42% 52% at 50% 50%, var(--bg) 40%, color-mix(in srgb, var(--bg) 70%, transparent) 65%, transparent 90%); }
+.hero5-in { position: relative; z-index: 2; }
+.announce { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 4px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.announce b { font-weight: 500; background: var(--green); color: var(--green-fg); border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+.hero5 h3 { margin: 22px auto 0; font-size: clamp(40px, 5vw + 12px, 72px); line-height: 1.02; letter-spacing: -0.045em; }
+.hero5 h3 em { font-style: normal; color: var(--green-ink); display: block; }
+.hero5 .lead { margin: 18px auto 0; max-width: 54ch; font-size: 17px; color: var(--muted-fg); }
+.hero5 .ctas { margin-top: 26px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.hero5 .fine { margin-top: 12px; font-size: 13px; color: var(--muted-fg); }
+
+.notes { font-size: 13px; color: var(--muted-fg); padding: 12px 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.notes span { display: flex; align-items: center; gap: 6px; }
+.notes span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+@media (max-width: 760px) {
+  .mini-hero { grid-template-columns: 1fr; padding: 28px 20px 20px; }
+  .phone { margin: 0 auto; }
+  .headline, .cta, .dark { padding-left: 20px; padding-right: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .marquee { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M10 4H6v16h4zM18 4h-4v16h4z"/></symbol>
+</svg>
+
+<main class="wrap">
+  <div class="top">
+    <div><h1>Where the business-type pills could go</h1><p>Five spots on the home page, each one live. Hover any moving row to pause it.</p></div>
+    <button class="btn js-theme" type="button"><svg class="icon"><use href="#i-moon"/></svg>Dark mode</button>
+  </div>
+
+  <!-- OPTION 1 -->
+  <section class="opt" aria-labelledby="o1">
+    <div class="opt-h"><span class="n">01</span><h2 id="o1">Full-width strip under the hero</h2><span class="badge">Recommended</span><p>Two rows slide in opposite directions. Click a pill with a green dot and the hero preview switches to that shop. It also changes by itself every few seconds.</p></div>
+    <div class="stage">
+      <div class="mini-hero">
+        <div>
+          <h3>Social Media <em>On Autopilot.</em></h3>
+          <p class="lead">Taglish captions, images and a posting schedule for <span class="shopname js-shopname">Aling Nena's Bakery</span>, all on one calendar.</p>
+          <div class="week js-week"></div>
+        </div>
+        <div class="phone"><div class="phone-in js-phone"></div></div>
+      </div>
+      <div class="strip">
+        <div class="strip-label"><span>Made for every Filipino MSME</span><span><b class="js-active">Panaderia</b> · green dot = has a sample</span></div>
+        <div class="marquee"><div class="track" style="--dur:70s" data-row="a"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:80s" data-row="b"></div></div>
+      </div>
+      <p class="sr" aria-live="polite" id="live1"></p>
+    </div>
+    <div class="notes"><span>Works on phones as is</span><span>Long names never get cut</span><span>Replaces the plain text row in the mockup</span></div>
+  </section>
+
+  <!-- OPTION 2 -->
+  <section class="opt" aria-labelledby="o2">
+    <div class="opt-h"><span class="n">02</span><h2 id="o2">Rolling word in the headline</h2><p>The last word of the headline rolls through the shop types. Pairs with option 1: the word and the active pill change together.</p></div>
+    <div class="stage">
+      <div class="headline">
+        <h3>Social Media On Autopilot<br>for your <span class="roll" aria-hidden="true"><span class="js-roll in">Panaderia</span></span><span class="sr">shop</span>.</h3>
+        <p>Taglish captions, images and a posting schedule, all on one calendar.</p>
+        <div class="ctas"><a class="btn btn-green" href="#o2">Start free trial<svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn" href="#o2">See how it works</a></div>
+      </div>
+    </div>
+    <div class="notes"><span>No extra space needed</span><span>Short words read best; long ones wrap to the next line</span></div>
+  </section>
+
+  <!-- OPTION 3 -->
+  <section class="opt" aria-labelledby="o3">
+    <div class="opt-h"><span class="n">03</span><h2 id="o3">Tilted band behind Why Kawayan</h2><p>Faint pills sway behind the word like bamboo. Pretty, but it competes with the Kaway·an animation, so treat it as an extra.</p></div>
+    <div class="stage dark">
+      <div class="tilt" aria-hidden="true">
+        <div class="marquee"><div class="track" style="--dur:90s" data-row="c"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:100s" data-row="d"></div></div>
+        <div class="marquee"><div class="track" style="--dur:110s" data-row="e"></div></div>
+      </div>
+      <div class="veil"></div>
+      <div class="dark-in">
+        <div class="word" aria-label="Kawayan"><span class="k" aria-hidden="true"><span style="--i:0">K</span><span style="--i:1">a</span><span style="--i:2">w</span><span style="--i:3">a</span><span style="--i:4">y</span></span><span class="an" aria-hidden="true">an</span></div>
+        <p>One Tagalog word, two meanings. Both describe what we're building for Filipino businesses.</p>
+      </div>
+    </div>
+    <div class="notes"><span>Background only, not clickable</span><span>Busy next to the letter animation</span></div>
+  </section>
+
+  <!-- OPTION 4 -->
+  <section class="opt" aria-labelledby="o4">
+    <div class="opt-h"><span class="n">04</span><h2 id="o4">Drifting behind "Ready to go Viral?"</h2><p>Slow rows fade out toward the middle so the heading stays clear. A last "this is for your shop too" before the footer.</p></div>
+    <div class="stage cta">
+      <div class="drift" aria-hidden="true">
+        <div class="marquee"><div class="track" style="--dur:120s" data-row="f"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:130s" data-row="g"></div></div>
+        <div class="marquee"><div class="track" style="--dur:140s" data-row="h"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:125s" data-row="i"></div></div>
+      </div>
+      <div class="cta-in">
+        <h3>Ready to go Viral?</h3>
+        <p>Set up your shop today and have next week's posts ready before dinner.</p>
+        <div class="ctas"><a class="btn btn-green" href="#o4">Start free trial</a><a class="btn" href="#o4">Log in</a></div>
+      </div>
+    </div>
+    <div class="notes"><span>Calm and safe</span><span>Easy to miss, since it's at the bottom</span></div>
+  </section>
+
+  <!-- OPTION 5 -->
+  <section class="opt" aria-labelledby="o5">
+    <div class="opt-h"><span class="n">05</span><h2 id="o5">Tilted band behind the hero</h2><span class="badge">New</span><p>Option 3's swaying band, moved behind the main headline in light mode. The middle stays clear so the headline and buttons read first; the pills show at the edges.</p></div>
+    <div class="stage hero5">
+      <div class="tilt" aria-hidden="true">
+        <div class="marquee"><div class="track" style="--dur:95s" data-row="j"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:105s" data-row="k"></div></div>
+        <div class="marquee"><div class="track" style="--dur:115s" data-row="l"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:100s" data-row="m"></div></div>
+        <div class="marquee"><div class="track" style="--dur:110s" data-row="n"></div></div>
+        <div class="marquee"><div class="track rev" style="--dur:120s" data-row="o"></div></div>
+        <div class="marquee"><div class="track" style="--dur:98s" data-row="p"></div></div>
+      </div>
+      <div class="veil5"></div>
+      <div class="hero5-in">
+        <span class="announce"><b>New</b>Plan a whole month in one click</span>
+        <h3>Social Media <em>On Autopilot.</em></h3>
+        <p class="lead">Taglish captions, images and a posting schedule for your panaderia, all on one calendar. Kawayan posts to Facebook and Instagram at the time you pick.</p>
+        <div class="ctas"><a class="btn btn-green" href="#o5" style="border-radius:8px;height:42px;padding:0 18px">Start free trial<svg class="icon"><use href="#i-arrow"/></svg></a><a class="btn" href="#o5" style="border-radius:8px;height:42px;padding:0 18px">See how it works</a></div>
+        <p class="fine">Create your first content calendar in minutes. No credit card required.</p>
+      </div>
+    </div>
+    <div class="notes"><span>Shows the business types in the first view of the page</span><span>Background only, so it never crowds the preview</span><span>Can pair with option 1's strip below it</span></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var TYPES = ['Coffee Shop', 'Sari-sari Store', 'Milk Tea Kiosk', 'Panaderia', 'Carinderia', 'Ukay Boutique', 'Barbershop', 'Hardware Store', 'Lechon Manok Stall', 'Beauty Salon', 'Frozen Goods Reseller', 'Halamanan / Plant Shop', 'Native Delicacies', 'Print & Layout Shop', 'Motoparts Supply', 'Poultry Farm'];
+  var SHOPS = {
+    'Panaderia': ["Aling Nena's Bakery", 'panaderia', 'Pandesal alert! Mainit pa at bagong luto, 6 AM pa lang. Kita-kits sa tindahan!', ['Pandesal alert', 'Ube ensaymada', 'Behind the oven']],
+    'Milk Tea Kiosk': ['Tea Tayo', 'milktea', 'Payday treat! Buy 1 take 1 sa lahat ng milk tea hanggang Linggo. Tara na, bes!', ['Buy 1 take 1', 'New: brown sugar', 'Rainy-day combo']],
+    'Sari-sari Store': ['Tindahan ni Aling Rosa', 'sarisari', 'Kumpleto na ulit! May yelo, load at paborito mong chichirya. Bukas hanggang 10 PM.', ['Restock day', 'Load promo', 'Bagong chichirya']],
+    'Carinderia': ['Kusina ni Lola', 'carinderia', 'Ulam of the day: sinigang na baboy at adobong manok. Unli rice pa rin, mga suki!', ['Ulam of the day', 'Lunch combo', 'Sunday special']],
+    'Coffee Shop': ['Barako Brew', 'coffee', 'Antok pa? Kapeng barako na, mainit at matapang. 20% off para sa mga estudyante today.', ['Barako Monday', 'Student promo', 'Iced latte drop']],
+    'Native Delicacies': ['Kakanin ni Aling Pacing', 'kakanin', 'Bibingka, puto at kutsinta, bagong luto ngayong umaga! Pre-order na para sa handaan.', ['Kakanin tray', 'Pre-order reminder', 'Fiesta special']]
+  };
+  var ORDER = Object.keys(SHOPS);
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  // rows: each row is a rotated copy of the list, duplicated for a seamless loop
+  function rowHTML(offset, interactive) {
+    var list = TYPES.slice(offset).concat(TYPES.slice(0, offset));
+    var one = list.map(function (t) {
+      var has = interactive && SHOPS[t];
+      return has ? '<button type="button" class="pill has" data-shop="' + esc(t) + '">' + esc(t) + '</button>' : '<span class="pill">' + esc(t) + '</span>';
+    }).join('');
+    return '<div class="set">' + one + '</div><div class="set" aria-hidden="true">' + one.replace(/<button /g, '<button tabindex="-1" ') + '</div>';
+  }
+  var offsets = { a: 0, b: 8, c: 2, d: 10, e: 5, f: 3, g: 11, h: 7, i: 13, j: 1, k: 9, l: 4, m: 12, n: 6, o: 14, p: 2 };
+  document.querySelectorAll('[data-row]').forEach(function (t) { t.innerHTML = rowHTML(offsets[t.dataset.row], t.dataset.row === 'a' || t.dataset.row === 'b'); });
+
+  // option 1: preview follows the active pill
+  var cur = 'Panaderia', timer;
+  function show(type) {
+    cur = type;
+    var s = SHOPS[type];
+    document.querySelector('.js-shopname').textContent = s[0];
+    document.querySelector('.js-active').textContent = type;
+    document.querySelector('.js-week').innerHTML = s[3].map(function (title, i) { return '<figure class="fade" style="animation-delay:' + (i * 60) + 'ms"><img src="img/' + s[1] + '-' + (i + 1) + '.jpg" alt=""><figcaption>' + esc(title) + '</figcaption></figure>'; }).join('');
+    document.querySelector('.js-phone').innerHTML = '<div class="ig-h"><span>' + esc(s[0].charAt(0)) + '</span>' + esc(s[0]) + '</div><img class="fade" src="img/' + s[1] + '-1.jpg" alt="Sample post image for ' + esc(s[0]) + '"><p class="fade"><b>' + esc(s[0]) + '</b> ' + esc(s[2]) + '</p>';
+    document.querySelectorAll('.pill.has').forEach(function (p) { p.classList.toggle('on', p.dataset.shop === type); p.setAttribute('aria-pressed', p.dataset.shop === type); });
+    document.getElementById('live1').textContent = 'Showing ' + s[0] + ', ' + type;
+  }
+  function next() { show(ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length]); }
+  function start() { if (!reduce) { clearInterval(timer); timer = setInterval(next, 4200); } }
+  document.addEventListener('click', function (e) {
+    var p = e.target.closest('.pill.has');
+    if (p) { show(p.dataset.shop); start(); }
+    if (e.target.closest('.js-theme')) {
+      var r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      r.dataset.theme = dark ? 'light' : 'dark';
+    }
+  });
+  show(cur); start();
+
+  // option 2: rolling headline word
+  var words = TYPES.slice(), wi = words.indexOf('Panaderia'), roll = document.querySelector('.js-roll');
+  if (!reduce) setInterval(function () {
+    roll.className = 'js-roll out';
+    setTimeout(function () { wi = (wi + 1) % words.length; roll.textContent = words[wi]; roll.className = 'js-roll in'; }, 300);
+  }, 2400);
+})();
+</script>
+</body>
+</html>
