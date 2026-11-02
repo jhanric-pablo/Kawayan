@@ -249,3 +249,4 @@
 .adm-icon-btn--primary:hover { background: var(--green-soft); color: var(--green-ink); border-color: transparent; }
 .adm-spinner { border-top-color: var(--green); }
 .adm-setting-row { border-radius: 10px; background: var(--card); }
+.adm-segment--full > button { flex: 1 1 auto; white-space: nowrap; padding-inline: 8px; font-size: var(--text-xs); }

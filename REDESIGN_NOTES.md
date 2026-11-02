@@ -385,8 +385,8 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Recent activity from the audit log — **have**
 
 ## F5. Staff — Verification
-- [ ] Pending / Approved / Sent back tabs — **FE** (existing filters renamed)
-- [ ] 3 panes: queue, document viewer, right rail (business info, checks list, send-back reason + note, Approve / Send back) — **FE** (checks are a reviewer aid, not saved; reason + note become the existing rejection reason)
+- [x] Pending / Approved / Sent back tabs — **FE** (existing filters renamed)
+- [x] 3 panes: queue, document viewer, right rail (business info, checks list, send-back reason + note, Approve / Send back) — **FE** (checks are a reviewer aid, not saved; reason + note become the existing rejection reason)
 
 ## F6. Staff — Support inbox
 - [x] Mine / Unassigned / All; Open / Waiting / Snoozed / Resolved; priority, number, business, "Reply due in…" — **have** (priority, SLA, snooze and labels already exist on tickets; no migration needed)
@@ -506,3 +506,10 @@ generation, Zernio publishing, PayMongo incl. Test mode) from the new
 registrations switch (same local setting as the Settings tab). The existing date-range KPIs,
 growth / retention charts, latest activity and Needs attention stay below, under "For the dates
 above". AI / Zernio / PayMongo show "Set up" (configured), not a live ping.
+
+**F5 — Verification.** Tabs read Pending / Approved / Sent back / All. Three panes: the queue
+(business, document type, age), the document viewer (file name, Zoom for images, Open in a new
+tab) and a right rail (business details, a Checks list for the reviewer — not saved, a "Pick a
+reason" select + note to the owner, Approve / Send back). The rail sits under the viewer below
+1536px. Send back stores reason + note as the existing rejection reason; the R key still opens
+the reason dialog, A still approves, ↑/↓ still move.

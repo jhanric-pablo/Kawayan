@@ -468,12 +468,23 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
     if (!rejectModal || !rejectReason.trim()) return; // the button stays disabled until a reason is typed
     try {
       await dbService.rejectVerification(rejectModal.id, rejectReason.trim());
-      toast.info(`"${rejectModal.businessName}" rejected`);
+      toast.info(`"${rejectModal.businessName}" sent back`);
       setRejectModal(null);
       setRejectReason('');
       await refreshVerificationsAndAdvance();
     } catch (e) {
-      toast.error('Could not reject. Please try again.');
+      toast.error('Could not send it back. Please try again.');
+    }
+  };
+
+  // Send back from the review rail (reason + note already picked there).
+  const handleSendBack = async (v: { id: string; businessName?: string }, reason: string) => {
+    try {
+      await dbService.rejectVerification(v.id, reason);
+      toast.info(`"${v.businessName || 'Business'}" sent back`);
+      await refreshVerificationsAndAdvance();
+    } catch {
+      toast.error('Could not send it back. Please try again.');
     }
   };
 
@@ -651,7 +662,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
       sub: `${new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })} · ${pendingVerifs} permit${pendingVerifs === 1 ? '' : 's'} and ${openTickets} ticket${openTickets === 1 ? '' : 's'} waiting.`,
     },
     users: { title: 'Users', sub: 'Search, edit roles, adjust wallets and manage subscriptions.' },
-    verification: { title: 'Verification queue', sub: 'Review business documents and approve or reject MSME accounts.' },
+    verification: { title: 'Verification', sub: 'Check each permit matches the business before approving.' },
     billing: { title: 'Billing', sub: 'Verify pending wallet top-ups and manage billing cycles.' },
     helpdesk: { title: 'Help desk', sub: 'Track and resolve customer support tickets.' },
     logs: { title: 'Audit logs', sub: 'Every privileged action, timestamped.' },
@@ -1198,6 +1209,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                 setRejectModal({ id: v.id, businessName: v.businessName });
                 setRejectReason('');
               }}
+              onSendBack={handleSendBack}
               paused={!!rejectModal || deciding}
             />
           )}
@@ -1494,11 +1506,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
       {/* ── Reject-verification dialog ── */}
       {rejectModal && (
-        <AdminModal title="Reject verification" sub={rejectModal.businessName} onClose={() => setRejectModal(null)}>
+        <AdminModal title="Send back for changes" sub={rejectModal.businessName} onClose={() => setRejectModal(null)}>
           <div className="space-y-4">
             <div>
               <FieldLabel htmlFor="reject-reason">
-                Rejection reason <span className="text-(--danger)">*</span>
+                Reason <span className="text-(--danger)">*</span>
               </FieldLabel>
               <textarea
                 id="reject-reason"
@@ -1514,7 +1526,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             <div className="flex gap-2.5">
               <button type="button" onClick={() => setRejectModal(null)} className="btn btn-outline flex-1">Cancel</button>
               <button type="button" onClick={handleReject} disabled={!rejectReason.trim()} className="btn btn-primary flex-1 disabled:opacity-50" style={{ background: 'var(--danger)' }}>
-                Confirm rejection
+                Send back
               </button>
             </div>
           </div>
