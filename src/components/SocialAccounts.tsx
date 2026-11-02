@@ -44,7 +44,8 @@ const BrandTile: React.FC<{ children: React.ReactNode; muted?: boolean }> = ({ c
   </div>
 );
 
-const SocialAccounts: React.FC = () => {
+/** `embedded`: shown inside Settings › Channels, without the page header. */
+const SocialAccounts: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -106,15 +107,17 @@ const SocialAccounts: React.FC = () => {
   const unavailable = !!loadError;
 
   return (
-    <div className="max-w-3xl space-y-6 animate-fade-in">
-      <div className="page-head">
-        <div>
-          <h1 className="page-head__title">Connected accounts</h1>
-          <p className="page-head__sub">
-            Link your pages once. Post now and Schedule in the calendar will then publish to them for you.
-          </p>
+    <div className={embedded ? 'space-y-4' : 'max-w-3xl space-y-6 animate-fade-in'}>
+      {!embedded && (
+        <div className="page-head">
+          <div>
+            <h1 className="page-head__title">Connected accounts</h1>
+            <p className="page-head__sub">
+              Link your pages once. Post now and Schedule in the calendar will then publish to them for you.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {loadError && (
         <div

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RadioGroup } from '@base-ui/react/radio-group';
 import { Radio } from '@base-ui/react/radio';
-import { PlayCircle, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, CreditCard, Download, Eye, Link2, Lock, MapPin, MessageSquare, Moon, PlayCircle, ShieldCheck, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { BrandProfile, User } from '../types';
 import { INDUSTRY_OPTIONS, isLegacyIndustry } from '../constants/industries';
@@ -14,6 +14,12 @@ import { AccessibilityOptions } from './AccessibilityWidget';
 import SettingsAppearance from './SettingsAppearance';
 import { LockedValue, SettingRow, SettingsSection } from './settings/SettingsParts';
 import VoicePreview from './settings/VoicePreview';
+import SocialAccounts from './SocialAccounts';
+import { socialService } from '../services/socialService';
+import { paymentService, Wallet } from '../services/paymentService';
+import { supportService } from '../services/supportService';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import type { ThemePref } from '../utils/sessionView';
 
 interface Props {
   profile?: BrandProfile | null;
@@ -24,14 +30,28 @@ interface Props {
   toggleDarkMode: () => void;
   /** Re-runs the onboarding walkthrough. Absent for non-'user' roles. */
   onReplayTour?: () => void;
+  /** Light / Dark / System. When given, Appearance offers System too. */
+  themePref?: ThemePref;
+  onChooseTheme?: (pref: ThemePref) => void;
+  /** Payments & plans → the Plan and billing page. */
+  onOpenBilling?: () => void;
+  /** Called after the owner deletes their account (signs out). */
+  onAccountDeleted?: () => void;
+  /** Section to open on arrival, e.g. 'channels'. */
+  initialSection?: string;
 }
 
 const SECTIONS = [
-  { id: 'business', label: 'Business', brand: true },
-  { id: 'voice', label: 'Voice & audience', brand: true },
-  { id: 'security', label: 'Login & security', brand: false },
-  { id: 'appearance', label: 'Appearance', brand: false },
+  { id: 'business', label: 'Business', brand: true, icon: MapPin },
+  { id: 'voice', label: 'Voice & audience', brand: true, icon: MessageSquare },
+  { id: 'channels', label: 'Channels', brand: true, icon: Link2 },
+  { id: 'appearance', label: 'Appearance', brand: false, icon: Moon },
+  { id: 'security', label: 'Login & security', brand: false, icon: Lock },
+  { id: 'payments', label: 'Payments & plans', brand: true, icon: CreditCard },
+  { id: 'accessibility', label: 'Accessibility', brand: false, icon: Eye },
 ];
+/** Sections that share the brand draft (an unsaved dot shows on them). */
+const BRAND_DRAFT = new Set(['business', 'voice']);
 const anchor = (id: string) => `settings-${id}`;
 
 const DEFAULT_COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
@@ -49,14 +69,84 @@ const splitThemes = (s: string) => s.split(',').map((t) => t.trim()).filter(Bool
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 
 /** Settings as one scrolling page of sections, with a section index that follows along. */
-const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, toggleDarkMode, onReplayTour }) => {
+const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, toggleDarkMode, onReplayTour, themePref, onChooseTheme, onOpenBilling, onAccountDeleted, initialSection }) => {
   const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
   const isSupport = user?.role === 'support';
   const sections = SECTIONS.filter((s) => !(isSupport && s.brand));
 
   // ── Section index: highlights the section in view; clicking scrolls to it ──
-  const [active, setActive] = useState(sections[0].id);
+  const [active, setActive] = useState(sections.some((x) => x.id === initialSection) ? initialSection! : sections[0].id);
+  useEffect(() => {
+    if (!initialSection || !sections.some((x) => x.id === initialSection)) return;
+    const t = window.setTimeout(() => document.getElementById(anchor(initialSection))?.scrollIntoView({ block: 'start' }), 60);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSection]);
+
+  // ── Channel problems (for the menu badge) and the wallet (Payments & plans) ──
+  const [expiredCount, setExpiredCount] = useState(0);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  useEffect(() => {
+    if (isSupport) return;
+    let live = true;
+    socialService.listAccounts().then((a) => live && setExpiredCount(a.filter((x) => !x.isActive).length)).catch(() => undefined);
+    paymentService.getWalletData().then((w) => live && setWallet(w)).catch(() => undefined);
+    return () => { live = false; };
+  }, [isSupport]);
+
+  // ── Your data: export everything as JSON; delete the account ──
+  const [exporting, setExporting] = useState(false);
+  const exportData = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const [posts, walletData, tickets] = await Promise.all([
+        dbService.getUserPosts(user.id).catch(() => []),
+        paymentService.getWalletData().catch(() => null),
+        supportService.getAllTickets().catch(() => []),
+      ]);
+      const account: Record<string, unknown> = { ...user };
+      delete account.password;
+      const data = {
+        exportedAt: new Date().toISOString(),
+        account,
+        brandProfile: profile ?? null,
+        posts,
+        wallet: walletData ? { balance: walletData.balance, currency: walletData.currency, subscription: walletData.subscription, transactions: walletData.transactions } : null,
+        supportTickets: tickets,
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kawayan-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Your data is downloading');
+    } catch {
+      toast.error('Could not export your data. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteEmail, setDeleteEmail] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await dbService.deleteOwnAccount(deleteEmail.trim().toLowerCase());
+      setDeleteOpen(false);
+      toast.success('Your account was deleted');
+      onAccountDeleted?.();
+    } catch (e: any) {
+      setDeleteError(e.message || 'Could not delete your account.');
+    } finally {
+      setDeleting(false);
+    }
+  };
   useEffect(() => {
     const els = sections.map((s) => document.getElementById(anchor(s.id))).filter((el): el is HTMLElement => !!el);
     const io = new IntersectionObserver(
@@ -179,7 +269,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
       <div className="page-head">
         <div>
           <h1 className="page-head__title">Settings</h1>
-          <p className="page-head__sub">{isSupport ? 'Your sign-in and how Kawayan looks.' : 'Your brand, your sign-in, and how Kawayan looks.'}</p>
+          <p className="page-head__sub">{isSupport ? 'Your sign-in and how Kawayan looks.' : 'Your business, voice, channels and account.'}</p>
         </div>
       </div>
 
@@ -201,8 +291,10 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                   : 'border-transparent text-(--fg-muted) hover:text-(--fg) lg:text-(--fg) lg:hover:bg-[color-mix(in_srgb,var(--fg)_5%,transparent)]',
               )}
             >
+              <s.icon className="hidden h-4 w-4 shrink-0 text-(--fg-muted) lg:block" aria-hidden />
               {s.label}
-              {s.brand && brandDirty && <span className="h-1.5 w-1.5 rounded-full bg-(--amber)" aria-label="Unsaved changes" />}
+              {BRAND_DRAFT.has(s.id) && brandDirty && <span className="h-1.5 w-1.5 rounded-full bg-(--amber)" aria-label="Unsaved changes" />}
+              {s.id === 'channels' && expiredCount > 0 && <span className="badge badge-red ml-auto px-1.5! py-0! text-[11px]" aria-label={`${expiredCount} channel problem${expiredCount > 1 ? 's' : ''}`}>{expiredCount}</span>}
             </button>
           ))}
         </div>
@@ -219,6 +311,18 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                   badge={<span className="badge badge-green shrink-0"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Verified</span>}
                 />
               </SettingRow>
+
+              {user?.verificationStatus && user.verificationStatus !== 'none' && (
+                <SettingRow label="Verification" hint="Approved permits unlock the full app.">
+                  {user.verificationStatus === 'verified' ? (
+                    <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Approved</span>
+                  ) : user.verificationStatus === 'pending' ? (
+                    <span className="badge badge-amber"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Waiting for review</span>
+                  ) : (
+                    <span className="badge badge-red"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Sent back</span>
+                  )}
+                </SettingRow>
+              )}
 
               <SettingRow label="Industry" htmlFor="st-industry" hint="Shapes the topics and examples in your captions.">
                 <select id="st-industry" className="input" value={brand.industry} onChange={(e) => setBrandField('industry', e.target.value)}>
@@ -331,6 +435,27 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
             </SettingsSection>
           )}
 
+          {!isSupport && (
+            <SettingsSection id={anchor('channels')} title="Channels" description="The pages Kawayan posts to, through Zernio.">
+              <div className="p-4 sm:p-5">
+                <SocialAccounts embedded />
+              </div>
+            </SettingsSection>
+          )}
+
+          <SettingsSection id={anchor('appearance')} title="Appearance" description="How Kawayan looks on this device.">
+            <SettingRow label="Theme" labelId="st-theme-label" hint="Light and Dark are saved to your account, so they follow you. System follows this device." wide>
+              <SettingsAppearance darkMode={darkMode} toggleDarkMode={toggleDarkMode} labelId="st-theme-label" themePref={themePref} onChooseTheme={onChooseTheme} />
+            </SettingRow>
+            {onReplayTour && (
+              <SettingRow label="Product walkthrough" hint="About two minutes: your calendar, planning and writing posts, and your account pages.">
+                <button type="button" onClick={onReplayTour} className="btn btn-outline">
+                  <PlayCircle className="h-4 w-4" aria-hidden /> Replay tour
+                </button>
+              </SettingRow>
+            )}
+          </SettingsSection>
+
           <SettingsSection id={anchor('security')} title="Login & security" description="How you sign in to Kawayan.">
             <SettingRow label="Email" hint="You sign in with this email. It can’t be changed.">
               <LockedValue id="st-login" value={user?.email || ''} />
@@ -368,26 +493,68 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                 </form>
               )}
             </SettingRow>
-          </SettingsSection>
-
-          <SettingsSection id={anchor('appearance')} title="Appearance" description="How Kawayan looks on this device.">
-            <SettingRow label="Theme" labelId="st-theme-label" hint="Saved to your account, so it follows you across devices." wide>
-              <SettingsAppearance darkMode={darkMode} toggleDarkMode={toggleDarkMode} labelId="st-theme-label" />
-            </SettingRow>
-            <SettingRow label="Accessibility" hint="Text size, contrast and motion. Saved in this browser.">
-              <div className="-mx-3"><AccessibilityOptions /></div>
-            </SettingRow>
-            {onReplayTour && (
-              <SettingRow label="Product walkthrough" hint="About two minutes: your calendar, planning and writing posts, and your account pages.">
-                <button type="button" onClick={onReplayTour} className="btn btn-outline">
-                  <PlayCircle className="h-4 w-4" aria-hidden /> Replay tour
-                </button>
+            {user?.role === 'user' && (
+              <SettingRow label="Your data" hint="Download everything Kawayan keeps about you, or delete your account (Data Privacy Act, RA 10173).">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={exportData} disabled={exporting}>
+                    <Download className="h-3.5 w-3.5" aria-hidden /> {exporting ? 'Preparing…' : 'Export my data'}
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm text-(--danger)" onClick={() => { setDeleteEmail(''); setDeleteError(''); setDeleteOpen(true); }}>
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden /> Delete account
+                  </button>
+                </div>
               </SettingRow>
             )}
           </SettingsSection>
+
+          {!isSupport && (
+            <SettingsSection id={anchor('payments')} title="Payments & plans" description="Your plan and wallet. Payments and receipts are on Plan and billing.">
+              <SettingRow label="Plan" hint="Change plans or buy extra posts on Plan and billing.">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="badge badge-green">{wallet ? (wallet.subscription === 'PRO' ? 'Pro' : wallet.subscription === 'ENTERPRISE' ? 'Enterprise' : 'Free Trial') : '—'}</span>
+                  {onOpenBilling && <button type="button" className="btn btn-outline btn-sm" onClick={onOpenBilling}>Open Plan and billing</button>}
+                </div>
+              </SettingRow>
+              <SettingRow label="Wallet balance" hint="For extra posts beyond your plan.">
+                <p className="mono text-lg font-semibold">{wallet ? `₱${wallet.balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p>
+              </SettingRow>
+            </SettingsSection>
+          )}
+
+          <SettingsSection id={anchor('accessibility')} title="Accessibility" description="Text size, contrast and motion. Saved in this browser.">
+            <div className="p-3 sm:p-4"><AccessibilityOptions /></div>
+          </SettingsSection>
+
         </div>
       </div>
       </div>
+
+      <Dialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-(--danger)" aria-hidden /> Delete your account?</DialogTitle>
+            <DialogDescription>
+              This removes your account, brand profile, posts, wallet history and tickets for good. Posts already on Facebook or Instagram stay there. Export your data first if you want a copy.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-1.5">
+            <label htmlFor="st-del-email" className="text-ui font-medium">Type your email to confirm</label>
+            <input id="st-del-email" className="input" type="email" autoComplete="off" placeholder={user?.email} value={deleteEmail} onChange={(e) => setDeleteEmail(e.target.value)} />
+            {deleteError && <p className="text-ui text-(--danger)" role="alert">{deleteError}</p>}
+          </div>
+          <DialogFooter>
+            <button type="button" className="btn btn-ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>Keep my account</button>
+            <button
+              type="button"
+              className="btn btn-primary bg-(--danger)! border-(--danger)!"
+              onClick={deleteAccount}
+              disabled={deleting || deleteEmail.trim().toLowerCase() !== (user?.email ?? '').toLowerCase()}
+            >
+              {deleting ? 'Deleting…' : 'Delete account'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Floating save bar, only while brand details have unsaved edits */}
       {brandDirty && (

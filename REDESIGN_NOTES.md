@@ -367,13 +367,13 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Payment history table: date, description, method, amount, status badge, receipt / Retry — **FE** (method = "Wallet" / "PayMongo" from the transaction type; receipt = the PayMongo reference; Retry re-opens checkout for a failed top-up)
 
 ## F2. Settings
-- [ ] Left section menu: Business, Voice & audience, Channels, Appearance, Login & security, Payments & plans, Accessibility — **FE**
+- [x] Left section menu: Business, Voice & audience, Channels, Appearance, Login & security, Payments & plans, Accessibility — **FE**
 - [x] Label-left / control-right rows, save bar — **have**
-- [ ] Channels section (Connected / Reconnect states, Connect) inside Settings — **FE** (reuses SocialAccounts)
+- [x] Channels section (Connected / Reconnect states, Connect) inside Settings — **FE** (reuses SocialAccounts)
 - [x] Appearance theme cards — **have**; System option — **FE**
-- [ ] Payments & plans section (summary + link to billing) — **FE**
-- [ ] Export my data (JSON download of profile, posts, plans, payments, tickets) — **FE**
-- [ ] Delete account — **API** (`DELETE /api/auth/me`, confirm by typing the email)
+- [x] Payments & plans section (summary + link to billing) — **FE**
+- [x] Export my data (JSON download of profile, posts, plans, payments, tickets) — **FE**
+- [x] Delete account — **API** (`DELETE /api/auth/me`, confirm by typing the email)
 
 ## F3. Help desk (owner)
 - [ ] Help desk page (`/help`): ticket list with status badges + search, conversation thread (mine tinted green), reply box with attachment, "Ask the assistant" card, New ticket — **FE** (reuses the Help panel's ticket/chat logic; the slide-over panel stays)
@@ -478,3 +478,13 @@ Add funds, a Free / Pro / Enterprise comparison and a payment-history table (dat
 method from the reference — PayMongo / Xendit / Wallet, amount, status badge, Copy ref / Continue /
 Cancel / Retry). Test-mode and pending banners and CSV export are unchanged. End-of-month cancel
 isn't available in the backend, so the button keeps its honest "Switch to Free" (immediate) label.
+
+**F2 — Settings.** The section menu now has Business, Voice & audience, Channels (red count of
+pages that need reconnecting), Appearance, Login & security, Payments & plans and Accessibility,
+with icons. New: Verification row (Approved / Waiting / Sent back), Channels section (the
+Connected accounts list embedded, Reconnect / Disconnect / Connect work as on the page), System
+theme card, Payments & plans (plan + wallet + link to billing), Accessibility as its own section,
+and "Your data": Export my data (JSON of account without password, brand profile, posts, wallet,
+tickets) and Delete account (type your email; new `DELETE /api/auth/me`, owners only). Reconnect
+buttons around the app now open Settings › Channels; the /social page and its nav item stay.
+The mockup's two-factor switch is not shown: the app has no 2FA.

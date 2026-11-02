@@ -103,6 +103,19 @@ export class ClientDatabaseService {
     }
   }
 
+  /** Deletes the signed-in owner's account. `confirmEmail` must match the account's email. */
+  async deleteOwnAccount(confirmEmail: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/auth/me`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ confirmEmail }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Could not delete your account');
+    }
+  }
+
   async updateUserTheme(userId: string, theme: 'light' | 'dark'): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/auth/theme`, {

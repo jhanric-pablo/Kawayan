@@ -66,6 +66,11 @@ export class UniversalDatabaseService {
     return service.updateUserTheme(userId, theme);
   }
 
+  async deleteOwnAccount(confirmEmail: string): Promise<void> {
+    const service = await this.getService();
+    return service.deleteOwnAccount(confirmEmail);
+  }
+
   async updateUserPassword(userId: string, newPassword: string): Promise<void> {
     const service = await this.getService();
     return service.updateUserPassword(userId, newPassword);

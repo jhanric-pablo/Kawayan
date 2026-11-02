@@ -2,6 +2,7 @@ import React from 'react';
 import { RadioGroup } from '@base-ui/react/radio-group';
 import { Radio } from '@base-ui/react/radio';
 import { Check } from 'lucide-react';
+import type { ThemePref } from '../utils/sessionView';
 
 type ThemeId = 'light' | 'dark';
 
@@ -65,24 +66,42 @@ interface Props {
   labelId: string;
   /** Dark mode lives on the account, so it syncs across devices. */
   toggleDarkMode: () => void;
+  /** With these, a third "System" card follows the device setting. */
+  themePref?: ThemePref;
+  onChooseTheme?: (pref: ThemePref) => void;
 }
 
+/** Half light, half dark: the System card's preview. */
+const SystemPreview: React.FC = () => (
+  <div className="relative h-28 overflow-hidden rounded-xl" aria-hidden>
+    <div className="absolute inset-0" style={{ clipPath: 'inset(0 50% 0 0)' }}><Preview c={THEMES[0].c} /></div>
+    <div className="absolute inset-0" style={{ clipPath: 'inset(0 0 0 50%)' }}><Preview c={THEMES[1].c} /></div>
+  </div>
+);
+
 /** Settings → Appearance: light or dark, from miniature previews. */
-const SettingsAppearance: React.FC<Props> = ({ darkMode, toggleDarkMode, labelId }) => {
+const SettingsAppearance: React.FC<Props> = ({ darkMode, toggleDarkMode, labelId, themePref, onChooseTheme }) => {
+  const withSystem = !!onChooseTheme;
+  const options = withSystem
+    ? [...THEMES, { id: 'system' as const, name: 'System', note: 'Follows this device', c: THEMES[0].c }]
+    : THEMES;
   return (
     <RadioGroup
-      value={darkMode ? 'dark' : 'light'}
-      onValueChange={(v) => (v === 'dark') !== darkMode && toggleDarkMode()}
+      value={withSystem ? themePref ?? (darkMode ? 'dark' : 'light') : darkMode ? 'dark' : 'light'}
+      onValueChange={(v) => {
+        if (onChooseTheme) onChooseTheme(v as ThemePref);
+        else if ((v === 'dark') !== darkMode) toggleDarkMode();
+      }}
       aria-labelledby={labelId}
-      className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2"
+      className={withSystem ? 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-3' : 'grid grid-cols-1 gap-3 min-[420px]:grid-cols-2'}
     >
-      {THEMES.map((t) => (
+      {options.map((t) => (
         <Radio.Root
           key={t.id}
           value={t.id}
           className="group rounded-xl border border-(--border) bg-(--card) p-2 text-left outline-hidden transition-[border-color,box-shadow] hover:border-(--border-strong) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-(--green) data-checked:shadow-[0_0_0_1px_var(--green)]"
         >
-          <Preview c={t.c} />
+          {t.id === 'system' ? <SystemPreview /> : <Preview c={t.c} />}
           <div className="flex items-center gap-2 px-1 pb-0.5 pt-2.5">
             <div className="min-w-0 flex-1">
               <p className="truncate text-ui font-medium text-(--fg)">{t.name}</p>

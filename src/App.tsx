@@ -86,6 +86,11 @@ const App: React.FC = () => {
   const [tourFirstRun, setTourFirstRun] = useState(false);
   // Shell → calendar requests (Create post, search hits, notifications).
   const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
+  // Settings section to open on arrival (e.g. Channels from a Reconnect button); cleared on leaving.
+  const [settingsSection, setSettingsSection] = useState<string | undefined>();
+  useEffect(() => {
+    if (view !== ViewState.SETTINGS) setSettingsSection(undefined);
+  }, [view]);
   // Month planner page: which month to open on (YYYY-MM).
   const [plannerMonth, setPlannerMonth] = useState<string | null>(null);
   const loginInProgressRef = useRef(false);
@@ -621,7 +626,10 @@ const App: React.FC = () => {
         intent={calendarIntent}
         onIntentDone={() => setCalendarIntent(null)}
         onOpenInsights={() => goTo(ViewState.INSIGHTS)}
-        onOpenChannels={() => goTo(ViewState.SOCIAL)}
+        onOpenChannels={() => {
+          setSettingsSection('channels');
+          goTo(ViewState.SETTINGS);
+        }}
         onOpenPlanner={(m) => {
           setPlannerMonth(m);
           goTo(ViewState.PLANNER);
@@ -692,7 +700,7 @@ const App: React.FC = () => {
             case ViewState.STUDIO:
               return calendarPage('studio');
             case ViewState.SETTINGS:
-              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
+              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} themePref={themePref} onChooseTheme={chooseTheme} onOpenBilling={user?.role === 'user' ? () => goTo(ViewState.BILLING) : undefined} onAccountDeleted={handleLogout} initialSection={settingsSection} key={settingsSection ?? 'settings'} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:
               return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
             case ViewState.SOCIAL:

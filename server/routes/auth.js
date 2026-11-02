@@ -24,6 +24,7 @@ const loginSchema = z.object({
 
 const themeSchema = z.object({ userId: id, theme: z.enum(['light', 'dark']) });
 const passwordSchema = z.object({ userId: id, newPassword: password('A new password is required') });
+const deleteAccountSchema = z.object({ confirmEmail: email('Type your email to confirm') });
 const forgotSchema = z.object({ email: email('Email is required') });
 const resetSchema = z.object({
   token: text('Token and new password are required', 200),
@@ -151,6 +152,26 @@ router.post('/api/auth/reset-password', validate(resetSchema), async (req, res) 
   } catch (error) {
     logger.error('Reset password error', { error: error.message });
     res.status(400).json({ error: error.message || 'Failed to reset password' });
+  }
+});
+
+// Owners delete their own account (Settings › Delete account). Staff accounts are removed by an admin.
+router.delete('/api/auth/me', authenticateToken, validate(deleteAccountSchema), async (req, res) => {
+  try {
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Staff accounts are removed by an admin.' });
+    const row = await dbService.getUserById(req.user.userId);
+    if (!row) return res.status(404).json({ error: 'User not found' });
+    if (String(row.email).toLowerCase() !== req.body.confirmEmail) {
+      return res.status(400).json({ error: 'That email doesn’t match your account.' });
+    }
+    const info = await dbService.describeUser(req.user.userId);
+    // audit_logs rows cascade with the user (user_id is required), so this goes to the server log.
+    await dbService.deleteUser(req.user.userId);
+    logger.info('AUDIT: delete_own_account', { userId: req.user.userId, details: `owner deleted account: ${info}` });
+    res.json({ message: 'Account deleted' });
+  } catch (error) {
+    logger.error('Delete own account error', { error: error.message });
+    res.status(500).json({ error: 'Failed to delete your account' });
   }
 });
 
