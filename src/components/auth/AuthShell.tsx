@@ -32,7 +32,7 @@ const AuthShell: React.FC<Props> = ({
       <div className="ax">
         <header className="ax__bar">
           <button type="button" className="ax__brand" onClick={onBack} aria-label="Kawayan home">
-            <KawayanLogo size={24} />
+            <KawayanLogo size={17} />
           </button>
           <div className="ax__tools">
             <button type="button" className="ax__back" onClick={onBack}>

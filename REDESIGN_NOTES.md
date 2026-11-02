@@ -47,17 +47,17 @@ logic is touched. All work is CSS, class names and markup around existing logic.
 Legend: `[ ]` todo, `[x]` restyled.
 
 ### Foundations
-- [ ] Tokens (light + dark) in `theme.css`, mapped onto app + shadcn variables
-- [ ] Fonts: Geist, Geist Mono, Fraunces 900 (self-hosted), Plus Jakarta Sans removed
-- [ ] `.btn`, `.input`, `.badge`, `.card`, `.surface`, `.page-head`, `.eyebrow`, scrollbars, focus ring
-- [ ] `ui/button.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `ui/popover.tsx`, `ui/dropdown-menu.tsx`, `ui/tabs.tsx`, `ui/switch.tsx`, `ui/tooltip.tsx`
-- [ ] `ui/Toast.tsx`
-- [ ] `ui/DynamicIslandAlert.tsx`
-- [ ] `ui/Stepper.tsx` + `stepper.css`
-- [ ] `OrganicDialog.tsx` (alert / confirm / prompt)
-- [ ] `KawayanLogo.tsx`
-- [ ] `AppHydrationLoader.tsx`
-- [ ] `styles/accessibility.css` (high-contrast etc. still work with new tokens)
+- [x] Tokens (light + dark) in `theme.css`, mapped onto app + shadcn variables
+- [x] Fonts: Geist, Geist Mono, Fraunces 900 (self-hosted), Plus Jakarta Sans removed
+- [x] `.btn`, `.input`, `.badge`, `.card`, `.surface`, `.page-head`, `.eyebrow`, scrollbars, focus ring
+- [x] `ui/button.tsx`, `ui/dialog.tsx`, `ui/sheet.tsx`, `ui/popover.tsx`, `ui/dropdown-menu.tsx`, `ui/tabs.tsx`, `ui/switch.tsx`, `ui/tooltip.tsx`
+- [x] `ui/Toast.tsx`
+- [x] `ui/DynamicIslandAlert.tsx`
+- [x] `ui/Stepper.tsx` + `stepper.css`
+- [x] `OrganicDialog.tsx` (alert / confirm / prompt)
+- [x] `KawayanLogo.tsx`
+- [x] `AppHydrationLoader.tsx`
+- [x] `styles/accessibility.css` (high-contrast etc. still work with new tokens)
 
 ### App shell
 - [ ] Sidebar (desktop) with business header, menu groups, quota card, account button
@@ -165,3 +165,10 @@ Legend: `[ ]` todo, `[x]` restyled.
 ## Progress log
 
 (One entry per step: what changed · what to check · what's left.)
+
+**Step 1 — tokens, fonts, shared UI.** New zinc + green tokens in `theme.css` (old variable names
+kept and re-pointed), Geist/Geist Mono/Fraunces via @fontsource, Google Fonts links removed,
+new bamboo logo, reshaped `.btn/.input/.badge/.card`, ui/* (button, switch, tabs, dialog, sheet,
+popover, dropdown, toast pill, stepper), OrganicDialog with muted footer, new hydration loader.
+Check: any screen in light/dark — colours should already be neutral with green only on main buttons.
+Left: per-screen layout work (steps 2–9).

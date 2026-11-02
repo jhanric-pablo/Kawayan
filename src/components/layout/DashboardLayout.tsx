@@ -236,7 +236,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
         <aside className="sticky top-0 z-40 flex h-screen w-[68px] shrink-0 flex-col border-r border-(--border) bg-(--bg) lg:w-60">
           <button type="button" onClick={onHome} className="flex h-14 shrink-0 items-center gap-2.5 px-[18px] lg:px-5" aria-label="Kawayan home">
             <img src={KAWAYAN_ICON} alt="" className="h-8 w-8 lg:hidden" />
-            <KawayanLogo size={24} className="hidden lg:inline-block" />
+            <KawayanLogo size={17} className="hidden lg:inline-block" />
           </button>
           <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-2.5 py-3 lg:px-3">
             <p className="eyebrow hidden px-2.5 pb-2 text-(--fg-subtle) lg:block">Workspace</p>

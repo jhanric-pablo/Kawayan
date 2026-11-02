@@ -39,7 +39,7 @@ const LegalPage: React.FC<Props> = ({ doc, onSwitch, onBack }) => {
       <header className="sticky top-0 z-40 border-b border-(--border) bg-(--bg)/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <button type="button" onClick={onBack} aria-label="Kawayan home" className="inline-flex rounded-md p-1">
-            <KawayanLogo size={22} />
+            <KawayanLogo size={17} />
           </button>
           <nav className="flex rounded-full border border-(--border) bg-(--card) p-1" aria-label="Legal documents">
             {(['terms', 'privacy'] as const).map((d) => (

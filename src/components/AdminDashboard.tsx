@@ -666,7 +666,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
       <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-(--border) bg-(--card) md:flex">
         <div className="flex h-16 shrink-0 items-center gap-2.5 px-4">
           <div className="leading-tight">
-            <KawayanLogo size={24} />
+            <KawayanLogo size={17} />
             <p className="mt-1 text-xs font-medium text-(--fg-muted)">Admin console</p>
           </div>
         </div>

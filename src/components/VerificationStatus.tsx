@@ -207,7 +207,7 @@ const VerificationStatus: React.FC<Props> = ({
 
   const Brand = (
     <div className="ob-brand">
-      <KawayanLogo size={26} />
+      <KawayanLogo size={17} />
     </div>
   );
 

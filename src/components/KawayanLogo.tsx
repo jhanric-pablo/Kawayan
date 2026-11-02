@@ -1,30 +1,32 @@
 import React from 'react';
 import clsx from 'clsx';
 
-/** The app icon (green rounded square with the bamboo), for spots too small for the wordmark. */
+/** The app icon file (kept for the favicon / manifest). In the UI use <KawayanMark />. */
 export const KAWAYAN_ICON = '/brand/kawayan-icon.svg';
 
+/** Bamboo mark: stalk in the text colour, nodes cut out in the page colour, a green leaf. */
+export const KawayanMark: React.FC<{ className?: string; size?: number }> = ({ className, size }) => (
+  <svg viewBox="0 0 28 28" className={clsx('kw-mark', className)} style={size ? { width: size, height: size } : undefined} aria-hidden="true">
+    <rect className="kw-stalk" x="11" y="2" width="6" height="24" rx="2" />
+    <rect className="kw-node" x="9" y="9" width="10" height="2" rx="1" />
+    <rect className="kw-node" x="9" y="17" width="10" height="2" rx="1" />
+    <path className="kw-leaf" d="M17 8c4-1 7-3 8-6-4 0-7 2-8 5z" />
+  </svg>
+);
+
 interface Props {
-  /** Font size in px; the bamboo "I" scales with it. Keep it at 24 or more, use the icon below that. */
+  /** Font size in px; the mark scales with it. */
   size?: number;
   /** Light version for dark backgrounds. Dark mode switches automatically. */
   onDark?: boolean;
   className?: string;
 }
 
-/** "Kawayan AI" wordmark from the brand kit: Fraunces letters with a bamboo stalk as the "I". */
-const KawayanLogo: React.FC<Props> = ({ size = 24, onDark = false, className }) => (
+/** "Kawayan" wordmark: the bamboo mark and the name in Geist. */
+const KawayanLogo: React.FC<Props> = ({ size = 18, onDark = false, className }) => (
   <span className={clsx('kw-logo', onDark && 'kw-logo--on-dark', className)} style={{ fontSize: size }} role="img" aria-label="Kawayan AI">
-    Kawayan A
-    <svg viewBox="0 0 56 124" aria-hidden="true">
-      <path className="kw-stalk" d="M8 30 L28 22 L28 54 L8 54 Z" />
-      <rect className="kw-stalk" x="8" y="58" width="20" height="30" />
-      <rect className="kw-stalk" x="8" y="92" width="20" height="32" rx="3" />
-      <rect className="kw-node" x="5" y="53" width="26" height="6" rx="3" />
-      <rect className="kw-node" x="5" y="87" width="26" height="6" rx="3" />
-      <path className="kw-leaf" d="M28 56 C 34 40, 44 30, 55 24 C 52 38, 42 50, 28 56 Z" />
-      <path className="kw-leaf" d="M28 40 C 31 26, 37 16, 45 6 C 45 20, 38 32, 28 40 Z" />
-    </svg>
+    <KawayanMark />
+    <span aria-hidden="true">Kawayan</span>
   </span>
 );
 

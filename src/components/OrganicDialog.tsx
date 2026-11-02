@@ -93,19 +93,20 @@ const OrganicDialogModal: React.FC<{
     >
       <div
         ref={sheetRef}
-        className="kw-sheet p-6 sm:p-7 max-w-md w-full"
+        className="kw-sheet max-w-md w-full overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="p-6">
         <h2
           id="organic-dialog-title"
-          className="font-display text-lg font-semibold mb-2 leading-snug"
+          className="text-base font-semibold tracking-tight mb-1.5 leading-snug"
           style={{ color: 'var(--fg)' }}
         >
           {isPrompt ? options.message : title}
         </h2>
 
         {!isPrompt && (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap mb-6" style={{ color: 'var(--fg-muted)' }}>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--fg-muted)' }}>
             {options.message}
           </p>
         )}
@@ -127,12 +128,13 @@ const OrganicDialogModal: React.FC<{
               }
             }}
             placeholder={options.placeholder ?? 'Type here…'}
-            className="input mb-6"
+            className="input"
             aria-label={options.message}
           />
         )}
 
-        <div className="flex flex-wrap justify-end gap-2.5">
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t px-6 py-3.5" style={{ borderColor: 'var(--border)', background: 'var(--muted)' }}>
           {showCancel && (
             <button ref={cancelRef} type="button" onClick={onCancel} className="btn btn-outline">
               {options.cancelLabel ?? 'Cancel'}

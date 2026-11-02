@@ -17,6 +17,9 @@ html.a11y-high-contrast {
   --primary: #000000;
   --kw-green: #004d00;
   --kw-sage: #006600;
+  --muted: #f0f0f0;
+  --muted-fg: #1a1a1a;
+  --green-ink: #004d00;
   --glass-bg: #ffffff;
   --glass-border: #000000;
 }
@@ -33,6 +36,9 @@ html.a11y-high-contrast.dark {
   --primary: #ffffff;
   --kw-green: #90ee90;
   --kw-sage: #adffad;
+  --muted: #111111;
+  --muted-fg: #e8e8e8;
+  --green-ink: #90ee90;
   --glass-bg: #000000;
   --glass-border: #ffffff;
 }

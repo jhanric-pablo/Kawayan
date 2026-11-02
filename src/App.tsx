@@ -43,7 +43,7 @@ import {
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
 import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
-import KawayanLogo, { KAWAYAN_ICON } from './components/KawayanLogo';
+import KawayanLogo, { KawayanMark } from './components/KawayanLogo';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -711,8 +711,8 @@ const App: React.FC = () => {
               onClick={() => goTo(isLoggedIn && user ? getHomeViewForRole(user.role) : ViewState.LANDING)}
             >
               {/* Logged in, the nav pills need the room on a phone: the icon stands in for the wordmark. */}
-              {isLoggedIn && <img src={KAWAYAN_ICON} alt="" className="w-8 h-8 sm:hidden" />}
-              <KawayanLogo size={24} className={isLoggedIn ? 'hidden sm:inline-block' : ''} />
+              {isLoggedIn && <KawayanMark className="w-7 h-7 sm:hidden" />}
+              <KawayanLogo size={17} className={isLoggedIn ? 'hidden sm:inline-block' : ''} />
               {user?.role === 'admin' && (
                 <span className="badge badge-green ml-1">Admin</span>
               )}
@@ -794,7 +794,7 @@ const App: React.FC = () => {
         <footer className="mt-auto py-7 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
           <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <KawayanLogo size={24} />
+              <KawayanLogo size={17} />
               <span className="text-xs" style={{ color: 'var(--fg-subtle)' }}>© 2025 Built for Philippine MSMEs</span>
             </div>
             <div className="flex items-center gap-5 text-xs" style={{ color: 'var(--fg-muted)' }}>

@@ -84,7 +84,7 @@ const LandingNav: React.FC<Props> = ({ onNavigate, darkMode, toggleTheme }) => {
         <div className="lnav__inner">
           <button type="button" className="lnav__brand" onClick={toTop} aria-label="Kawayan — back to top">
             {/* Light letters over the dark hero, normal ones once the bar turns light on scroll */}
-            <KawayanLogo size={26} onDark={!scrolled} />
+            <KawayanLogo size={17} onDark={!scrolled} />
           </button>
 
           <div className="lnav__links">
