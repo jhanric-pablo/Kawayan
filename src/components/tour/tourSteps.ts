@@ -16,13 +16,15 @@ export interface TourStep {
   /** A practical hint, shown in its own line. */
   tip?: string;
   icon: LucideIcon;
+  /** false: skipped on phones (< 768px), where the sidebar is a drawer. Default true. */
+  phone?: boolean;
 }
 
 /**
  * The walkthrough, in the order someone would use Kawayan: the calendar, making posts,
  * keeping track, then the account pages. Every anchor is on the calendar screen or the app
  * frame around it, so the tour never changes pages. A step whose anchor isn't on screen
- * (for example the tray on a phone) is skipped.
+ * or isn't visible (collapsed sidebar, phone drawer) is skipped.
  */
 export const TOUR_STEPS: TourStep[] = [
   {
@@ -53,6 +55,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'month-nav',
+    phone: false,
     chapter: 'Your calendar',
     title: 'Move between months',
     body: 'Use the arrows to go back or ahead a month. When you’re on another month, the middle button reads “Back to today” and brings you home.',
@@ -61,6 +64,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'up-next',
+    phone: false,
     chapter: 'Your calendar',
     title: 'What needs you next',
     body: 'Today’s post, drafts to review this week, and anything that failed to publish. Click one to open it.',
@@ -97,6 +101,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'posts-used',
+    phone: false,
     chapter: 'Stay on top',
     title: 'Your posts this month',
     body: 'How many of your monthly posts you’ve used. It resets on the 1st. Free gives you 8 a month and Pro gives you 16; extra posts are ₱150 each.',
@@ -106,6 +111,7 @@ export const TOUR_STEPS: TourStep[] = [
   // ── Your account ──
   {
     anchor: 'nav-insights',
+    phone: false,
     chapter: 'Your account',
     title: 'See what’s working',
     body: 'Followers, reach and engagement against the period before, your best posts, and up to three posts side by side. Download your numbers any time.',
@@ -113,6 +119,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'nav-social',
+    phone: false,
     chapter: 'Your account',
     title: 'Connect your pages',
     body: 'Link one Facebook Page and one Instagram Business or Creator account. After that, Kawayan posts for you at the times you pick.',
@@ -120,6 +127,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'nav-billing',
+    phone: false,
     chapter: 'Your account',
     title: 'Plan and wallet',
     body: 'Upgrade to Pro, or top up your wallet with GCash, Maya or a card through PayMongo, for extra posts.',
@@ -127,6 +135,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'nav-settings',
+    phone: false,
     chapter: 'Your account',
     title: 'Make it sound like you',
     body: 'Change your brand voice, audience and themes; Kawayan uses them in every caption. Light or dark mode lives here too, and so does this tour.',
@@ -134,10 +143,11 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     anchor: 'help-button',
+    phone: false,
     chapter: 'Your account',
     title: 'Help is one click away',
     body: 'Ask the AI assistant, send a ticket, or request a call with a real person.',
-    tip: 'Press ⌘K (Ctrl+K on Windows) from anywhere.',
+    tip: 'Or press ⌘/ (Ctrl+/ on Windows) from anywhere.',
     icon: MessageSquare,
   },
 

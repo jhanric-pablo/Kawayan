@@ -613,3 +613,19 @@ already allowed it): it opens prefilled with any saved profile, shows the steppe
 still in progress, and saving returns to the verification screen. Calendar, generation and billing
 stay closed. Live updates, the approval celebration and the redirect are unchanged; rejected and
 first-submission flows keep their upload form.
+
+**6 — Product tour fixed (kept SpotlightTour; fewer moving parts than adding driver.js).** Bugs
+found: (a) hidden anchors (quota card when the sidebar is collapsed, anything behind the phone
+drawer) counted as present, so the card sat at 0,0; (b) the Help step pointed at `help-button`,
+which no longer rendered once Help desk became a nav item, so it was always skipped; (c) position was
+re-measured once 320 ms after scrolling, so long smooth scrolls and the sidebar animation left it
+misplaced; (d) no re-measure on layout shifts; (e) the phone used the desktop card and every step,
+and "Take the tour" from the phone drawer left the drawer open (its modal aria-hidden hid the page);
+(f) "X of Y" instead of "Step X of Y", long point lists; (g) the Help tip said ⌘K (now search).
+Fixes: anchors must be laid out and visible; the spotlight and card follow the target every frame
+(rAF, transform only) and a step whose target disappears mid-tour is skipped; targets are scrolled
+into view smoothly (instantly with reduced motion; no gliding then); phones get a bottom sheet and 7
+steps (`phone: false` on the sidebar-only steps) and the drawer closes when the tour opens; card is
+"Step X of Y", title, body (+ a tip on desktop), Back / Next / Skip, Esc, focus trapped. First run,
+"Take the tour" and saving completion unchanged. Also: verification card no longer overflows on
+phones, and the phone top bar shows one logo (the wordmark's `hidden` was overridden by `.kw-logo`).

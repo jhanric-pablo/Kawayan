@@ -553,7 +553,7 @@ const App: React.FC = () => {
     { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
     { id: ViewState.SOCIAL, label: 'Channels', icon: Share2, roles: ['user'], group: 'Account', tour: 'nav-social' },
     { id: ViewState.BILLING, label: 'Plan and billing', icon: CreditCard, roles: ['user'], group: 'Account', tour: 'nav-billing' },
-    { id: ViewState.HELP, label: 'Help desk', icon: LifeBuoy, roles: ['user'], group: 'Account' },
+    { id: ViewState.HELP, label: 'Help desk', icon: LifeBuoy, roles: ['user'], group: 'Account', tour: 'help-button' },
   ].filter((item) => item.roles.includes(user?.role || ''));
 
   // A 'user' account that isn't verified yet must stay on the verification
@@ -823,7 +823,7 @@ const App: React.FC = () => {
             >
               {/* Logged in, the nav pills need the room on a phone: the icon stands in for the wordmark. */}
               {isLoggedIn && <KawayanMark className="w-7 h-7 sm:hidden" />}
-              <KawayanLogo size={17} className={isLoggedIn ? 'hidden sm:inline-block' : ''} />
+              <span className={isLoggedIn ? 'hidden sm:inline-flex' : 'inline-flex'}><KawayanLogo size={17} /></span>
               {user?.role === 'admin' && (
                 <span className="badge badge-green ml-1">Admin</span>
               )}

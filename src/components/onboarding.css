@@ -728,3 +728,8 @@ button.vs-wait__c:active { transform: scale(0.99); }
 .vs-wait__c.is-primary > svg:first-child { color: var(--green-ink); }
 .vs-wait__c.is-locked { background: var(--muted); border-style: dashed; }
 .vs-wait__c.is-locked b, .vs-wait__c.is-locked > svg { color: var(--fg-muted); }
+.vs-split > * { min-width: 0; }
+.vs-status .vs-file { flex-wrap: wrap; }
+.vs-status .vs-file__meta { min-width: 0; flex: 1 1 10rem; }
+.vs-status .vs-file__name { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .vs-status { padding: 18px; } .vs-steps__s { font-size: var(--text-xs); gap: 6px; } }

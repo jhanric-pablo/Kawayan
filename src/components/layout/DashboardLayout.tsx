@@ -10,6 +10,7 @@ import { SubscriptionTier, countPostsInMonth, getBatchLimitForSubscription } fro
 import { HELP_EVENT } from '../../utils/usePhone';
 import { Sidebar, SidebarProvider, useSidebar } from '../ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TOUR_OPEN_EVENT } from '../tour/SpotlightTour';
 import { MOD_KEY, SideTip, SideToggle, SidebarBridge, useSideOpen } from './shellSidebar';
 import {
   FEED_EVENT, PLATFORM_LABEL, PostChannels, WorkspaceFeed, failedPostsKey, postChannelsKey, readStored,
@@ -253,6 +254,11 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   // The sidebar context lives inside the provider; this keeps a handle for closing the phone drawer.
   const sidebarRef = useRef<ReturnType<typeof useSidebar> | null>(null);
   const setDrawerOpen = (open: boolean) => sidebarRef.current?.setOpenMobile(open);
+  useEffect(() => {
+    const close = () => sidebarRef.current?.setOpenMobile(false);
+    window.addEventListener(TOUR_OPEN_EVENT, close);
+    return () => window.removeEventListener(TOUR_OPEN_EVENT, close);
+  }, []);
 
   const reconnect = () => socialService.connect(expired[0].platform).catch((e: any) => toast.error(e.message));
   const navButton = (item: NavItem) => ({
