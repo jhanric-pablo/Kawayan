@@ -64,7 +64,7 @@
   border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 14px 14px 0 0;
 }
-.kw-crumb { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--fg-muted); }
+.kw-crumb { align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--fg-muted); }
 .kw-crumb b { color: var(--fg); font-weight: 500; }
 .kw-vr { width: 1px; height: 18px; background: var(--border); flex: none; }
 .kw-icon-btn {
@@ -141,4 +141,27 @@
 body:has(.in-tray, .kw-savebar) .kw-toasts { translate: 0 -4.25rem; }
 @media (prefers-reduced-motion: reduce) {
   .am__menu, .kw-drawer__panel { animation: none; }
+}
+
+/* ── Staff console (admin, support): the same frame with a near-black sidebar ── */
+.kw-shell--staff { background: #0a0a0a; }
+.kw-side--staff {
+  --fg: #fafafa; --fg-muted: #a1a1aa; --fg-subtle: #a1a1aa; --card: #1b1b1f; --bg: #0a0a0a; --muted: #1b1b1f; --bg-alt: #1b1b1f;
+  --border: #27272a; --border-strong: #3f3f46; --green-ink: #5fd39a; --shadow-xs: none;
+  background: #0a0a0a; color: #fafafa;
+}
+.kw-side--staff .kw-side__biz:hover,
+.kw-side--staff .kw-side__item:hover,
+.kw-side--staff .am--side .am__btn:hover,
+.kw-side--staff .am--side .am__btn[aria-expanded='true'] { background: rgba(255, 255, 255, 0.06); }
+.kw-side--staff .kw-side__item[aria-current='page'] { background: #1b1b1f; border-color: #27272a; box-shadow: none; }
+.kw-side--staff .kw-side__item[aria-current='page'] svg { color: #5fd39a; }
+.kw-side--staff .kw-side__logo { background: #1b1b1f; border-color: #27272a; }
+.kw-side--staff .adm-nav__count { background: #1b1b1f; color: #fafafa; border: 1px solid #27272a; }
+.kw-side--staff .kw-side__quota { background: #111113; }
+/* The inset keeps the page's own theme */
+.kw-shell--staff .kw-inset { border-color: #27272a; }
+@media (max-width: 767px) {
+  .adm-side { display: none; }
+  .kw-shell--staff { background: var(--bg); }
 }

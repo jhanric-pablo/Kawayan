@@ -22,7 +22,7 @@ const SNOOZES = [{ label: '1 hour', h: 1 }, { label: '4 hours', h: 4 }, { label:
 
 const isSnoozed = (t: Ticket) => !!t.snoozedUntil && new Date(t.snoozedUntil) > new Date() && t.status !== 'Resolved';
 const statusOf = (t: Ticket): StatusTab => (t.status === 'Resolved' ? 'resolved' : isSnoozed(t) ? 'snoozed' : t.status === 'Pending' ? 'waiting' : 'open');
-const DOT: Record<StatusTab, string> = { open: 'bg-(--primary)', waiting: 'bg-amber-500', snoozed: 'bg-sky-500', resolved: 'bg-(--border-strong)' };
+const DOT: Record<StatusTab, string> = { open: 'bg-(--primary)', waiting: 'bg-(--amber)', snoozed: 'bg-sky-500', resolved: 'bg-(--border-strong)' };
 const owner = (t: Ticket) => t.ownerName || t.userEmail.split('@')[0];
 const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 const mins = (ms: number) => Math.round(ms / 60000);
@@ -236,7 +236,7 @@ const SupportDashboard: React.FC = () => {
           {/* ── List ── */}
           <section className={clsx('flex min-h-0 flex-col border-r border-(--border)', selected && 'max-md:hidden')} aria-label="Conversations">
             <div className="flex items-center gap-2 px-3.5 pb-2 pt-3.5">
-              <h1 className="text-base font-bold">Inbox</h1>
+              <h1 className="text-base font-semibold">Inbox</h1>
               <div className="ml-auto flex items-center gap-1.5 rounded-md border border-(--border) bg-(--bg) px-2">
                 <Search className="h-3.5 w-3.5 text-(--fg-subtle)" aria-hidden />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search conversations" className="h-7 w-28 bg-transparent text-[13px] outline-none" />
@@ -271,7 +271,7 @@ const SupportDashboard: React.FC = () => {
                       onClick={() => setSelectedId(t.id)}
                       className={clsx('relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5 border-b border-(--border) px-3.5 py-3 text-left transition-colors', t.id === selectedId ? 'bg-(--bg)' : 'hover:bg-(--bg)')}
                     >
-                      {t.id === selectedId && <span className="absolute inset-y-0 left-0 w-0.5 bg-(--primary)" aria-hidden />}
+                      {t.id === selectedId && <span className="absolute inset-y-0 left-0 w-0.5 bg-(--green)" aria-hidden />}
                       <i className={clsx('h-2 w-2 rounded-full', DOT[statusOf(t)])} aria-hidden />
                       <span className="truncate font-semibold">{owner(t)}</span>
                       <span className="text-xs tabular-nums text-(--fg-subtle)">{ago(t.updatedAt || t.createdAt)}</span>
@@ -279,7 +279,7 @@ const SupportDashboard: React.FC = () => {
                       <span className="col-start-2 col-end-4 flex flex-wrap gap-x-2.5 text-xs text-(--fg-subtle)">
                         <span>#{t.ticketNum}</span>
                         {(t.priority === 'High' || t.priority === 'Critical') && <span className="text-(--fg-muted)">{t.priority}</span>}
-                        {calls.some((c) => c.user_id === t.userId) && <span className="font-semibold text-(--primary)">Waiting on a call</span>}
+                        {calls.some((c) => c.user_id === t.userId) && <span className="font-medium text-(--green-ink)">Waiting on a call</span>}
                         {d && <span className={clsx(d.late && 'font-semibold text-(--danger)')}>{d.text}</span>}
                         {!t.assigneeId && scope !== 'unassigned' && <span>Unassigned</span>}
                       </span>
@@ -303,7 +303,7 @@ const SupportDashboard: React.FC = () => {
                   <button type="button" className="sp-ib md:hidden" onClick={() => setSelectedId(null)} aria-label="Back to list"><X aria-hidden /></button>
                   <span className="sp-av" aria-hidden>{initials(owner(selected))}</span>
                   <div className="min-w-[14rem] flex-1 leading-tight">
-                    <p className="truncate text-[14.5px] font-bold">{selected.subject}</p>
+                    <p className="truncate text-[14.5px] font-semibold">{selected.subject}</p>
                     <p className="truncate text-xs text-(--fg-subtle)">{owner(selected)} · #{selected.ticketNum} · opened {ago(selected.createdAt)}{selected.status !== 'Resolved' && due ? ` · ${due.text}` : ''}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -323,7 +323,7 @@ const SupportDashboard: React.FC = () => {
                           <Clock className="h-4 w-4" aria-hidden /> {isSnoozed(selected) ? 'Snoozed' : 'Snooze'}
                         </button>
                         {snoozeOpen && (
-                          <div className="absolute right-0 top-[calc(100%+4px)] z-10 grid w-40 rounded-lg border border-(--border-strong) bg-(--card) p-1 shadow-lg" role="menu">
+                          <div className="absolute right-0 top-[calc(100%+4px)] z-10 grid w-40 rounded-xl border border-(--border) bg-(--card) p-1 shadow-lg" role="menu">
                             {SNOOZES.map((s) => (
                               <button key={s.h} type="button" role="menuitem" className="rounded-md px-2.5 py-1.5 text-left hover:bg-(--bg-alt)" onClick={() => { setSnoozeOpen(false); update({ snoozeHours: s.h }); }}>{s.label}</button>
                             ))}
@@ -332,7 +332,7 @@ const SupportDashboard: React.FC = () => {
                         )}
                       </div>
                     )}
-                    <button type="button" className={clsx('btn btn-sm', selected.status === 'Resolved' ? 'btn-glass' : 'btn-primary')} onClick={() => update({ status: selected.status === 'Resolved' ? 'Open' : 'Resolved' })} title="E">
+                    <button type="button" className={clsx('btn btn-sm', selected.status === 'Resolved' ? 'btn-outline' : 'btn-primary')} onClick={() => update({ status: selected.status === 'Resolved' ? 'Open' : 'Resolved' })} title="E">
                       {selected.status === 'Resolved' ? 'Reopen' : <><Check className="h-4 w-4" aria-hidden /> Resolve</>}
                     </button>
                   </div>
@@ -365,7 +365,7 @@ const SupportDashboard: React.FC = () => {
           {selected && (
             <aside className="hidden min-h-0 overflow-y-auto border-l border-(--border) xl:block" aria-label="Details">
               <details className="border-b border-(--border)" open>
-                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Ticket</summary>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-(--fg-muted)">Ticket</summary>
                 <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 px-4 pb-4">
                   <dt className="text-(--fg-subtle)">Status</dt>
                   <dd className="flex items-center gap-1.5"><i className={clsx('h-1.5 w-1.5 rounded-full', DOT[statusOf(selected)])} aria-hidden />{{ open: 'Open', waiting: 'Waiting on owner', snoozed: 'Snoozed', resolved: 'Resolved' }[statusOf(selected)]}</dd>
@@ -381,7 +381,7 @@ const SupportDashboard: React.FC = () => {
                     {selected.assigneeId === me?.id ? (
                       <button type="button" className="ml-auto text-xs font-semibold text-(--fg-subtle) hover:text-(--fg)" onClick={() => update({ assignee: 'none' })}>Unassign</button>
                     ) : (
-                      <button type="button" className="ml-auto text-xs font-semibold text-(--primary) hover:underline" onClick={() => update({ assignee: 'me' })}>Take it</button>
+                      <button type="button" className="ml-auto min-h-8 text-xs font-medium text-(--fg) underline underline-offset-2 hover:text-(--green-ink)" onClick={() => update({ assignee: 'me' })}>Take it</button>
                     )}
                   </dd>
                   <dt className="text-(--fg-subtle)">Category</dt><dd>{selected.category}</dd>
@@ -403,7 +403,7 @@ const SupportDashboard: React.FC = () => {
                 </dl>
               </details>
               <details className="border-b border-(--border)" open>
-                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Business</summary>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-(--fg-muted)">Business</summary>
                 <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-2 px-4 pb-4">
                   <dt className="text-(--fg-subtle)">Name</dt><dd className="truncate">{biz?.profile?.businessName || owner(selected)}</dd>
                   <dt className="text-(--fg-subtle)">Industry</dt><dd className="truncate">{biz?.profile?.industry || '—'}</dd>
@@ -413,7 +413,7 @@ const SupportDashboard: React.FC = () => {
                 </dl>
               </details>
               <details open>
-                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Earlier tickets</summary>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-(--fg-muted)">Earlier tickets</summary>
                 <div className="grid gap-1 px-2 pb-4">
                   {earlier.length === 0 ? <p className="px-2 text-(--fg-subtle)">None</p> : earlier.map((t) => (
                     <button key={t.id} type="button" onClick={() => setSelectedId(t.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-(--bg)">
@@ -441,19 +441,19 @@ const CallsView: React.FC<{ calls: any[]; history: any[]; tickets: Ticket[]; onJ
   const nameOf = (userId: string, email: string) => tickets.find((t) => t.userId === userId)?.ownerName || email.split('@')[0];
   return (
     <div className="min-h-0 overflow-y-auto p-5 lg:p-7">
-      <h1 className="text-lg font-bold">Calls</h1>
+      <h1 className="text-lg font-semibold">Calls</h1>
       <p className="mt-0.5 text-(--fg-muted)">Owners waiting for someone to join, and past calls.</p>
-      <h2 className="mt-6 text-xs font-bold text-(--fg-muted)">Waiting now</h2>
+      <h2 className="mt-6 text-xs font-semibold text-(--fg-muted)">Waiting now</h2>
       <div className="mt-2 grid gap-2">
         {calls.length === 0 ? <p className="rounded-lg border border-dashed border-(--border) p-4 text-(--fg-subtle)">Nobody is waiting.</p> : calls.map((c) => (
-          <div key={c.user_id} className="flex items-center gap-3 rounded-xl border border-(--primary) bg-(--bg) p-3 shadow-[0_0_0_3px_var(--ring)]">
+          <div key={c.user_id} className="flex items-center gap-3 rounded-xl border border-(--green) bg-(--card) p-3 shadow-[0_0_0_1px_var(--green)]">
             <span className="sp-av" aria-hidden>{initials(nameOf(c.user_id, c.user_email))}</span>
             <div className="min-w-0 flex-1"><b className="block font-semibold">{nameOf(c.user_id, c.user_email)}</b><span className="block truncate text-(--fg-muted)">{c.reason || 'Support call'} · waiting {ago(c.started_at)}</span></div>
             <button type="button" className="btn btn-primary btn-sm" onClick={() => onJoin(c)}><PhoneCall className="h-4 w-4" aria-hidden /> Join</button>
           </div>
         ))}
       </div>
-      <h2 className="mt-7 text-xs font-bold text-(--fg-muted)">Past calls</h2>
+      <h2 className="mt-7 text-xs font-semibold text-(--fg-muted)">Past calls</h2>
       <div className="mt-2 overflow-x-auto rounded-xl border border-(--border)">
         <table className="w-full min-w-[34rem] text-left">
           <thead className="text-xs text-(--fg-subtle)"><tr><th className="px-3 py-2 font-semibold">Who</th><th className="px-3 py-2 font-semibold">About</th><th className="px-3 py-2 font-semibold">When</th><th className="px-3 py-2 text-right font-semibold">Length</th></tr></thead>
@@ -502,13 +502,13 @@ const ReportsView: React.FC<{ tickets: Ticket[] }> = ({ tickets }) => {
   ];
   return (
     <div className="min-h-0 overflow-y-auto p-5 lg:p-7">
-      <h1 className="text-lg font-bold">Reports</h1>
+      <h1 className="text-lg font-semibold">Reports</h1>
       <p className="mt-0.5 text-(--fg-muted)">All tickets so far. Reply targets: Critical 15m, High 1h, Medium 4h, Low 1 day.</p>
       <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-xl border border-(--border) lg:grid-cols-4">
         {kpis.map((k, i) => (
           <div key={k.label} className={clsx('p-4', i > 0 && 'border-l border-(--border)', i === 2 && 'max-lg:border-l-0 max-lg:border-t', i === 3 && 'max-lg:border-t')}>
             <p className="text-xs font-semibold text-(--fg-muted)">{k.label}</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{k.value}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{k.value}</p>
             <p className={clsx('text-xs', k.bad ? 'font-semibold text-(--danger)' : 'text-(--fg-subtle)')}>{k.sub}</p>
           </div>
         ))}
@@ -520,7 +520,7 @@ const ReportsView: React.FC<{ tickets: Ticket[] }> = ({ tickets }) => {
             {r.days.map((x) => (
               <div key={x.d.toISOString()} className="flex flex-1 flex-col items-center gap-1" title={`${x.d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}: ${x.n}`}>
                 <span className="text-[10px] tabular-nums text-(--fg-subtle)">{x.n || ''}</span>
-                <div className="w-full rounded-t-sm bg-(--primary)" style={{ height: `${Math.max(2, (x.n / r.max) * 100)}px`, opacity: x.n ? 1 : 0.2 }} />
+                <div className="w-full rounded-t-sm bg-(--green)" style={{ height: `${Math.max(2, (x.n / r.max) * 100)}px`, opacity: x.n ? 1 : 0.2 }} />
               </div>
             ))}
           </div>
@@ -532,7 +532,7 @@ const ReportsView: React.FC<{ tickets: Ticket[] }> = ({ tickets }) => {
             {r.byCat.map(({ c, n }) => (
               <div key={c}>
                 <div className="flex justify-between text-[13px]"><span>{c}</span><span className="tabular-nums text-(--fg-muted)">{n}</span></div>
-                <div className="mt-1 h-1.5 rounded-full bg-(--bg-alt)"><div className="h-full rounded-full bg-(--primary)" style={{ width: `${tickets.length ? (n / tickets.length) * 100 : 0}%` }} /></div>
+                <div className="mt-1 h-1.5 rounded-full bg-(--bg-alt)"><div className="h-full rounded-full bg-(--green)" style={{ width: `${tickets.length ? (n / tickets.length) * 100 : 0}%` }} /></div>
               </div>
             ))}
           </div>
@@ -567,13 +567,13 @@ const RepliesView: React.FC<{ replies: CannedReply[]; onChange: (r: CannedReply[
   return (
     <div className="grid min-h-0 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-7">
       <div>
-        <h1 className="text-lg font-bold">Saved replies</h1>
+        <h1 className="text-lg font-semibold">Saved replies</h1>
         <p className="mt-0.5 text-(--fg-muted)">Type <kbd className="rounded border border-(--border-strong) px-1 text-xs">/</kbd> and the shortcut in any reply to insert one.</p>
         <div className="mt-5 grid overflow-hidden rounded-xl border border-(--border)">
           {replies.length === 0 ? <p className="p-4 text-(--fg-subtle)">No saved replies yet. If the list stays empty, run the support SQL in Supabase first.</p> : replies.map((r, i) => (
             <div key={r.id} className={clsx('grid gap-1 p-4', i > 0 && 'border-t border-(--border)')}>
               <div className="flex items-center gap-2">
-                <code className="text-xs font-semibold text-(--primary)">/{r.shortcut}</code>
+                <code className="mono text-xs font-medium text-(--fg)">/{r.shortcut}</code>
                 <b className="font-semibold">{r.title}</b>
                 <button type="button" className="ml-auto text-xs font-semibold text-(--fg-subtle) hover:text-(--fg)" onClick={() => setForm(r)}>Edit</button>
                 <button type="button" className="text-xs font-semibold text-(--fg-subtle) hover:text-(--danger)" onClick={() => remove(r.id)}>Delete</button>

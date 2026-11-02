@@ -111,16 +111,16 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Legal pages (`LegalPage` privacy + terms)
 
 ### Staff
-- [ ] Admin console shell (near-black sidebar)
-- [ ] Admin › Overview
-- [ ] Admin › Users
-- [ ] Admin › Verification (`admin/AdminVerification`)
-- [ ] Admin › Billing (payments to verify)
-- [ ] Admin › Help desk
-- [ ] Admin › Audit logs
-- [ ] Admin › Settings ("Allow registrations")
-- [ ] Support inbox (`SupportDashboard`, `support.css`)
-- [ ] Call window (`support/CallWindow`, `callWindow.css`)
+- [x] Admin console shell (near-black sidebar)
+- [x] Admin › Overview
+- [x] Admin › Users
+- [x] Admin › Verification (`admin/AdminVerification`)
+- [x] Admin › Billing (payments to verify)
+- [x] Admin › Help desk
+- [x] Admin › Audit logs
+- [x] Admin › Settings ("Allow registrations")
+- [x] Support inbox (`SupportDashboard`, `support.css`)
+- [x] Call window (`support/CallWindow`, `callWindow.css`)
 
 ### Final pass
 - [ ] Dark mode on every screen
@@ -234,3 +234,17 @@ Removed: the pinned/parallax hero scroll effect and mouse parallax (decorative m
 Check: header links/active section, phone menu, theme toggle, hero CTAs, FAQ open/close, pricing
 buttons → sign up, footer Privacy/Terms/staff lock, reduced motion.
 Left: unused old landing CSS is cleaned up in step 9.
+
+**Step 8 — staff.** The admin console uses the same sidebar-inset frame as the owner app with the
+mockup's near-black sidebar (grouped menu with counts, health card, account button at the bottom
+opening upward) and a top bar (breadcrumb, search, theme toggle). The support role's shell gets the
+same near-black sidebar. KPI tiles follow the mockup's stat cards (revenue tile inverted), tables use
+sentence-case headers, mono numbers/money, muted row hover; segments look like the mockup tabs.
+Verification queue: green rail on the selected submission, status tags as badges. Support inbox:
+green only for "waiting on a call" and resolve. Call window: neutral near-black, mono timer, opens
+with a short scale-in instead of animating width/height.
+Check: every admin tab (Users edit/delete dialogs, Billing approve, Help desk, Audit logs filter,
+Settings › Allow registrations / Maintenance), verification approve/reject, support inbox reply,
+internal note, call join/leave/expand/dock.
+Left: on phones the admin console keeps its horizontal tab row (no drawer) — it already works and
+needs no new state.

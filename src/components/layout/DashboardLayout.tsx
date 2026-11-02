@@ -332,13 +332,13 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   );
 
   return (
-    <div className={clsx('kw-shell', narrow && 'is-collapsed')}>
-      {!phone && <aside className="kw-side">{sidebar}</aside>}
+    <div className={clsx('kw-shell', narrow && 'is-collapsed', !isUser && 'kw-shell--staff')}>
+      {!phone && <aside className={clsx('kw-side', !isUser && 'kw-side--staff')}>{sidebar}</aside>}
 
       {phone && drawerOpen && (
         <div className="kw-drawer" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="kw-drawer__scrim" onClick={() => setDrawerOpen(false)} aria-hidden />
-          <aside className="kw-side kw-drawer__panel" ref={drawerRef}>
+          <aside className={clsx('kw-side kw-drawer__panel', !isUser && 'kw-side--staff')} ref={drawerRef}>
             <button type="button" className="kw-drawer__close" onClick={() => setDrawerOpen(false)} aria-label="Close menu">
               <X className="h-4 w-4" aria-hidden />
             </button>
@@ -359,7 +359,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
             <PanelLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
           <span className="kw-vr" aria-hidden />
-          <nav aria-label="Breadcrumb" className="kw-crumb min-w-0">
+          <nav aria-label="Breadcrumb" className="kw-crumb flex min-w-0">
             <span className="hidden truncate sm:inline">{isUser ? 'Workspace' : user.role === 'support' ? 'Support' : 'Kawayan'}</span>
             <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 sm:inline" aria-hidden />
             <b className="truncate" aria-current="page">{current?.label}</b>

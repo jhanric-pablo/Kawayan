@@ -19,13 +19,13 @@ interface Props {
 }
 
 const TAG: Record<string, string> = {
-  pending: 'border-amber-300/70 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300',
-  verified: 'border-(--badge-border) bg-(--badge-bg) text-(--badge-text)',
-  rejected: 'border-red-300/70 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300',
+  pending: 'border-transparent bg-(--amber-soft) text-(--amber)',
+  verified: 'border-transparent bg-(--green-soft) text-(--green-ink)',
+  rejected: 'border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_7%,var(--card))] text-(--danger)',
 };
 
 const StatusTag: React.FC<{ status: string }> = ({ status }) => (
-  <span className={clsx('inline-flex shrink-0 rounded-full border px-2 text-xs font-semibold capitalize leading-5', TAG[status] ?? TAG.pending)}>{status}</span>
+  <span className={clsx('inline-flex h-[22px] shrink-0 items-center rounded-full border px-2 text-xs font-medium capitalize', TAG[status] ?? TAG.pending)}>{status}</span>
 );
 
 const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -118,7 +118,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 rounded-xl border border-(--border) bg-(--bg-alt) px-3 focus-within:border-(--primary)">
+          <label className="flex items-center gap-2 rounded-xl border border-(--border) bg-(--bg-alt) px-3 focus-within:border-(--green)">
             <Search className="h-3.5 w-3.5 shrink-0 text-(--fg-subtle)" aria-hidden />
             <input
               value={query}
@@ -143,7 +143,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
                   aria-current={v.id === selectedId || undefined}
                   className={clsx(
                     'block w-full px-4 py-3 text-left hover:bg-(--bg-alt)',
-                    v.id === selectedId && 'bg-(--bg-alt) shadow-[inset_2px_0_0_var(--primary)]',
+                    v.id === selectedId && 'bg-(--bg-alt) shadow-[inset_2px_0_0_var(--green)]',
                   )}
                 >
                   <span className="flex items-center gap-2">
@@ -172,7 +172,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
           <>
             <header className="flex items-start gap-3 border-b border-(--border) px-5 py-4">
               <div className="min-w-0 flex-1">
-                <h2 className="truncate font-display text-base font-bold">{selected.businessName || 'Unnamed business'}</h2>
+                <h2 className="truncate font-display text-base font-semibold">{selected.businessName || 'Unnamed business'}</h2>
                 <p className="truncate font-mono text-xs text-(--fg-muted)">{selected.email}</p>
               </div>
               <StatusTag status={selected.status} />
@@ -198,7 +198,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
             </dl>
 
             {selected.status === 'rejected' && selected.rejectionReason && (
-              <p className="border-b border-(--border) bg-red-50 px-4 py-2 text-xs text-red-800 dark:bg-red-950/30 dark:text-red-200">
+              <p className="border-b border-(--border) bg-[color-mix(in_srgb,var(--danger)_7%,var(--card))] px-4 py-2 text-xs text-(--danger)">
                 <b className="font-semibold">Rejection reason:</b> {selected.rejectionReason}
               </p>
             )}

@@ -19,7 +19,7 @@ import AccountMenu from './AccountMenu';
 import AdminVerification, { VerifFilter } from './admin/AdminVerification';
 import { parseUtc, timeAgo } from '../utils/adminJobs';
 import './admin/adminConsole.css';
-import KawayanLogo from './KawayanLogo';
+import { KawayanMark } from './KawayanLogo';
 
 interface Props {
   darkMode: boolean;
@@ -93,7 +93,7 @@ const AdminModal: React.FC<{ title: string; sub?: string; onClose: () => void; c
   <Dialog open onOpenChange={(open) => !open && onClose()}>
     <DialogContent className="gap-0 rounded-2xl p-0 sm:max-w-md">
       <DialogHeader className="gap-0.5 border-b border-border px-5 py-4 pr-12">
-        <DialogTitle className="font-bold">{title}</DialogTitle>
+        <DialogTitle className="font-semibold">{title}</DialogTitle>
         {sub && <DialogDescription className="truncate text-xs">{sub}</DialogDescription>}
       </DialogHeader>
       <div className="p-5">{children}</div>
@@ -111,7 +111,7 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => (
 
 const PlanBadge: React.FC<{ plan?: string }> = ({ plan = 'FREE' }) =>
   plan === 'FREE' ? (
-    <span className="inline-flex rounded-full border border-(--border-strong) px-2.5 text-xs font-bold leading-5 text-(--fg-muted)">Free</span>
+    <span className="inline-flex rounded-full border border-(--border-strong) px-2.5 text-xs font-semibold leading-5 text-(--fg-muted)">Free</span>
   ) : (
     <span className="badge badge-green">{plan === 'PRO' ? 'Pro' : 'Enterprise'}</span>
   );
@@ -132,17 +132,17 @@ const axisTick = { fill: 'var(--fg-subtle)', fontSize: 11 };
 const ACTION_META: Record<string, { label: string; icon: React.ElementType; bg: string; fg: string; dot: string }> = {
   register: { label: 'Account registered', icon: UserPlus, bg: 'bg-blue-500/10', fg: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' },
   login: { label: 'Signed in', icon: LogIn, bg: 'bg-(--bg-alt)', fg: 'text-(--fg-muted)', dot: 'bg-(--fg-subtle)' },
-  submit_verification: { label: 'Document submitted', icon: Upload, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
-  resubmit_verification: { label: 'Document resubmitted', icon: Upload, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
-  approve_verification: { label: 'Verification approved', icon: CheckCircle, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  reject_verification: { label: 'Verification rejected', icon: XCircle, bg: 'bg-red-500/10', fg: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
+  submit_verification: { label: 'Document submitted', icon: Upload, bg: 'bg-(--amber)/10', fg: 'text-(--amber)', dot: 'bg-(--amber)' },
+  resubmit_verification: { label: 'Document resubmitted', icon: Upload, bg: 'bg-(--amber)/10', fg: 'text-(--amber)', dot: 'bg-(--amber)' },
+  approve_verification: { label: 'Verification approved', icon: CheckCircle, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
+  reject_verification: { label: 'Verification rejected', icon: XCircle, bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', fg: 'text-(--danger)', dot: 'bg-(--danger)' },
   delete_user: { label: 'Account deleted', icon: Trash2, bg: 'bg-rose-600/10', fg: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-600' },
-  upgrade_plan: { label: 'Plan upgraded', icon: TrendingUp, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  wallet_topup: { label: 'Wallet topped up', icon: Wallet, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  publish_post: { label: 'Post published', icon: Send, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  schedule_post: { label: 'Post scheduled', icon: CalendarClock, bg: 'bg-amber-500/10', fg: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
-  post_published: { label: 'Scheduled post went live', icon: CheckCircle, bg: 'bg-emerald-500/10', fg: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  post_failed: { label: 'Scheduled post failed', icon: AlertTriangle, bg: 'bg-red-500/10', fg: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
+  upgrade_plan: { label: 'Plan upgraded', icon: TrendingUp, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
+  wallet_topup: { label: 'Wallet topped up', icon: Wallet, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
+  publish_post: { label: 'Post published', icon: Send, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
+  schedule_post: { label: 'Post scheduled', icon: CalendarClock, bg: 'bg-(--amber)/10', fg: 'text-(--amber)', dot: 'bg-(--amber)' },
+  post_published: { label: 'Scheduled post went live', icon: CheckCircle, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
+  post_failed: { label: 'Scheduled post failed', icon: AlertTriangle, bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', fg: 'text-(--danger)', dot: 'bg-(--danger)' },
 };
 const DEFAULT_ACTION_META = { label: 'System event', icon: Activity, bg: 'bg-(--bg-alt)', fg: 'text-(--fg-muted)', dot: 'bg-(--fg-subtle)' };
 
@@ -259,7 +259,7 @@ const AdminSearch: React.FC<{ hitsFor: (q: string) => SearchHit[]; onPick: (hit:
 const SettingSwitch: React.FC<{ label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, desc, checked, onChange }) => (
   <label className="adm-setting-row cursor-pointer">
     <span>
-      <span className="block text-sm font-bold text-(--fg)">{label}</span>
+      <span className="block text-sm font-semibold text-(--fg)">{label}</span>
       <span className="block text-xs text-(--fg-muted)">{desc}</span>
     </span>
     <Switch checked={checked} onCheckedChange={onChange} />
@@ -661,29 +661,30 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const pendingTotal = pendingTxns.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   return (
-    <div className="adm flex min-h-screen bg-(--bg) text-sm text-(--fg)">
-      {/* ── Sidebar ── */}
-      <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-(--border) bg-(--card) md:flex">
-        <div className="flex h-16 shrink-0 items-center gap-2.5 px-4">
-          <div className="leading-tight">
-            <KawayanLogo size={17} />
-            <p className="mt-1 text-xs font-medium text-(--fg-muted)">Admin console</p>
-          </div>
+    <div className="adm kw-shell kw-shell--staff text-sm text-(--fg)">
+      {/* ── Sidebar (near-black staff console) ── */}
+      <aside className="kw-side kw-side--staff adm-side">
+        <div className="kw-side__biz cursor-default hover:bg-transparent!">
+          <span className="kw-side__logo" aria-hidden><KawayanMark /></span>
+          <span className="kw-side__label min-w-0 text-left">
+            <b className="block truncate">Kawayan</b>
+            <small className="block truncate">Admin console</small>
+          </span>
         </div>
-        <nav aria-label="Admin" className="flex-1 overflow-y-auto px-3 pb-4">
+        <nav aria-label="Admin" className="flex flex-col">
           {(['Workspace', 'System'] as const).map((group) => (
-            <div key={group} className="mt-3">
-              <p className="eyebrow px-2.5 pb-1.5 text-(--fg-subtle)">{group}</p>
-              <div className="space-y-0.5">
+            <div key={group}>
+              <p className="kw-side__grp">{group}</p>
+              <div className="kw-side__menu">
                 {NAV.filter((item) => item.group === group).map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setActiveTab(item.id)}
                     aria-current={activeTab === item.id ? 'page' : undefined}
-                    className="adm-nav"
+                    className="kw-side__item"
                   >
-                    <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} aria-hidden />
+                    <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.count != null && <span className="adm-nav__count">{item.count}</span>}
                   </button>
@@ -692,41 +693,52 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             </div>
           ))}
         </nav>
-        <div className="m-3 rounded-xl border border-(--border) bg-(--bg-alt) p-3 text-xs" role="status">
-          <p className="flex items-center gap-2 font-semibold">
+        <div className="kw-side__quota card text-xs" role="status">
+          <p className="flex items-center gap-2 font-medium text-(--fg)">
             <span className="relative flex h-2 w-2" aria-hidden>
               {health.status === 'ok' && <span className={cx('absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:hidden', pill.dot)} />}
               <span className={cx('relative inline-flex h-2 w-2 rounded-full', pill.dot)} />
             </span>
             {pill.label}
           </p>
-          {health.latencyMs != null && <p className="mt-1 text-(--fg-muted)">API and database · {health.latencyMs} ms</p>}
+          {health.latencyMs != null && <p className="text-(--fg-muted)">API and database · <span className="mono">{health.latencyMs} ms</span></p>}
+        </div>
+        <div className="kw-side__me">
+          <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} placement="sidebar" />
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="kw-inset">
         {/* ── Top bar ── */}
-        <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-4 border-b border-(--border) bg-(--card)/90 px-4 backdrop-blur md:px-6">
-          <nav aria-label="Breadcrumb" className="hidden shrink-0 items-center gap-1.5 text-ui text-(--fg-muted) lg:flex">
+        <header className="kw-topbar">
+          <span className="md:hidden"><KawayanMark className="h-6 w-6" /></span>
+          <nav aria-label="Breadcrumb" className="kw-crumb hidden shrink-0 lg:flex">
             <span>Admin</span>
-            <ChevronRight className="h-3.5 w-3.5 text-(--fg-subtle)" aria-hidden />
-            <span className="font-semibold text-(--fg)">{head.title}</span>
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            <b>{head.title}</b>
           </nav>
-          <div className="flex min-w-0 flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 justify-end">
             <AdminSearch hitsFor={searchHits} onPick={pickSearchHit} />
           </div>
-          <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} />
+          {toggleTheme && (
+            <button type="button" className="kw-icon-btn" onClick={toggleTheme} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {darkMode ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+            </button>
+          )}
+          <span className="md:hidden">
+            <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} />
+          </span>
         </header>
 
         {/* Phones: tabs instead of the sidebar */}
-        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto border-b border-(--border) bg-(--card) px-3 py-2 md:hidden">
+        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto border-b border-(--border) bg-(--bg) px-3 py-2 md:hidden">
           {NAV.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setActiveTab(item.id)}
               aria-current={activeTab === item.id ? 'page' : undefined}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-(--fg-muted) aria-[current=page]:bg-(--bg-alt) aria-[current=page]:font-semibold aria-[current=page]:text-(--fg)"
+              className="min-h-9 shrink-0 rounded-lg px-2.5 text-xs font-medium text-(--fg-muted) aria-[current=page]:bg-(--muted) aria-[current=page]:text-(--fg)"
             >
               {item.label}{item.count != null ? ` · ${item.count}` : ''}
             </button>
@@ -737,7 +749,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
         <div className="mx-auto w-full max-w-[1440px] min-w-0 flex-1 p-4 md:p-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="font-display text-xl font-bold tracking-tight">{head.title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">{head.title}</h1>
               <p className="mt-0.5 text-ui text-(--fg-muted)">{head.sub}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -849,7 +861,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                   className="lg:col-span-2"
                   title="Latest activity"
                   actions={
-                    <button type="button" onClick={() => setActiveTab('logs')} className="flex items-center gap-1 text-xs font-bold text-(--primary) hover:underline">
+                    <button type="button" onClick={() => setActiveTab('logs')} className="flex items-center gap-1 text-xs font-semibold text-(--primary) hover:underline">
                       View all <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                   }
@@ -888,7 +900,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                             <row.icon className="h-4 w-4" />
                           </span>
                           <span className="flex-1 text-sm font-medium">{row.label}</span>
-                          <span className={cx('rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums', row.count ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-(--bg-alt) text-(--fg-subtle)')}>
+                          <span className={cx('rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums', row.count ? 'bg-(--amber)/15 text-(--amber)' : 'bg-(--bg-alt) text-(--fg-subtle)')}>
                             {row.count}
                           </span>
                           <ChevronRight className="h-4 w-4 text-(--fg-subtle)" aria-hidden />
@@ -945,7 +957,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                       <tr key={u.id}>
                         <td>
                           <div className="flex items-center gap-3">
-                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-(--kw-green-pale) text-xs font-bold uppercase text-(--primary)">
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-(--green-soft) text-xs font-semibold uppercase text-(--primary)">
                               {(u.businessName || u.email || '?').charAt(0)}
                             </span>
                             <span className="min-w-0">
@@ -1086,7 +1098,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                 )}
                 <div className="border-t border-(--border) px-5 py-3 text-xs text-(--fg-muted)">
                   Manage each user's plan and billing cycle from the{' '}
-                  <button type="button" onClick={() => setActiveTab('users')} className="font-bold text-(--primary) hover:underline">Users</button> tab.
+                  <button type="button" onClick={() => setActiveTab('users')} className="font-semibold text-(--primary) hover:underline">Users</button> tab.
                 </div>
               </Panel>
             </div>
@@ -1226,7 +1238,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                     <span className="flex items-center gap-2.5">
                       <span className={cx('h-2.5 w-2.5 rounded-full', pill.dot)} aria-hidden />
                       <span>
-                        <span className="block text-sm font-bold">API and database</span>
+                        <span className="block text-sm font-semibold">API and database</span>
                         <span className="block text-xs text-(--fg-muted)">{pill.label}{health.latencyMs != null ? ` · ${health.latencyMs} ms` : ''}</span>
                       </span>
                     </span>
@@ -1303,7 +1315,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             <TabsContent value="balance" className="space-y-3">
               <div className="rounded-xl border border-(--border) bg-(--bg-alt) p-4 text-center">
                 <span className="eyebrow text-(--fg-subtle)">Current balance</span>
-                <p className="mt-1 font-display text-2xl font-bold">{peso(managingUser.balance)}</p>
+                <p className="mt-1 font-display text-2xl font-semibold">{peso(managingUser.balance)}</p>
               </div>
               <div>
                 <FieldLabel htmlFor="adj-amount">Amount to add (negative to subtract)</FieldLabel>
