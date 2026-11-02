@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { X, ArrowRight, ArrowLeft } from 'lucide-react';
-import StepProgress from '../auth/StepProgress';
+import { X, ArrowRight, ArrowLeft, Lightbulb, Check } from 'lucide-react';
 import { placePopover, type Rect } from '../../utils/tourPlacement';
 import { TOUR_STEPS } from './tourSteps';
 import './tour.css';
@@ -8,6 +7,9 @@ import './tour.css';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Right after brand setup: greet by name and end on "Plan my first month". */
+  firstRun?: boolean;
+  businessName?: string;
 }
 
 const GUTTER = 12;
@@ -28,7 +30,7 @@ const findAnchor = (anchor: string | null): HTMLElement | null =>
  * Steps whose anchor isn't in the DOM are skipped rather than shown floating —
  * the nav pills are role-filtered and hidden entirely for unverified users.
  */
-const SpotlightTour: React.FC<Props> = ({ open, onClose }) => {
+const SpotlightTour: React.FC<Props> = ({ open, onClose, firstRun = false, businessName }) => {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -80,7 +82,9 @@ const SpotlightTour: React.FC<Props> = ({ open, onClose }) => {
     if (!open || !current) return;
     const el = findAnchor(current.anchor);
     if (el) {
-      el.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+      // Tall things (the tray) scroll to their top, clear of the sticky top bar; the rest centre.
+      const tall = el.getBoundingClientRect().height > window.innerHeight * 0.55;
+      el.scrollIntoView({ block: tall ? 'start' : 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
     }
     measure();
     // Re-measure after the smooth scroll settles, and once the popover has its
@@ -120,9 +124,25 @@ const SpotlightTour: React.FC<Props> = ({ open, onClose }) => {
 
   if (!open || !current) return null;
 
+  // Count only the steps this screen can show (the tray is hidden on phones, for example).
+  const visible = TOUR_STEPS.map((s, i) => i).filter((i) => !TOUR_STEPS[i].anchor || findAnchor(TOUR_STEPS[i].anchor));
+  const position = Math.max(1, visible.indexOf(step) + 1);
+  const total = visible.length;
+
   const Icon = current.icon;
+  const isFirst = step === 0;
   const isLast = step === TOUR_STEPS.length - 1;
+  const title = isFirst && firstRun ? `Welcome to Kawayan${businessName ? `, ${businessName}` : ''}` : current.title;
+  const body = isFirst && firstRun
+    ? 'Your brand is set up, so every caption is written in your voice. Here’s where everything is; it takes about two minutes.'
+    : current.body;
   const cutout = rect ?? { top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0 };
+
+  const planFirstMonth = () => {
+    onClose();
+    // Open the planner the tour just pointed at.
+    window.setTimeout(() => findAnchor('plan-month')?.click(), 120);
+  };
 
   return (
     <>
@@ -132,6 +152,7 @@ const SpotlightTour: React.FC<Props> = ({ open, onClose }) => {
         style={{ top: cutout.top, left: cutout.left, width: cutout.width, height: cutout.height }}
       />
       <div
+        key={step}
         ref={popRef}
         role="dialog"
         aria-modal="true"
@@ -143,29 +164,51 @@ const SpotlightTour: React.FC<Props> = ({ open, onClose }) => {
       >
         <span className="tour-pop__arrow" aria-hidden="true" />
 
-        <span className="tour-pop__icon"><Icon className="w-4.5 h-4.5" /></span>
-        <h2 id="tour-title" className="tour-pop__title">{current.title}</h2>
-        <p className="tour-pop__body">{current.body}</p>
+        <div className="tour-pop__head">
+          <span className="tour-pop__icon"><Icon className="w-4.5 h-4.5" /></span>
+          <span className="tour-pop__chapter">{current.chapter}</span>
+          <span className="tour-pop__count">{position} of {total}</span>
+        </div>
+        <h2 id="tour-title" className="tour-pop__title">{title}</h2>
+        <p className="tour-pop__body">{body}</p>
 
-        <StepProgress steps={TOUR_STEPS.map((s) => s.name)} current={step} />
+        {current.points && (
+          <ul className="tour-pop__points">
+            {current.points.map((p) => (
+              <li key={p}><Check aria-hidden /> {p}</li>
+            ))}
+          </ul>
+        )}
+        {current.tip && (
+          <p className="tour-pop__tip"><Lightbulb aria-hidden /> {current.tip}</p>
+        )}
+
+        <div className="tour-pop__progress" role="progressbar" aria-label="Tour progress" aria-valuemin={1} aria-valuemax={total} aria-valuenow={position}>
+          <i style={{ width: `${(position / total) * 100}%` }} />
+        </div>
 
         <div className="tour-pop__actions">
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
-            <X className="w-3.5 h-3.5" />
-            {isLast ? 'Close' : 'Skip tour'}
+            {isLast ? 'Explore on my own' : <><X className="w-3.5 h-3.5" /> Skip tour</>}
           </button>
           <div className="tour-pop__right">
-            {step > 0 && (
+            {step > 0 && !isLast && (
               <button type="button" className="btn btn-outline btn-sm" onClick={() => go(-1)} aria-label="Previous step">
                 <ArrowLeft className="w-3.5 h-3.5" />
               </button>
             )}
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => (isLast ? onClose() : go(1))}>
-              {isLast ? 'Get started' : 'Next'}
-              {!isLast && <ArrowRight className="w-3.5 h-3.5" />}
-            </button>
+            {isLast ? (
+              <button type="button" className="btn btn-primary btn-sm" onClick={findAnchor('plan-month') ? planFirstMonth : onClose}>
+                {findAnchor('plan-month') ? 'Plan my first month' : 'Get started'} <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => go(1)}>
+                {isFirst ? 'Start the tour' : 'Next'} <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
+        <p className="tour-pop__keys" aria-hidden="true">← → to move · Esc to close</p>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ViewState } from '../../types';
 import { ArrowRight, Menu, X, Sun, Moon } from 'lucide-react';
+import KawayanLogo from '../KawayanLogo';
 
 interface Props {
   onNavigate: (v: ViewState) => void;
@@ -82,11 +83,8 @@ const LandingNav: React.FC<Props> = ({ onNavigate, darkMode, toggleTheme }) => {
       <nav className={`lnav${scrolled ? ' is-scrolled' : ''}${menuOpen ? ' is-menu' : ''}`}>
         <div className="lnav__inner">
           <button type="button" className="lnav__brand" onClick={toTop} aria-label="Kawayan — back to top">
-            <span className="lnav__logo">
-              <img src="/logo.png" alt="" />
-              <i className="lnav__logo-ring" aria-hidden="true" />
-            </span>
-            <span className="lnav__word">Kawayan<i>.</i></span>
+            {/* Light letters over the dark hero, normal ones once the bar turns light on scroll */}
+            <KawayanLogo size={26} onDark={!scrolled} />
           </button>
 
           <div className="lnav__links">

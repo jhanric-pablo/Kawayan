@@ -25,11 +25,11 @@ const TAG: Record<string, string> = {
 };
 
 const StatusTag: React.FC<{ status: string }> = ({ status }) => (
-  <span className={clsx('inline-flex shrink-0 rounded-full border px-2 text-[11px] font-semibold capitalize leading-5', TAG[status] ?? TAG.pending)}>{status}</span>
+  <span className={clsx('inline-flex shrink-0 rounded-full border px-2 text-xs font-semibold capitalize leading-5', TAG[status] ?? TAG.pending)}>{status}</span>
 );
 
 const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <kbd className="rounded border border-(--border-strong) px-1 font-mono text-[10px] font-semibold opacity-80">{children}</kbd>
+  <kbd className="rounded border border-(--border-strong) px-1 font-mono text-xs font-semibold opacity-80">{children}</kbd>
 );
 
 const stamp = (iso?: string) => (iso ? parseUtc(iso).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
@@ -125,7 +125,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Business, email or account ID"
               aria-label="Filter submissions"
-              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] outline-hidden placeholder:text-(--fg-subtle)"
+              className="h-9 min-w-0 flex-1 bg-transparent text-ui outline-hidden placeholder:text-(--fg-subtle)"
             />
           </label>
         </div>
@@ -150,7 +150,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{v.businessName || 'Unnamed business'}</span>
                     <StatusTag status={v.status} />
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-(--fg-muted)">
+                  <span className="mt-0.5 flex items-center gap-2 font-mono text-xs text-(--fg-muted)">
                     <span className="min-w-0 flex-1 truncate">{v.email}</span>
                     <span className="shrink-0">{v.createdAt ? timeAgo(v.createdAt) : '—'}</span>
                   </span>
@@ -159,7 +159,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
             ))
           )}
         </ul>
-        <p className="flex items-center gap-2 border-t border-(--border) px-3 py-1.5 text-[11px] text-(--fg-subtle)">
+        <p className="flex items-center gap-2 border-t border-(--border) px-3 py-1.5 text-xs text-(--fg-subtle)">
           <Kbd>↑↓</Kbd> move <Kbd>A</Kbd> approve <Kbd>R</Kbd> reject
         </p>
       </aside>
@@ -173,27 +173,27 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
             <header className="flex items-start gap-3 border-b border-(--border) px-5 py-4">
               <div className="min-w-0 flex-1">
                 <h2 className="truncate font-display text-base font-bold">{selected.businessName || 'Unnamed business'}</h2>
-                <p className="truncate font-mono text-[11px] text-(--fg-muted)">{selected.email}</p>
+                <p className="truncate font-mono text-xs text-(--fg-muted)">{selected.email}</p>
               </div>
               <StatusTag status={selected.status} />
             </header>
 
             <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-b border-(--border) px-5 py-3.5 text-xs sm:grid-cols-[96px_minmax(0,1fr)_96px_minmax(0,1fr)]">
               <dt className="text-(--fg-muted)">Account ID</dt>
-              <dd className="truncate font-mono text-[11px]">{selected.userId}</dd>
+              <dd className="truncate font-mono text-xs">{selected.userId}</dd>
               <dt className="text-(--fg-muted)">Phone</dt>
-              <dd className="font-mono text-[11px]">{selected.businessPhone || '—'}</dd>
+              <dd className="font-mono text-xs">{selected.businessPhone || '—'}</dd>
               <dt className="text-(--fg-muted)">Address</dt>
               <dd className="sm:col-span-3">{selected.businessAddress || '—'}</dd>
               <dt className="text-(--fg-muted)">Submitted</dt>
-              <dd className="font-mono text-[11px]">{stamp(selected.createdAt)}</dd>
+              <dd className="font-mono text-xs">{stamp(selected.createdAt)}</dd>
               <dt className="text-(--fg-muted)">Reviewed</dt>
-              <dd className="font-mono text-[11px]">{selected.status === 'pending' ? '—' : stamp(selected.reviewedAt)}</dd>
+              <dd className="font-mono text-xs">{selected.status === 'pending' ? '—' : stamp(selected.reviewedAt)}</dd>
               <dt className="text-(--fg-muted)">Document</dt>
               <dd className="flex min-w-0 items-center gap-1.5 sm:col-span-3">
                 <FileText className="h-3.5 w-3.5 shrink-0 text-(--fg-subtle)" aria-hidden />
-                <span className="truncate font-mono text-[11px]" title={selected.documentName}>{selected.documentName || '—'}</span>
-                <span className="rounded border border-(--border-strong) px-1 font-mono text-[10px] leading-4">{isPdf ? 'PDF' : 'IMAGE'}</span>
+                <span className="truncate font-mono text-xs" title={selected.documentName}>{selected.documentName || '—'}</span>
+                <span className="rounded border border-(--border-strong) px-1 font-mono text-xs leading-4">{isPdf ? 'PDF' : 'IMAGE'}</span>
               </dd>
             </dl>
 
@@ -222,7 +222,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
 
             {selected.status === 'pending' && (
               <footer className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t border-(--border) bg-(--card) px-5 py-3">
-                <span className="mr-auto text-[11px] text-(--fg-muted)">Approving gives the owner full access right away.</span>
+                <span className="mr-auto text-xs text-(--fg-muted)">Approving gives the owner full access right away.</span>
                 <button type="button" onClick={() => onReject(selected)} className="btn btn-danger btn-sm">
                   <X className="h-3.5 w-3.5" /> Reject <Kbd>R</Kbd>
                 </button>

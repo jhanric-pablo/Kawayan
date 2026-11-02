@@ -76,8 +76,8 @@ const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSett
       >
         <span className="am__avatar" aria-hidden>{name[0]?.toUpperCase()}</span>
         <span className="hidden min-w-0 text-left leading-tight sm:block" aria-hidden>
-          <b className="block max-w-[150px] truncate text-[12.5px] font-semibold text-(--fg)">{name}</b>
-          <span className="block text-[10.5px] text-(--fg-muted)">{roleLabel}</span>
+          <b className="block max-w-[150px] truncate text-xs font-semibold text-(--fg)">{name}</b>
+          <span className="block text-xs text-(--fg-muted)">{roleLabel}</span>
         </span>
         <ChevronDown className="am__chev" aria-hidden />
       </button>

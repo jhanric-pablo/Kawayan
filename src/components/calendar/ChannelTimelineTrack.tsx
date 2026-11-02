@@ -2,25 +2,20 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Check, ChevronLeft, ChevronRight, CircleX, Clock, Ellipsis, Layers, Linkedin, PencilLine, Plus, RefreshCw, Settings2, Unplug } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CircleX, Clock, Ellipsis, Layers, PencilLine, Plus, RefreshCw, Settings2, Unplug } from 'lucide-react';
 import clsx from 'clsx';
 import { ContentIdea, GeneratedPost } from '../../types';
 import type { SocialAccount, SocialPlatform } from '../../services/socialService';
-import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from '../SocialAccounts';
+import { FacebookGlyph, InstagramGlyph } from '../SocialAccounts';
 import type { PostChannels } from '../../utils/workspaceFeed';
 import { CardStatus, LaneId, TimelineCardItem, bucketByLane } from './mapCalendarEvents';
 import TimelinePostCard from './TimelinePostCard';
-
-const LinkedInGlyph: React.FC<{ className?: string }> = ({ className }) => (
-  <Linkedin className={className} color="#0A66C2" strokeWidth={1.75} aria-hidden />
-);
 
 const LANES: { id: LaneId; name: string; Glyph?: React.FC<{ className?: string }>; soon?: boolean }[] = [
   { id: 'plan', name: 'Drafts & ideas' },
   { id: 'facebook', name: 'Facebook', Glyph: FacebookGlyph },
   { id: 'instagram', name: 'Instagram', Glyph: InstagramGlyph },
-  { id: 'tiktok', name: 'TikTok', Glyph: TikTokGlyph, soon: true },
-  { id: 'linkedin', name: 'LinkedIn', Glyph: LinkedInGlyph, soon: true },
+  // TikTok and LinkedIn come back here once Kawayan can publish to them; empty "coming soon" rows only added noise.
 ];
 
 /** Width of one day on the track, px (compact: the planner). */
@@ -50,6 +45,7 @@ interface Props {
   onEditPost: (post: GeneratedPost) => void;
   onRetryPost?: (post: GeneratedPost) => void;
   onOpenDay: (day: number) => void;
+  /** Connect / Reconnect: opens the Social accounts tab, where the platform login starts. */
   onConnect?: (platform: SocialPlatform) => void;
   onDisconnect?: (account: SocialAccount) => void;
   onManageAccounts?: () => void;
@@ -59,6 +55,10 @@ interface Props {
   renderIdea?: (item: TimelineCardItem) => React.ReactNode;
   /** Days that get a pulsing placeholder in the ideas lane (while the AI plans). */
   ghostDays?: number[];
+  /** Drag a draft onto another day. Without it, posts can't be dragged. */
+  onMovePost?: (post: GeneratedPost, day: number) => void;
+  /** Drag an idea onto another day. */
+  onMoveIdea?: (ideaIndex: number, day: number) => void;
 }
 
 /**
@@ -68,6 +68,7 @@ interface Props {
 const ChannelTimelineTrack: React.FC<Props> = ({
   currentDate, posts, ideas, accounts, channels, failedIds, loading,
   onOpenPost, onEditPost, onRetryPost, onOpenDay, onConnect, onDisconnect, onManageAccounts, compact, renderIdea, ghostDays,
+  onMovePost, onMoveIdea,
 }) => {
   const col = compact ? COMPACT_COL : COL;
   const year = currentDate.getFullYear();
@@ -89,6 +90,26 @@ const ChannelTimelineTrack: React.FC<Props> = ({
     return () => clearInterval(id);
   }, []);
   const todayIdx = now.getFullYear() === year && now.getMonth() === month ? now.getDate() - 1 : -1;
+
+  // ── Drag to another day: drafts and ideas only; scheduled and published posts stay put ──
+  const dragItem = useRef<{ item: TimelineCardItem; fromDay: number } | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [overDay, setOverDay] = useState<number | null>(null);
+  const isPast = (day: number) => new Date(year, month, day) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const canMove = (item: TimelineCardItem) =>
+    item.post ? !!onMovePost && (item.status === 'draft' || item.status === 'failed') : item.status === 'idea' && item.ideaIndex != null && !!onMoveIdea;
+  const endDrag = () => {
+    dragItem.current = null;
+    setDragKey(null);
+    setOverDay(null);
+  };
+  const dropOn = (day: number) => {
+    const drag = dragItem.current;
+    endDrag();
+    if (!drag || drag.fromDay === day || isPast(day)) return;
+    if (drag.item.post) onMovePost?.(drag.item.post, day);
+    else if (drag.item.ideaIndex != null) onMoveIdea?.(drag.item.ideaIndex, day);
+  };
 
   const { cells, laneCount } = useMemo(
     () => bucketByLane(posts, ideas, new Date(year, month, 1), channels, accounts ?? [], failedIds),
@@ -145,7 +166,7 @@ const ChannelTimelineTrack: React.FC<Props> = ({
       <div className="relative grid w-max" style={{ gridTemplateColumns: `var(--head) repeat(${days}, ${col}px)` }}>
         {/* Corner */}
         <div style={{ gridRow: 1, gridColumn: 1 }} className={clsx('sticky left-0 z-30 flex h-12 items-center justify-between gap-1 border-b border-r border-(--border) bg-(--card)', compact ? 'px-0.5' : 'px-3')}>
-          {!compact && <span className="hidden text-[11px] font-bold uppercase tracking-[0.08em] text-(--fg-subtle) sm:inline">Channels</span>}
+          {!compact && <span className="eyebrow hidden text-(--fg-subtle) sm:inline">Channels</span>}
           <span className="flex">
             <button type="button" onClick={() => scrollWeek(-1)} aria-label="Earlier week" className="grid h-7 w-7 place-items-center rounded-md text-(--fg-muted) hover:bg-(--bg-alt) hover:text-(--fg)">
               <ChevronLeft className="h-4 w-4" strokeWidth={2} />
@@ -170,9 +191,9 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                 isToday ? 'bg-(--today-highlight) text-(--primary)' : 'text-(--fg-muted)',
               )}
             >
-              <span className="text-[11px] font-semibold uppercase tracking-wide">{date.toLocaleDateString('en-PH', { weekday: 'short' })}</span>
+              <span className="eyebrow">{date.toLocaleDateString('en-PH', { weekday: 'short' })}</span>
               <span className={clsx('text-sm font-bold tabular-nums', !isToday && 'text-(--fg)')}>{i + 1}</span>
-              {isToday && <span className="ml-auto rounded-full bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-1.5 text-[10px] font-bold">Today</span>}
+              {isToday && <span className="ml-auto rounded-full bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] px-1.5 text-xs font-bold">Today</span>}
             </div>
           );
         })}
@@ -198,13 +219,13 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                   )}
                 </span>
                 {!compact && <div className={clsx('min-w-0 flex-1', lane.soon && 'opacity-60')}>
-                  <p className="truncate text-[13px] font-semibold text-(--fg)">{lane.name}</p>
-                  <p className={clsx('truncate text-[11px]', broken ? 'text-amber-600 dark:text-amber-300' : 'text-(--fg-muted)')}>
+                  <p className="truncate text-ui font-semibold text-(--fg)">{lane.name}</p>
+                  <p className={clsx('truncate text-xs', broken ? 'text-amber-600 dark:text-amber-300' : 'text-(--fg-muted)')}>
                     {broken ? 'Needs reconnecting' : meta.sub}
                   </p>
                 </div>}
                 {!compact && onConnect && live && accounts !== null && meta.linked.length === 0 && (
-                  <button type="button" onClick={() => onConnect(platform)} className="shrink-0 rounded-full border border-(--border-strong) px-2 py-0.5 text-[11px] font-semibold text-(--primary) hover:bg-(--bg-alt)">
+                  <button type="button" onClick={() => onConnect(platform)} className="shrink-0 rounded-full border border-(--border-strong) px-2 py-0.5 text-xs font-semibold text-(--primary) hover:bg-(--bg-alt)">
                     Connect
                   </button>
                 )}
@@ -216,10 +237,12 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                     <DropdownMenuContent className="min-w-[200px]">
                       {meta.linked.map((a) => (
                         <DropdownMenuGroup key={a.id}>
-                          <DropdownMenuLabel className="text-[11px] font-semibold">@{a.username}</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => onConnect(platform)}>
-                            <RefreshCw className="text-(--fg-muted)" aria-hidden /> Reconnect
-                          </DropdownMenuItem>
+                          <DropdownMenuLabel className="text-xs font-semibold">@{a.username}</DropdownMenuLabel>
+                          {!a.isActive && (
+                            <DropdownMenuItem onClick={() => onConnect(platform)}>
+                              <RefreshCw className="text-(--fg-muted)" aria-hidden /> Reconnect
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem variant="destructive" onClick={() => onDisconnect?.(a)}>
                             <Unplug aria-hidden /> Disconnect
                           </DropdownMenuItem>
@@ -245,8 +268,20 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                   <div
                     key={day}
                     style={{ gridRow: row, gridColumn: i + 2 }}
+                    onDragOver={(e) => {
+                      if (!dragKey || lane.soon || isPast(day) || dragItem.current?.fromDay === day) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (overDay !== day) setOverDay(day);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      dropOn(day);
+                    }}
                     className={clsx(
-                      'relative flex flex-col gap-1.5 border-l border-t border-(--border) p-1.5',
+                      'relative flex flex-col gap-1.5 border-l border-t border-(--border) p-1.5 transition-colors',
+                      dragKey && overDay === day && !lane.soon && 'bg-[color-mix(in_srgb,var(--primary)_12%,transparent)]! shadow-[inset_0_0_0_2px_var(--primary)]',
+                      dragKey && isPast(day) && 'opacity-50',
                       lane.soon ? 'min-h-[52px]' : compact ? 'min-h-[68px]' : 'min-h-[92px]',
                       new Date(year, month, day).getDay() === 1 && 'border-l-(--border-strong)',
                       i === todayIdx
@@ -262,10 +297,15 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                         onClick={() => onOpenDay(day)}
                         className="group absolute inset-0 z-0 flex items-end justify-center rounded-none pb-2 opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100"
                       >
-                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-(--border-strong) bg-(--card) px-2 py-0.5 text-[11px] font-semibold text-(--fg-muted)">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-(--border-strong) bg-(--card) px-2 py-0.5 text-xs font-semibold text-(--fg-muted)">
                           <Plus className="h-3 w-3" strokeWidth={2.25} aria-hidden /> Add
                         </span>
                       </button>
+                    )}
+                    {lane.id === 'plan' && dragKey && overDay === day && (
+                      <span className="pointer-events-none relative z-20 self-center rounded-full bg-(--primary) px-2.5 py-0.5 text-xs font-semibold text-(--on-accent)">
+                        Move here
+                      </span>
                     )}
                     {lane.id === 'plan' && ghostDays?.includes(day) && (
                       <span
@@ -284,14 +324,14 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                             type="button"
                             onClick={() => onOpenPost(item.post!)}
                             title={`${item.title} · ${item.time ?? pill.label}`}
-                            className={clsx('relative z-10 flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-left text-[11px] font-semibold transition-[filter] hover:brightness-110', pill.cls)}
+                            className={clsx('relative z-10 flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-left text-xs font-semibold transition-[filter] hover:brightness-110', pill.cls)}
                           >
                             <pill.Icon className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-label={pill.label} />
                             <span className="truncate">{item.title}</span>
                           </button>
                         );
                       }
-                      return (
+                      const card = (
                         <TimelinePostCard
                           key={item.key}
                           item={item}
@@ -300,13 +340,32 @@ const ChannelTimelineTrack: React.FC<Props> = ({
                           onRetry={item.status === 'failed' && item.post && onRetryPost ? () => onRetryPost(item.post!) : undefined}
                         />
                       );
+                      if (!canMove(item)) return card;
+                      return (
+                        <div
+                          key={item.key}
+                          draggable
+                          title="Drag to another day"
+                          onDragStart={(e) => {
+                            dragItem.current = { item, fromDay: day };
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', item.title);
+                            // Let the browser take its drag snapshot before the card fades.
+                            requestAnimationFrame(() => setDragKey(item.key));
+                          }}
+                          onDragEnd={endDrag}
+                          className={clsx('relative z-10 cursor-grab active:cursor-grabbing', dragKey === item.key && 'opacity-40')}
+                        >
+                          {card}
+                        </div>
+                      );
                     })}
                     {(hidden > 0 || (open && items.length > MAX_VISIBLE)) && (
                       <button
                         type="button"
                         onClick={() => toggleCell(cellKey)}
                         aria-expanded={open}
-                        className="relative z-10 rounded-md py-1 text-[11px] font-semibold text-(--primary) hover:bg-(--bg-alt)"
+                        className="relative z-10 rounded-md py-1 text-xs font-semibold text-(--primary) hover:bg-(--bg-alt)"
                       >
                         {open ? 'Show less' : `+${hidden} more`}
                       </button>

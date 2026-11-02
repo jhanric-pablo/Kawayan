@@ -1,132 +1,144 @@
-import React from 'react';
-import { Sprout, Radio } from 'lucide-react';
-import WaveHandIcon from './WaveHandIcon';
-import BambooGrowIcon from './BambooGrowIcon';
+import React, { useEffect, useRef, useState } from 'react';
 
-/**
- * Splits a string into per-word spans that fade + rise in sequence once an
- * ancestor with `.reveal` gains `.is-in` (scroll-reveal). `bold` marks word
- * indices that get the sage highlight. Word spacing is handled in CSS via
- * `.lp-anitext__w` margin so the markup stays plain.
- */
-const AnimatedText: React.FC<{
-  text: string;
-  className?: string;
-  base?: number;
-  step?: number;
-  bold?: number[];
-}> = ({ text, className = '', base = 0, step = 0.045, bold = [] }) => {
-  const words = text.split(' ');
+const MEANINGS = [
+  {
+    word: 'kaway',
+    gloss: 'to wave hello',
+    value: 'Connection',
+    points: [
+      'Taglish captions that sound like your shop, not a robot.',
+      'Your tone, audience and industry, set once in the brand survey.',
+      'A reach score on every draft, so you can fix it before it goes out.',
+    ],
+  },
+  {
+    word: 'kawayan',
+    gloss: 'bamboo',
+    value: 'Growth',
+    points: [
+      'A month of Facebook and Instagram posts, planned in one go.',
+      'Insights that compare your posts and show what worked.',
+      'Scheduled posting that keeps going while you run the store.',
+    ],
+  },
+];
+
+/** Sample posts the Connection card types out, each followed by customer replies. */
+const POSTS = [
+  { shop: 'Aling Nena’s Bakery', text: 'Bagong luto na ang pandesal! Mainit pa, tara na bago maubos.', replies: ['Reserve po 10!', 'Sarap nito, solid.'] },
+  { shop: 'Kusina ni Lola', text: 'Tag-ulan na naman. Perfect time para sa mainit na champorado.', replies: ['Meron pa po mamaya?', 'Order ako for 3!'] },
+  { shop: 'Tea Tayo', text: 'Payday treat! Buy 1 take 1 sa lahat ng milk tea hanggang Linggo.', replies: ['Game, pupunta kami!', 'Open po kayo bukas?'] },
+];
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Types a caption out letter by letter, shows the replies, then moves to the next shop. */
+const TypingPost: React.FC = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [shown, setShown] = useState(() => (reducedMotion() ? POSTS[0].text.length : 0));
+  const post = POSTS[index];
+  const done = shown >= post.text.length;
+
+  // Type only while the card is on screen.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !('IntersectionObserver' in window)) return setVisible(true);
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion() || !visible) return;
+    const timer = done
+      ? setTimeout(() => { setIndex((i) => (i + 1) % POSTS.length); setShown(0); }, 3600)
+      : setTimeout(() => setShown((n) => n + 1), 32);
+    return () => clearTimeout(timer);
+  }, [shown, done, visible]);
+
   return (
-    <span className={`lp-anitext ${className}`.trim()}>
-      <span className="sr-only">{text}</span>
-      <span aria-hidden="true">
-        {words.map((w, i) => (
-          <span
-            key={i}
-            className={`lp-anitext__w${bold.includes(i) ? ' is-b' : ''}`}
-            style={{ transitionDelay: `${(base + i * step).toFixed(3)}s` } as React.CSSProperties}
-          >
-            {w}
-          </span>
+    <div ref={ref} className="lp-chat" aria-hidden="true">
+      <div className="lp-chat__post">
+        <div className="lp-chat__head">
+          <span className="lp-chat__avatar">{post.shop.charAt(0)}</span>
+          <span className="lp-chat__shop">{post.shop}</span>
+          <span className="lp-chat__time">Just now</span>
+        </div>
+        <p className="lp-chat__text">
+          {post.text.slice(0, shown)}
+          {!done && <span className="lp-chat__caret" />}
+        </p>
+      </div>
+      <div className="lp-chat__replies">
+        {done && post.replies.map((r, i) => (
+          <span key={`${index}-${i}`} className="lp-chat__reply" style={{ animationDelay: `${0.35 + i * 0.55}s` }}>{r}</span>
         ))}
-      </span>
-    </span>
+      </div>
+    </div>
   );
 };
 
+/** Four bamboo stalks, one per week, growing joint by joint and then swaying. */
+const GrowingWeeks: React.FC = () => (
+  <div className="lp-grow" aria-hidden="true">
+    {[2, 3, 4, 5].map((joints, week) => (
+      <div key={week} className="lp-grow__col">
+        <div className="lp-grow__stalk" style={{ '--w': week } as React.CSSProperties}>
+          <span className="lp-grow__leaf" />
+          {Array.from({ length: joints }, (_, j) => (
+            <i key={j} className="lp-grow__seg" style={{ '--j': joints - 1 - j } as React.CSSProperties} />
+          ))}
+        </div>
+        <span className="lp-grow__label">Week {week + 1}</span>
+      </div>
+    ))}
+  </div>
+);
+
 /**
- * "Why Kawayan AI?" — the story behind the name.
- * Kaway (to wave / welcome → connection) + Kawayan (bamboo → growth, resilience).
- * Everything animates on scroll-in: the headline word swings + underlines itself,
- * the copy assembles word-by-word, the wave ripples, and the bamboo grows and sways.
+ * "Why Kawayan AI?" as a dictionary entry that acts itself out:
+ * "Kaway" waves hello, then "an" sprouts up and the word becomes bamboo.
+ * The two cards below show each meaning happening in the app.
  */
 const WhyKawayan: React.FC = () => (
-  <section id="why" className="lp-why">
-    <div className="lp-why__bg" aria-hidden="true">
-      <span className="lp-blob lp-blob--green w-[560px] h-[560px] -left-40 -top-24" data-parallax="0.06" />
-      <span className="lp-blob lp-blob--sage w-[460px] h-[460px] -right-32 -bottom-20" data-parallax="0.09" />
-      <div className="lp-why__dots" />
-      <svg className="lp-why__leaf lp-why__leaf--1" data-parallax="0.16" viewBox="0 0 40 12"><path d="M1 6C11 1 30 1 39 6C29 11 10 11 1 6Z" /></svg>
-      <svg className="lp-why__leaf lp-why__leaf--2" data-parallax="0.24" viewBox="0 0 40 12"><path d="M1 6C11 1 30 1 39 6C29 11 10 11 1 6Z" /></svg>
-      <svg className="lp-why__leaf lp-why__leaf--3" data-parallax="0.1" viewBox="0 0 40 12"><path d="M1 6C11 1 30 1 39 6C29 11 10 11 1 6Z" /></svg>
-    </div>
+  <section id="why" className="lp-why" aria-labelledby="why-title">
+    <div className="lp-why__dots" aria-hidden="true" />
 
     <div className="lp-why__inner">
-      <div className="text-center max-w-2xl mx-auto reveal">
-        <span className="lp-eyebrow lp-eyebrow--on-dark mb-5"><span className="lp-eyebrow__dot" /> Why the name</span>
-        <h2 className="lp-why__title">
-          Why{' '}
-          <span className="lp-why__word">
-            <span>Kaway</span><span className="lp-why__word-accent">an</span>
-            <i className="lp-why__underline" />
-          </span>{' '}
-          AI?
-        </h2>
-        <p className="lp-why__lede">
-          <AnimatedText
-            text="Two Filipino ideas shape everything we build — connection and growth."
-            base={0.2}
-            step={0.028}
-            bold={[8, 10]}
-          />
-        </p>
-      </div>
+      <div className="text-center reveal">
+        <span className="lp-eyebrow lp-eyebrow--on-dark"><span className="lp-eyebrow__dot" /> Why the name</span>
+        <h2 id="why-title" className="sr-only">Why Kawayan AI? Kaway means to wave hello. Kawayan means bamboo.</h2>
 
-      <div className="lp-why__grid">
-        <article className="lp-why-card reveal reveal-d1">
-          <div className="lp-why-card__viz lp-why-card__viz--wave">
-            <span className="lp-why-card__ring" />
-            <span className="lp-ripple" />
-            <span className="lp-ripple" />
-            <span className="lp-ripple" />
-            <span className="lp-why-card__glyph"><WaveHandIcon className="lp-why-card__glyph-svg" /></span>
-          </div>
-          <h3 className="lp-why-card__title">
-            <AnimatedText text="Kaway — a wave hello" step={0.05} bold={[0]} />
-          </h3>
-          <p className="lp-why-card__body">
-            <AnimatedText
-              base={0.3}
-              step={0.014}
-              bold={[0]}
-              text="Kaway is the Filipino word for waving, for welcoming someone in. Marketing should do the same — greet people, start a conversation, and turn a scroll into a real connection. Kawayan AI helps your brand sound warm, human, and approachable."
-            />
-          </p>
-        </article>
-
-        <article className="lp-why-card reveal reveal-d2">
-          <div className="lp-why-card__viz lp-why-card__viz--bamboo">
-            <BambooGrowIcon />
-          </div>
-          <h3 className="lp-why-card__title">
-            <AnimatedText text="Kawayan — bamboo strong" step={0.05} bold={[0]} />
-          </h3>
-          <p className="lp-why-card__body">
-            <AnimatedText
-              base={0.3}
-              step={0.014}
-              bold={[0]}
-              text="Kawayan also means bamboo — fast to grow, quick to bend in a storm, and almost impossible to break. Your business can be the same: adaptable and resilient as platforms, trends, and algorithms keep shifting."
-            />
-          </p>
-        </article>
-      </div>
-
-      <div className="lp-why__foot reveal reveal-d3">
-        <p className="lp-why__foot-text">
-          <AnimatedText
-            base={0.1}
-            step={0.02}
-            text="Most of all, the name is about who we serve. Kawayan AI is built with Filipino businesses in mind — pairing AI with marketing that's culturally fluent and locally rooted."
-          />
-        </p>
-        <div className="lp-why__tag">
-          <Sprout className="w-4 h-4" />
-          <span className="lp-why__tag-text">Grow local. Reach digital.</span>
-          <Radio className="w-4 h-4" />
+        <div className="lp-name" aria-hidden="true">
+          <span className="lp-name__part lp-name__part--kaway">
+            {'Kaway'.split('').map((ch, i) => <span key={i} style={{ '--i': i } as React.CSSProperties}>{ch}</span>)}
+          </span>
+          <span className="lp-name__part lp-name__part--an"><span>an</span></span>
+          <span className="lp-name__br lp-name__br--kaway"><b>kaway</b> {MEANINGS[0].gloss}</span>
+          <span className="lp-name__br lp-name__br--kawayan"><b>kawayan</b> {MEANINGS[1].gloss}</span>
         </div>
+
+        <p className="lp-why__lede">
+          One Tagalog word, two meanings. Both describe what we&rsquo;re building for Filipino businesses.
+        </p>
       </div>
+
+      <div className="lp-why__cols">
+        {MEANINGS.map((m, i) => (
+          <article key={m.word} className={`lp-why-col reveal reveal-d${i + 1}`}>
+            <div className="lp-why-col__viz">{i === 0 ? <TypingPost /> : <GrowingWeeks />}</div>
+            <h3 className="lp-why-col__title">{m.value}</h3>
+            <p className="lp-why-col__from">from <i>{m.word}</i>, {m.gloss}</p>
+            <ul className="lp-why-col__list">
+              {m.points.map((p) => <li key={p}>{p}</li>)}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <p className="lp-why__tag reveal reveal-d3">Grow local. Reach digital.</p>
     </div>
   </section>
 );

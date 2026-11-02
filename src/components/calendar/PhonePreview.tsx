@@ -26,10 +26,14 @@ interface Props {
   defaultPlatform?: PreviewPlatform;
   /** When set, a photo dropped on the media area becomes the post's visual. */
   onDropImage?: (file: File) => void;
+  /** Which app tabs to offer (inside Kawayan: only the ones it can post to). */
+  tabs?: PreviewPlatform[];
+  /** Show made-up likes and comments. Only for marketing samples, never on a real post. */
+  sampleStats?: boolean;
 }
 
 /** The post as it would look in each app, inside a phone. Read-only apart from photo drops. */
-const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadingImage, defaultPlatform = 'instagram', onDropImage }) => {
+const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadingImage, defaultPlatform = 'instagram', onDropImage, tabs, sampleStats = false }) => {
   const [platform, setPlatform] = useState<PreviewPlatform>(defaultPlatform);
   const [dragging, setDragging] = useState(false);
   const likes = useMemo(() => Math.floor(Math.random() * 500) + 10, []);
@@ -86,7 +90,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
     <div className="flex flex-col items-center gap-4">
       <Tabs.Root value={platform} onValueChange={(v) => setPlatform(v as PreviewPlatform)}>
         <Tabs.List aria-label="Preview platform" className="relative inline-flex rounded-full border border-(--border) bg-(--card) p-1">
-          {TABS.map(({ id, label, Icon }) => (
+          {TABS.filter((t) => !tabs || tabs.includes(t.id)).map(({ id, label, Icon }) => (
             <Tabs.Tab
               key={id}
               value={id}
@@ -140,9 +144,9 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                 <Bookmark className="ml-auto h-5 w-5" strokeWidth={1.75} aria-hidden />
               </div>
               <div className="space-y-1 px-3 pb-5 pt-2">
-                <p className="font-semibold">{fmt(likes)} likes</p>
+                {sampleStats && <p className="font-semibold">{fmt(likes)} likes</p>}
                 <p><span className="font-semibold">{handle}</span> {captionNode}</p>
-                <p className="text-zinc-500">View all {fmt(comments)} comments</p>
+                {sampleStats && <p className="text-zinc-500">View all {fmt(comments)} comments</p>}
                 <p className="text-[10px] uppercase tracking-wide text-zinc-500">Just now</p>
               </div>
             </div>
@@ -164,14 +168,14 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                 </div>
                 <p className="px-3 pb-2.5">{captionNode}</p>
                 {media}
-                <div className="flex items-center justify-between px-3 py-2 text-[11px] text-zinc-500">
+                {sampleStats && <div className="flex items-center justify-between px-3 py-2 text-[11px] text-zinc-500">
                   <span className="flex items-center gap-1">
                     <span className="grid h-4 w-4 place-items-center rounded-full bg-[#1877F2] text-white"><ThumbsUp className="h-2.5 w-2.5" aria-hidden /></span>
                     <span className="-ml-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#F33E58] text-white ring-2 ring-white dark:ring-black"><Heart className="h-2.5 w-2.5" fill="currentColor" aria-hidden /></span>
                     {fmt(likes)}
                   </span>
                   <span>{fmt(comments)} comments · {fmt(shares)} shares</span>
-                </div>
+                </div>}
                 <div className="mx-3 flex justify-around border-t border-zinc-200 py-1.5 text-[11.5px] font-semibold text-zinc-500 dark:border-zinc-800">
                   <span className="flex items-center gap-1.5"><ThumbsUp className="h-4 w-4" aria-hidden /> Like</span>
                   <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4" aria-hidden /> Comment</span>
@@ -193,10 +197,10 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
                   {initials}
                   <span className="absolute -bottom-2 grid h-4 w-4 place-items-center rounded-full bg-[#FE2C55] text-[11px] leading-none">+</span>
                 </span>
-                <span className="mt-1 flex flex-col items-center gap-0.5"><Heart className="h-6 w-6" fill="currentColor" aria-hidden />{fmt(likes)}</span>
-                <span className="flex flex-col items-center gap-0.5"><MessageCircle className="h-6 w-6" fill="currentColor" aria-hidden />{fmt(comments)}</span>
-                <span className="flex flex-col items-center gap-0.5"><Bookmark className="h-6 w-6" fill="currentColor" aria-hidden />{fmt(Math.round(likes / 6))}</span>
-                <span className="flex flex-col items-center gap-0.5"><Share2 className="h-6 w-6" aria-hidden />{fmt(shares)}</span>
+                <span className="mt-1 flex flex-col items-center gap-0.5"><Heart className="h-6 w-6" fill="currentColor" aria-hidden />{sampleStats && fmt(likes)}</span>
+                <span className="flex flex-col items-center gap-0.5"><MessageCircle className="h-6 w-6" fill="currentColor" aria-hidden />{sampleStats && fmt(comments)}</span>
+                <span className="flex flex-col items-center gap-0.5"><Bookmark className="h-6 w-6" fill="currentColor" aria-hidden />{sampleStats && fmt(Math.round(likes / 6))}</span>
+                <span className="flex flex-col items-center gap-0.5"><Share2 className="h-6 w-6" aria-hidden />{sampleStats && fmt(shares)}</span>
               </div>
               <div className="absolute inset-x-3 bottom-6 pr-12">
                 <p className="mb-1 font-semibold">@{handle}</p>

@@ -14,6 +14,7 @@ interface Props {
 
 const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
   const [profile, setProfile] = useState<BrandProfile>({
+    userId: '', // filled in by the caller on save
     businessName,
     industry: '',
     targetAudience: '',
@@ -38,7 +39,7 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
   const audienceSuggestions = ['Gen Z students', 'Working moms', 'Titas of Manila', 'Small business owners', 'OFW families'];
   const themeSuggestions = ['Product launches', 'Behind the scenes', 'Customer testimonials', 'Promos & sales', 'Tips & how-tos', 'Memes'];
 
-  const appendTag = (field: keyof BrandProfile, tag: string) => {
+  const appendTag = (field: 'targetAudience' | 'keyThemes', tag: string) => {
     setProfile(prev => {
       const current = (prev[field] || '').trim();
       if (current.toLowerCase().includes(tag.toLowerCase())) return prev;

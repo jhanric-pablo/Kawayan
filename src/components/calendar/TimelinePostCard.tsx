@@ -16,7 +16,7 @@ const BADGE: Record<CardStatus, string> = {
 const LABEL: Record<CardStatus, string> = { idea: 'Idea', draft: 'Draft', scheduled: 'Scheduled', published: 'Posted', failed: 'Failed' };
 
 export const StatusBadge: React.FC<{ status: CardStatus; time?: string; className?: string }> = ({ status, time, className }) => (
-  <span className={clsx('inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-px text-[10.5px] font-semibold leading-4', BADGE[status], className)}>
+  <span className={clsx('inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-px text-xs font-semibold leading-4', BADGE[status], className)}>
     {status === 'scheduled' && time && <Clock className="h-2.5 w-2.5" strokeWidth={2.25} aria-hidden />}
     {status === 'scheduled' && time ? time : LABEL[status]}
   </span>
@@ -40,7 +40,7 @@ const TimelinePostCard: React.FC<Props> = ({ item, onOpen, onEdit, onRetry }) =>
   return (
     <div
       className={clsx(
-        'relative z-10 rounded-lg border p-1.5 shadow-xs transition-[border-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-sm motion-reduce:transform-none',
+        'kw-pop relative z-10 rounded-lg border p-1.5 shadow-xs transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-8px_rgba(0,0,0,0.25)] motion-reduce:transform-none',
         item.status === 'idea'
           ? 'border-dashed border-(--border-strong) bg-(--bg-alt)'
           : 'border-(--border) bg-(--card) hover:border-(--border-strong)',
@@ -55,13 +55,13 @@ const TimelinePostCard: React.FC<Props> = ({ item, onOpen, onEdit, onRetry }) =>
             <FormatIcon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
           </span>
         )}
-        <span className="line-clamp-2 min-w-0 text-[12px] font-semibold leading-[1.3] text-(--fg)">{item.title}</span>
+        <span className="line-clamp-2 min-w-0 text-xs font-semibold leading-[1.3] text-(--fg)">{item.title}</span>
       </button>
 
       <div className="mt-1.5 flex items-center gap-1">
         <StatusBadge status={item.status} time={item.time} />
         {failed && onRetry && (
-          <button type="button" onClick={onRetry} className="inline-flex items-center gap-0.5 rounded px-1 text-[10.5px] font-bold text-red-600 hover:underline dark:text-red-300">
+          <button type="button" onClick={onRetry} className="inline-flex items-center gap-0.5 rounded px-1 text-xs font-bold text-red-600 hover:underline dark:text-red-300">
             <RotateCcw className="h-2.5 w-2.5" strokeWidth={2.5} aria-hidden /> Retry
           </button>
         )}

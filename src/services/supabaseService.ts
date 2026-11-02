@@ -6,6 +6,10 @@ import { logger } from '../utils/logger';
 import { normalizeEmail, sanitizeUserForSession } from '../utils/authSession';
 import { User, BrandProfile, GeneratedPost } from '../types';
 
+// Some older columns are "timestamp" (no zone) but hold UTC. Mark them as UTC so browsers don't read them as local time.
+const utc = (v: string | null | undefined) => (v && !/(Z|[+-]\d\d:?\d\d)$/.test(v) ? `${v}Z` : v);
+const utcCall = (row: any) => ({ ...row, started_at: utc(row.started_at), ended_at: utc(row.ended_at) });
+
 export class SupabaseService {
   private supabase: SupabaseClient;
 
@@ -434,12 +438,18 @@ export class SupabaseService {
     }
   }
 
-  async getUserPosts(userId: string): Promise<GeneratedPost[]> {
-    const { data: rows, error } = await this.supabase
+  /** All of a user's posts, or only one month's when `month` ("YYYY-MM") is given. */
+  async getUserPosts(userId: string, month?: string): Promise<GeneratedPost[]> {
+    let query = this.supabase
       .from('generated_posts')
       .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
+      .eq('user_id', userId);
+    if (month) {
+      const [y, m] = month.split('-').map(Number);
+      const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+      query = query.gte('date', `${month}-01`).lt('date', `${next}-01`);
+    }
+    const { data: rows, error } = await query.order('date', { ascending: false });
     if (error || !rows) return [];
     return rows.map(row => ({
       id: row.id,
@@ -794,9 +804,68 @@ export class SupabaseService {
       category: row.category || 'General',
       priority: row.priority,
       status: row.status,
-      createdAt: row.created_at,
+      createdAt: utc(row.created_at),
+      updatedAt: utc(row.updated_at ?? row.created_at),
       messages: row.messages ? JSON.parse(row.messages) : [],
+      assigneeId: row.assignee_id ?? null,
+      assigneeName: row.assignee_name ?? null,
+      labels: row.labels ?? [],
+      snoozedUntil: row.snoozed_until ?? null,
+      firstResponseAt: row.first_response_at ?? null,
+      resolvedAt: row.resolved_at ?? null,
+      rating: row.rating ?? null,
+      ownerName: row.users?.business_name ?? null,
     };
+  }
+
+  /** Inbox fields (assignee, priority, labels, snooze, timing, rating). Only the keys given are changed. */
+  async updateTicketFields(ticketId: string, fields: {
+    status?: string; priority?: string; assigneeId?: string | null; assigneeName?: string | null; labels?: string[];
+    snoozedUntil?: string | null; firstResponseAt?: string; resolvedAt?: string | null; rating?: number;
+  }): Promise<void> {
+    const map: Record<string, string> = {
+      status: 'status', priority: 'priority', assigneeId: 'assignee_id', assigneeName: 'assignee_name', labels: 'labels',
+      snoozedUntil: 'snoozed_until', firstResponseAt: 'first_response_at', resolvedAt: 'resolved_at', rating: 'rating',
+    };
+    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const [k, v] of Object.entries(fields)) if (v !== undefined && map[k]) payload[map[k]] = v;
+    const { error } = await this.supabase.from('tickets').update(payload).eq('id', ticketId);
+    if (error) throw error;
+  }
+
+  async getTicketNotes(ticketId: string): Promise<any[]> {
+    const { data, error } = await this.supabase.from('ticket_notes').select('*').eq('ticket_id', ticketId).order('created_at');
+    if (error) throw error;
+    return (data || []).map((r: any) => ({ id: r.id, ticketId: r.ticket_id, authorId: r.author_id, authorName: r.author_name, kind: r.kind, body: r.body, createdAt: r.created_at }));
+  }
+
+  async addTicketNote(note: { ticketId: string; authorId: string; authorName: string; kind: 'note' | 'activity'; body: string }): Promise<any> {
+    const { data, error } = await this.supabase
+      .from('ticket_notes')
+      .insert({ ticket_id: note.ticketId, author_id: note.authorId, author_name: note.authorName, kind: note.kind, body: note.body })
+      .select()
+      .single();
+    if (error) throw error;
+    return { id: data.id, ticketId: data.ticket_id, authorId: data.author_id, authorName: data.author_name, kind: data.kind, body: data.body, createdAt: data.created_at };
+  }
+
+  async getCannedReplies(): Promise<any[]> {
+    const { data, error } = await this.supabase.from('canned_replies').select('id, shortcut, title, body').order('shortcut');
+    if (error) throw error;
+    return data || [];
+  }
+
+  async saveCannedReply(reply: { id?: string; shortcut: string; title: string; body: string; createdBy: string }): Promise<void> {
+    const row = { shortcut: reply.shortcut, title: reply.title, body: reply.body, created_by: reply.createdBy };
+    const { error } = reply.id
+      ? await this.supabase.from('canned_replies').update(row).eq('id', reply.id)
+      : await this.supabase.from('canned_replies').insert(row);
+    if (error) throw error;
+  }
+
+  async deleteCannedReply(id: string): Promise<void> {
+    const { error } = await this.supabase.from('canned_replies').delete().eq('id', id);
+    if (error) throw error;
   }
 
   async getTicketById(ticketId: string): Promise<any | null> {
@@ -810,10 +879,12 @@ export class SupabaseService {
   }
 
   async getAllTicketsAdmin(): Promise<any[]> {
+    // With the owner's business name, so the inbox can show who wrote in.
     const { data: rows, error } = await this.supabase
       .from('tickets')
-      .select('*')
+      .select('*, users!tickets_user_id_fkey(business_name)') // tickets also links to users via assignee_id
       .order('created_at', { ascending: false });
+    if (error) logger.error('Get all tickets failed', { error: error.message });
     if (error || !rows) return [];
     return rows.map(row => this.mapTicketRow(row));
   }
@@ -860,7 +931,7 @@ export class SupabaseService {
     if (fetchError) throw fetchError;
     if (call) {
       const endedAt = new Date().toISOString();
-      const startedAt = new Date(call.started_at).getTime();
+      const startedAt = new Date(utc(call.started_at)!).getTime();
       const duration = Math.floor((Date.now() - startedAt) / 1000);
       const callId = call.room_name.split('-')[1] || null;
       await this.supabase.from('call_history').insert({
@@ -886,7 +957,9 @@ export class SupabaseService {
       .select('*')
       .order('started_at', { ascending: true });
     if (error) return [];
-    return data || [];
+    // ponytail: a call left open by a closed tab is hidden after 2 hours rather than cleaned up by a job.
+    const cutoff = Date.now() - 2 * 3600_000;
+    return (data || []).map(utcCall).filter((c) => new Date(c.started_at).getTime() > cutoff);
   }
 
   async getCallHistory(): Promise<any[]> {
@@ -896,7 +969,7 @@ export class SupabaseService {
       .order('started_at', { ascending: false })
       .limit(100);
     if (error) return [];
-    return data || [];
+    return (data || []).map(utcCall);
   }
 
   // Admin Stats
@@ -1072,6 +1145,24 @@ export class SupabaseService {
       .upload(storagePath, buffer, { contentType: mimetype, upsert: true });
     if (error) throw error;
     return storagePath;
+  }
+
+  // Post images live in the public 'post-images' bucket (created on first use), so a post carries
+  // a short URL instead of megabytes of base64, browsers can cache it, and Zernio can fetch it.
+  private postImageBucketReady = false;
+
+  async uploadPostImage(userId: string, buffer: Buffer, contentType: string): Promise<string> {
+    if (!this.postImageBucketReady) {
+      const { error } = await this.supabase.storage.createBucket('post-images', { public: true });
+      if (error && !/already exists/i.test(error.message)) throw error;
+      this.postImageBucketReady = true;
+    }
+    const ext = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' }[contentType] || 'img';
+    const storagePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const bucket = this.supabase.storage.from('post-images');
+    const { error } = await bucket.upload(storagePath, buffer, { contentType, cacheControl: '31536000' });
+    if (error) throw error;
+    return bucket.getPublicUrl(storagePath).data.publicUrl;
   }
 
   async getVerificationDocSignedUrl(storagePath: string): Promise<string> {

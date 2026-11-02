@@ -10,7 +10,42 @@ export const hasPersistedSession = (): boolean => {
   }
 };
 
+/** Each screen's address, so Back/Forward work and screens can be linked to. */
+export const VIEW_PATHS: Record<ViewState, string> = {
+  [ViewState.LANDING]: '/',
+  [ViewState.LOGIN]: '/login',
+  [ViewState.SIGNUP]: '/signup',
+  [ViewState.ADMIN_LOGIN]: '/admin-portal',
+  [ViewState.RESET_PASSWORD]: '/reset-password',
+  [ViewState.VERIFICATION]: '/verification',
+  [ViewState.SURVEY]: '/setup',
+  [ViewState.CALENDAR]: '/calendar',
+  [ViewState.SETTINGS]: '/settings',
+  [ViewState.INSIGHTS]: '/insights',
+  [ViewState.SOCIAL]: '/social',
+  [ViewState.BILLING]: '/billing',
+  [ViewState.SUPPORT_DASHBOARD]: '/support',
+  [ViewState.ADMIN_DASHBOARD]: '/admin',
+};
+
+/** Screens that read the query string on arrival (payment, social and reset-email returns). */
+export const VIEWS_KEEPING_QUERY = new Set<ViewState>([ViewState.BILLING, ViewState.SOCIAL, ViewState.RESET_PASSWORD]);
+
+/** Legal pages, readable by anyone at any time (not part of the screen flow). */
+export const LEGAL_PATHS: Record<string, 'terms' | 'privacy' | undefined> = { '/terms': 'terms', '/privacy': 'privacy' };
+
+export const PUBLIC_VIEWS = new Set<ViewState>([ViewState.LANDING, ViewState.LOGIN, ViewState.SIGNUP, ViewState.ADMIN_LOGIN]);
+
+export const viewFromPath = (pathname: string): ViewState | null => {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  const hit = (Object.entries(VIEW_PATHS) as [ViewState, string][]).find(([, p]) => p === path);
+  return hit ? hit[0] : null;
+};
+
 export const readStoredView = (): ViewState | null => {
+  // An address like /insights wins over the remembered screen; "/" means "wherever I was".
+  const fromUrl = typeof window !== 'undefined' ? viewFromPath(window.location.pathname) : null;
+  if (fromUrl && fromUrl !== ViewState.LANDING) return fromUrl;
   try {
     // Try localStorage first (survives hard refreshes + tab closes)
     const raw = localStorage.getItem(VIEW_STORAGE_KEY)

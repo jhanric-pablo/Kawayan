@@ -16,6 +16,7 @@ import verificationRoutes from './server/routes/verification.js';
 import socialRoutes from './server/routes/social.js';
 import supportRoutes from './server/routes/support.js';
 import aiRoutes from './server/routes/ai.js';
+import imageRoutes from './server/routes/images.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 3001;
@@ -87,6 +88,7 @@ app.use(adminRoutes);
 app.use(verificationRoutes);
 app.use(socialRoutes);
 app.use(supportRoutes);
+app.use(imageRoutes);
 app.use(aiRoutes);
 
 // API 404 handler — must be before the React catch-all

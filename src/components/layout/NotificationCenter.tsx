@@ -50,15 +50,15 @@ const Row: React.FC<{ entry: Entry; fresh?: boolean }> = ({ entry: e, fresh }) =
       <e.Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
     </span>
     <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-(--fg)">
+      <p className="flex items-center gap-1.5 text-ui font-semibold text-(--fg)">
         {e.title}
         {fresh && <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-label="New" />}
       </p>
       <p className="truncate text-xs text-(--fg-muted)">{e.body}</p>
       <div className="mt-1 flex items-center gap-2">
-        {e.time && <span className="text-[11px] text-(--fg-subtle)">{timeAgo(e.time)}</span>}
+        {e.time && <span className="text-xs text-(--fg-subtle)">{timeAgo(e.time)}</span>}
         {e.action && (
-          <button type="button" onClick={e.action.onClick} className="text-[11.5px] font-bold text-(--primary) hover:underline">
+          <button type="button" onClick={e.action.onClick} className="text-xs font-bold text-(--primary) hover:underline">
             {e.action.label}
           </button>
         )}
@@ -69,7 +69,7 @@ const Row: React.FC<{ entry: Entry; fresh?: boolean }> = ({ entry: e, fresh }) =
 );
 
 const TAB =
-  'relative z-1 flex h-10 items-center gap-1.5 px-2 text-[13px] font-semibold text-(--fg-muted) outline-hidden hover:text-(--fg) focus-visible:text-(--fg) data-active:text-(--fg)';
+  'relative z-1 flex h-10 items-center gap-1.5 px-2 text-ui font-semibold text-(--fg-muted) outline-hidden hover:text-(--fg) focus-visible:text-(--fg) data-active:text-(--fg)';
 
 /** Bell + popover: system alerts (security, channel access, failed posts) and a publishing history. */
 const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpenPost: (postId: string) => void }> = ({ userId, feed, onOpenPost }) => {
@@ -149,11 +149,12 @@ const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpen
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="relative grid h-9 w-9 place-items-center rounded-full border border-(--border) bg-(--card) text-(--fg-muted) transition-colors hover:border-(--border-strong) hover:text-(--fg) data-popup-open:border-(--border-strong) data-popup-open:text-(--fg)"
+        data-tour="notifications"
+        className="relative grid h-9 w-9 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg) data-popup-open:bg-(--bg-alt) data-popup-open:text-(--fg)"
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-on-brand ring-2 ring-(--bg)">
+          <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-xs font-bold text-on-brand ring-2 ring-(--bg)">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -162,8 +163,8 @@ const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpen
         <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
           <PopoverTitle className="font-sans text-sm font-bold">Notifications</PopoverTitle>
           {issues === 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-badge-text">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand motion-reduce:animate-none" aria-hidden /> All systems healthy
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-badge-text">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden /> All systems healthy
             </span>
           )}
         </div>
@@ -171,7 +172,7 @@ const NotificationCenter: React.FC<{ userId: string; feed: WorkspaceFeed; onOpen
           <Tabs.List className="relative flex gap-2 border-b border-(--border) px-3">
             <Tabs.Tab value="alerts" className={TAB}>
               System alerts
-              {issues > 0 && <span className="rounded-full bg-red-500/15 px-1.5 text-[10.5px] font-bold text-red-600 dark:text-red-300">{issues}</span>}
+              {issues > 0 && <span className="rounded-full bg-red-500/15 px-1.5 text-xs font-bold text-red-600 dark:text-red-300">{issues}</span>}
             </Tabs.Tab>
             <Tabs.Tab value="history" className={TAB}>History log</Tabs.Tab>
             <Tabs.Indicator className="absolute -bottom-px left-(--active-tab-left) h-0.5 w-(--active-tab-width) rounded-full bg-brand transition-[left,width] duration-200 ease-out" />

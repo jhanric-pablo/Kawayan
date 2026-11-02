@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Info, Loader2, Plus } from 'lucide-react';
+import { Info, Loader2 } from 'lucide-react';
 import { socialService, SocialAccount, SocialPlatform } from '../services/socialService';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
@@ -27,13 +27,13 @@ export const TikTokGlyph: React.FC<GlyphProps> = ({ className = 'w-5 h-5' }) => 
 );
 
 const PLATFORMS: { id: SocialPlatform; name: string; detail: string; Glyph: React.FC }[] = [
-  { id: 'facebook', name: 'Facebook', detail: 'Publishes to a Facebook Page you manage.', Glyph: FacebookGlyph },
-  { id: 'instagram', name: 'Instagram', detail: 'Works with Instagram Business and Creator accounts.', Glyph: InstagramGlyph },
+  { id: 'facebook', name: 'Facebook', detail: 'Publishes to one Facebook Page you manage.', Glyph: FacebookGlyph },
+  { id: 'instagram', name: 'Instagram', detail: 'One Instagram Business or Creator account.', Glyph: InstagramGlyph },
 ];
 
 const BrandTile: React.FC<{ children: React.ReactNode; muted?: boolean }> = ({ children, muted }) => (
   <div
-    className="w-10 h-10 shrink-0 rounded-(--r) flex items-center justify-center"
+    className="w-10 h-10 shrink-0 rounded-(--radius) flex items-center justify-center"
     style={{
       border: '1px solid var(--border)',
       background: 'var(--card)',
@@ -106,7 +106,7 @@ const SocialAccounts: React.FC = () => {
   const unavailable = !!loadError;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-3xl space-y-6 animate-fade-in">
       <div className="page-head">
         <div>
           <h1 className="page-head__title">Connected accounts</h1>
@@ -118,7 +118,7 @@ const SocialAccounts: React.FC = () => {
 
       {loadError && (
         <div
-          className="flex items-start gap-3 rounded-(--r-lg) px-4 py-3"
+          className="flex items-start gap-3 rounded-(--radius-lg) px-4 py-3"
           style={{ background: 'var(--bg-alt)', border: '1px solid var(--border)' }}
           role="status"
         >
@@ -133,22 +133,27 @@ const SocialAccounts: React.FC = () => {
       <div className="surface overflow-hidden">
         {PLATFORMS.map((p, i) => {
           const linked = accounts.filter((a) => a.platform === p.id);
+          const needsReconnect = linked.length > 0 && linked.every((a) => !a.isActive);
           return (
             <div key={p.id} className="px-4 sm:px-5 py-4" style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}>
               <div className="flex items-start gap-3 sm:gap-4">
                 <BrandTile><p.Glyph /></BrandTile>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>{p.name}</p>
-                  <p className="text-[13px]" style={{ color: 'var(--fg-muted)' }}>{p.detail}</p>
+                  <p className="text-ui" style={{ color: 'var(--fg-muted)' }}>{p.detail}</p>
                 </div>
-                <button
-                  onClick={() => handleConnect(p.id)}
-                  disabled={loading || unavailable || busy === p.id}
-                  className="btn btn-outline btn-sm shrink-0"
-                >
-                  {busy === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : linked.length > 0 && <Plus className="w-3.5 h-3.5" />}
-                  {linked.length > 0 ? 'Add' : 'Connect'}
-                </button>
+                {(linked.length === 0 || needsReconnect) ? (
+                  <button
+                    onClick={() => handleConnect(p.id)}
+                    disabled={loading || unavailable || busy === p.id}
+                    className="btn btn-outline btn-sm shrink-0"
+                  >
+                    {busy === p.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {needsReconnect ? 'Reconnect' : 'Connect'}
+                  </button>
+                ) : (
+                  <span className="text-xs font-medium shrink-0 py-1.5" style={{ color: 'var(--primary)' }}>Connected</span>
+                )}
               </div>
 
               {/* Indented to line up with the platform name (40px tile + 16px gap). */}
@@ -156,9 +161,15 @@ const SocialAccounts: React.FC = () => {
                 <div className="mt-3 ml-[52px] sm:ml-14 h-3 w-32 rounded animate-pulse" style={{ background: 'var(--bg-alt)' }} />
               ) : (
                 linked.length > 0 && (
+                  <>
+                  {linked.length > 1 && (
+                    <p className="mt-3 ml-[52px] sm:ml-14 text-xs" style={{ color: 'var(--warning)' }}>
+                      Kawayan posts to one {p.name} {p.id === 'facebook' ? 'Page' : 'account'}. Disconnect the ones you don't use.
+                    </p>
+                  )}
                   <ul className="mt-3 ml-[52px] sm:ml-14 space-y-2">
                     {linked.map((a) => (
-                      <li key={a.id} className="flex items-center gap-2 text-[13px]">
+                      <li key={a.id} className="flex items-center gap-2 text-ui">
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ background: a.isActive ? 'var(--primary)' : 'var(--warning)' }}
@@ -181,6 +192,7 @@ const SocialAccounts: React.FC = () => {
                       </li>
                     ))}
                   </ul>
+                  </>
                 )
               )}
             </div>
@@ -191,7 +203,7 @@ const SocialAccounts: React.FC = () => {
           <BrandTile muted><TikTokGlyph /></BrandTile>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold" style={{ color: 'var(--fg-muted)' }}>TikTok</p>
-            <p className="text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
+            <p className="text-ui" style={{ color: 'var(--fg-subtle)' }}>
               TikTok reviews apps before they can post publicly. We'll add it once Kawayan is approved.
             </p>
           </div>

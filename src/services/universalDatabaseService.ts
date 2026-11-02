@@ -99,9 +99,9 @@ export class UniversalDatabaseService {
     return service.savePost(post);
   }
 
-  async getUserPosts(userId: string): Promise<GeneratedPost[]> {
+  async getUserPosts(userId: string, month?: string): Promise<GeneratedPost[]> {
     const service = await this.getService();
-    return service.getUserPosts(userId);
+    return service.getUserPosts(userId, month);
   }
 
   async savePlan(userId: string, month: string, ideas: any[]): Promise<void> {

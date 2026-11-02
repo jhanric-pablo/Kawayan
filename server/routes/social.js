@@ -84,6 +84,10 @@ router.get('/api/social/connect/:platform', authenticateToken, async (req, res) 
   const { platform } = req.params;
   if (!SOCIAL_PLATFORMS.includes(platform)) return res.status(400).json({ error: 'Unsupported platform' });
   try {
+    const name = platform === 'facebook' ? 'Facebook Page' : 'Instagram account';
+    if ((await listSocialAccounts(req.user.userId)).some((a) => a.platform === platform && a.isActive)) {
+      return res.status(409).json({ error: `You already have a ${name} connected. Disconnect it first to use a different one.` });
+    }
     const profileId = await getZernioProfileId(req.user.userId);
     const redirect = encodeURIComponent(`${originOf(req)}/?social=${platform}`);
     const { authUrl } = await zernio(`/connect/${platform}?profileId=${profileId}&redirect_url=${redirect}`);

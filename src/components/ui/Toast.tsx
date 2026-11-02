@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import DynamicIslandAlert, { IslandAction } from './DynamicIslandAlert';
 
 type ToastVariant = 'success' | 'error' | 'info';
@@ -14,6 +14,7 @@ interface ToastItem {
   id: number;
   message: string;
   variant: ToastVariant;
+  duration: number;
   action?: IslandAction;
 }
 
@@ -29,23 +30,17 @@ const ToastContext = createContext<ToastAPI | null>(null);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<ToastItem[]>([]);
   const seq = useRef(0);
-  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
-
+  // Each pill runs its own timer (it pauses while pointed at), then calls dismiss.
   const dismiss = useCallback((id: number) => {
     setItems((cur) => cur.filter((t) => t.id !== id));
-    const t = timers.current.get(id);
-    if (t) { clearTimeout(t); timers.current.delete(id); }
   }, []);
 
   const push = useCallback((message: string, opts?: ToastOptions) => {
     const id = ++seq.current;
     const duration = opts?.duration ?? (opts?.action ? 7000 : 3200);
     // The same message twice (e.g. a repeated sync) shows once.
-    setItems((cur) => [...cur.filter((t) => t.message !== message).slice(-2), { id, message, variant: opts?.variant ?? 'info', action: opts?.action }]);
-    timers.current.set(id, setTimeout(() => dismiss(id), duration));
-  }, [dismiss]);
-
-  useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+    setItems((cur) => [...cur.filter((t) => t.message !== message).slice(-2), { id, message, variant: opts?.variant ?? 'info', duration, action: opts?.action }]);
+  }, []);
 
   const api: ToastAPI = {
     toast: push,
@@ -57,13 +52,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {/* Bottom-right on wide screens, bottom-centre above the tab bar on phones (see appShell.css). */}
       <div
-        className="pointer-events-none fixed left-1/2 top-3 z-130 flex w-[min(92vw,520px)] -translate-x-1/2 flex-col items-center gap-2"
+        className="kw-toasts pointer-events-none fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-130 flex flex-col gap-2 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[380px]"
         role="region"
         aria-label="Notifications"
       >
         {items.map((t) => (
-          <DynamicIslandAlert key={t.id} message={t.message} tone={t.variant} action={t.action} onDismiss={() => dismiss(t.id)} />
+          <DynamicIslandAlert key={t.id} message={t.message} tone={t.variant} duration={t.duration} action={t.action} onDismiss={() => dismiss(t.id)} />
         ))}
       </div>
     </ToastContext.Provider>

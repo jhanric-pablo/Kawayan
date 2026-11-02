@@ -1,4 +1,4 @@
-<img src="public/logo.png" alt="Kawayan logo" width="72" align="right">
+<img src="public/brand/kawayan-icon.svg" alt="Kawayan AI logo" width="72" align="right">
 
 # Kawayan
 

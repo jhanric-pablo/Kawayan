@@ -1,31 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ViewState } from '../types';
 import {
-  ArrowRight, Sparkles, Calendar, Zap, CheckCircle2,
-  Wand2, Share2, Store,
+  ArrowRight, CheckCircle2,
   ShieldCheck, Lock, UserCheck,
 } from 'lucide-react';
-import HeroBackground from './landing/HeroBackground';
+import HeroShowcase from './landing/HeroShowcase';
 import WhyKawayan from './landing/WhyKawayan';
+import HowItWorks from './landing/HowItWorks';
+import Features from './landing/Features';
 import './landing/landing.css';
 
 interface Props {
   onNavigate: (view: ViewState) => void;
 }
-
-// Showcases the variety of Philippine MSMEs Kawayan AI serves — scrolls beside the hero.
-const BUSINESS_TYPES = [
-  'Coffee Shop', 'Sari-sari Store', 'Milk Tea Kiosk', 'Panaderia', 'Carinderia',
-  'Ukay Boutique', 'Barbershop', 'Hardware Store', 'Lechon Manok Stall', 'Beauty Salon',
-  'Frozen Goods Reseller', 'Halamanan / Plant Shop', 'Native Delicacies', 'Print & Layout Shop',
-  'Motoparts Supply', 'Poultry Farm',
-];
-
-const STEPS = [
-  { icon: Store, title: 'Tell us your brand', desc: 'Four quick questions — your name, audience, voice, and the topics you post about.' },
-  { icon: Wand2, title: 'AI plans your month', desc: 'One click turns that into a full calendar of Taglish captions with matching visuals.' },
-  { icon: Share2, title: 'Preview & publish', desc: 'See exactly how each post looks on Facebook, Instagram, and TikTok — then post.' },
-];
 
 const QUOTES = [
   { text: 'Dati, gabi-gabi akong nag-iisip ng caption. Ngayon isang click — buong linggo ng posts, Taglish pa, parang sarili kong pananalita.', name: 'Rosa D.', role: 'Panaderia owner · Bulacan', av: 'RD' },
@@ -100,7 +87,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const indicatorRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
 
   // --- Smooth scroll scrub + layered parallax ---
@@ -134,11 +120,12 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
 
       const containerTop = container.offsetTop;
       const scrollRange = window.innerHeight * 2;
-      const progress = Math.min(1, Math.max(0, (currentScrollY.current - containerTop) / scrollRange));
+      // The pinned fade-out only makes sense on desktop, where the hero is sticky; phones scroll it normally.
+      const progress = window.innerWidth < 1024 ? 0 : Math.min(1, Math.max(0, (currentScrollY.current - containerTop) / scrollRange));
       const eased = progress * (2 - progress);
       const opacity = Math.max(0, 1 - eased * 1.5);
       const scale = 1 - eased * 0.05;
-      const { x: mx, y: my } = mouseRef.current;
+      const { x: mx, y: my } = window.innerWidth < 1024 ? { x: 0, y: 0 } : mouseRef.current;
 
       if (contentRef.current) {
         contentRef.current.style.opacity = opacity.toString();
@@ -150,7 +137,6 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         bgRef.current.style.opacity = (1 - progress * 0.6).toString();
       }
       if (overlayRef.current) overlayRef.current.style.opacity = (0.7 + (1 - opacity) * 0.3).toString();
-      if (indicatorRef.current) indicatorRef.current.style.opacity = (1 - progress * 4).toString();
 
       if (!reduce) {
         const sy = window.scrollY;
@@ -209,7 +195,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       {/* ══ Hero ══ */}
       <div ref={containerRef} className="relative bg-emerald-900 z-0">
         <section
-          className="sticky top-0 h-screen w-full flex items-center overflow-hidden z-10 transform-gpu"
+          className="relative lg:sticky lg:top-0 min-h-screen lg:h-screen w-full flex items-center overflow-hidden z-10 transform-gpu"
           style={{ willChange: 'transform' }}
         >
           <div
@@ -217,79 +203,15 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             className="absolute inset-0 -z-20 pointer-events-none transform-gpu"
             style={{ willChange: 'transform, opacity', transform: 'translate3d(0,0,0) scale(1.05)' }}
           >
-            <HeroBackground />
+            <div className="lp-hs-bg" />
           </div>
 
-          <div ref={overlayRef} className="absolute inset-0 -z-10 transition-opacity duration-700">
-            <div className="absolute inset-0 bg-emerald-900/45 dark:bg-[#060F0D]/60" />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(43,87,72,0.4) 0%, rgba(26,61,48,0.42) 45%, rgba(11,23,20,0.72) 100%)' }} />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(19,58,48,0.2) 0%, rgba(11,23,20,0) 35%, rgba(8,16,13,0.62) 100%)' }} />
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 120% at 50% 40%, transparent 36%, rgba(5,12,10,0.62) 100%)' }} />
-          </div>
+          <div ref={overlayRef} className="absolute inset-0 -z-10 transition-opacity duration-700" style={{ background: "radial-gradient(120% 90% at 50% 30%, transparent 40%, rgba(5,12,10,0.4) 100%)" }} />
 
-          <div className="absolute bottom-0 left-0 w-full h-44 bg-linear-to-t from-white dark:from-slate-900 to-transparent z-20" />
+          <div className="absolute bottom-0 left-0 w-full h-24 bg-linear-to-t from-background to-transparent z-10" />
 
-          {/* Vertical business-type marquee */}
-          <div className="absolute right-3 sm:right-6 lg:right-10 top-0 bottom-0 z-20 hidden lg:flex items-center pointer-events-none">
-            <div
-              className="relative h-[70vh] overflow-hidden"
-              style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent)' }}
-            >
-              <div className="flex flex-col items-end gap-3 animate-scroll-y">
-                {[...BUSINESS_TYPES, ...BUSINESS_TYPES].map((biz, i) => (
-                  <div key={i} className="flex w-max items-center gap-2.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm px-4 py-2.5">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#9CB080' }} />
-                    <span className="text-[11px] lg:text-xs font-semibold uppercase tracking-[0.14em] text-white/80 whitespace-nowrap">{biz}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div ref={indicatorRef} className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-white/40 animate-bounce transition-opacity duration-500">
-            <span className="text-[10px] font-bold uppercase tracking-[0.25em]">Scroll to explore</span>
-            <div className="w-px h-8" style={{ background: 'linear-gradient(to bottom, #9CB080, transparent)' }} />
-          </div>
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
-            <div ref={contentRef} className="max-w-3xl mx-auto text-center transition-transform duration-100 ease-out">
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-8 text-[10.5px] font-bold uppercase tracking-[0.18em] text-white/85 border border-white/15 bg-white/[0.07] backdrop-blur-md">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-dot" />
-                For every Filipino MSME
-              </span>
-
-              <h1
-                className="font-display font-bold text-[3.25rem] sm:text-7xl lg:text-8xl text-white mb-7 leading-[0.94] tracking-[-0.035em]"
-                style={{ filter: 'drop-shadow(0 4px 30px rgba(0,0,0,0.85))' }}
-              >
-                Social Media <br />
-                <span style={{ color: '#9CB080' }}>
-                  On Autopilot.
-                </span>
-              </h1>
-
-              <p
-                className="text-lg sm:text-xl text-white/90 max-w-xl mx-auto mb-10 leading-relaxed font-medium"
-                style={{ filter: 'drop-shadow(0 2px 14px rgba(0,0,0,0.9))' }}
-              >
-                AI that understands Taglish and Filipino business culture—so you can create captions, visuals, and schedules with confidence.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <button
-                  onClick={() => onNavigate(ViewState.SIGNUP)}
-                  className="group/btn relative px-8 py-4 rounded-full font-bold text-[0.95rem] overflow-hidden w-full sm:w-auto hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
-                  style={{ background: '#FFFFFF', color: '#15352A', boxShadow: '0 12px 34px -10px rgba(0,0,0,0.5)' }}
-                >
-                  <span className="relative flex items-center justify-center gap-2">
-                    Start Free Trial <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
-                  </span>
-                </button>
-              </div>
-              <p className="mt-4 text-sm font-medium text-white/65">
-                Create your first 7-day content calendar in minutes. No credit card required.
-              </p>
-            </div>
+          <div ref={contentRef} className="relative z-20 w-full transition-transform duration-100 ease-out">
+            <HeroShowcase onNavigate={onNavigate} />
           </div>
         </section>
       </div>
@@ -322,16 +244,16 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       <div className="w-full bg-background border-y border-slate-200 dark:border-slate-800 py-7 overflow-hidden relative z-10">
         <div className="absolute inset-y-0 left-0 w-32 bg-linear-to-r from-white dark:from-slate-900 to-transparent z-10" />
         <div className="absolute inset-y-0 right-0 w-32 bg-linear-to-l from-white dark:from-slate-900 to-transparent z-10" />
-        <p className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 dark:text-slate-600 z-20 pointer-events-none">Trusted by</p>
+        <p className="eyebrow absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-slate-400 dark:text-slate-600 z-20 pointer-events-none">Trusted by</p>
         <div className="flex w-[200%] animate-scroll">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex justify-around w-1/2 items-center gap-16 px-16 min-w-max">
-              <span className="text-xl font-black text-slate-300 dark:text-slate-700 tracking-tight">KAIN<span style={{ color: '#2B5748' }}>.</span>PO</span>
-              <span className="text-xl font-light italic text-slate-300 dark:text-slate-700">ManilaStrut</span>
+              <span className="text-xl font-bold text-slate-300 dark:text-slate-700 tracking-tight">KAIN<span style={{ color: '#2B5748' }}>.</span>PO</span>
+              <span className="text-xl font-normal italic text-slate-300 dark:text-slate-700">ManilaStrut</span>
               <span className="text-xl font-bold tracking-[0.2em] text-slate-300 dark:text-slate-700">BARAKO</span>
               <span className="text-xl font-mono text-slate-300 dark:text-slate-700">TechTito</span>
-              <span className="text-xl font-semibold text-slate-300 dark:text-slate-700">Lola&apos;s<span className="font-light">Best</span></span>
-              <span className="text-xl font-black text-slate-300 dark:text-slate-700" style={{ letterSpacing: '0.08em' }}>DISKARTE<span style={{ color: '#2B5748' }}>!</span></span>
+              <span className="text-xl font-semibold text-slate-300 dark:text-slate-700">Lola&apos;s<span className="font-normal">Best</span></span>
+              <span className="text-xl font-bold text-slate-300 dark:text-slate-700" style={{ letterSpacing: '0.08em' }}>DISKARTE<span style={{ color: '#2B5748' }}>!</span></span>
             </div>
           ))}
         </div>
@@ -352,19 +274,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             <p className="text-lg text-slate-500 dark:text-slate-400">Three steps. No design skills, no marketing degree.</p>
           </div>
 
-          <div className="lp-steps">
-            <div className="lp-steps__line" />
-            {STEPS.map((s, i) => (
-              <div key={s.title} className={`lp-step reveal reveal-d${i + 1}`}>
-                <div className="lp-step__badge">
-                  <s.icon className="w-6 h-6" />
-                  <span className="lp-step__n">{i + 1}</span>
-                </div>
-                <h3 className="lp-step__title">{s.title}</h3>
-                <p className="lp-step__desc">{s.desc}</p>
-              </div>
-            ))}
-          </div>
+          <HowItWorks />
         </div>
       </section>
 
@@ -373,70 +283,12 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         <div className="lp-blob lp-blob--sage w-[460px] h-[460px] -right-40 top-1/3" data-parallax="0.1" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20 reveal">
-            <span className="lp-eyebrow mb-5"><span className="lp-eyebrow__dot" /> Built for Filipino MSMEs</span>
-            <h2 className="font-display font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white mt-5 mb-4 leading-[1.08] tracking-tight">Master the algorithm.</h2>
-            <p className="text-lg text-slate-500 dark:text-slate-400">Native Filipino AI understanding. No more robotic translations.</p>
+            <span className="lp-eyebrow mb-5"><span className="lp-eyebrow__dot" /> Features</span>
+            <h2 className="font-display font-bold text-4xl sm:text-5xl text-slate-900 dark:text-white mt-5 mb-4 leading-[1.08] tracking-tight">Post with confidence.</h2>
+            <p className="text-lg text-slate-500 dark:text-slate-400">The tools inside Kawayan, shown the way you&rsquo;ll use them.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 grid-rows-2 gap-4 sm:gap-5 h-auto md:h-[620px]">
-            <div className="md:col-span-2 row-span-2 bg-card rounded-[1.75rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:shadow-lg hover:-translate-y-1 transition-all duration-400 reveal reveal--scale">
-              <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl -mr-20 -mt-20 opacity-[0.12] group-hover:opacity-20 transition-opacity duration-500" style={{ background: 'radial-gradient(circle, #2B5748, transparent)' }} />
-              <div className="relative z-10 h-full flex flex-col justify-between">
-                <div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6" style={{ background: '#2B5748', boxShadow: '0 8px 22px -8px rgba(43,87,72,0.5)' }}>
-                    <Sparkles className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="font-display font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white mb-3 tracking-[-0.02em]">Taglish Magic</h3>
-                  <p className="text-base text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
-                    Our AI doesn&apos;t just translate; it understands culture. It generates &quot;hugot&quot;, &quot;diskarte&quot;, and &quot;sweldo&quot; humor that resonates deeply with Pinoy audiences.
-                  </p>
-                </div>
-                <div className="mt-8 bg-(--bg-alt) rounded-2xl p-4 border border-slate-200 dark:border-slate-800 w-full max-w-md self-center transform group-hover:scale-[1.02] transition-transform duration-500">
-                  <div className="flex gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
-                    <div className="bg-card p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-slate-600 dark:text-slate-300">
-                      Create a caption for a rainy day coffee promo.
-                    </div>
-                  </div>
-                  <div className="flex gap-3 flex-row-reverse">
-                    <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold" style={{ background: '#2B5748' }}>AI</div>
-                    <div className="p-3 rounded-2xl rounded-tr-none text-sm font-medium" style={{ background: 'rgba(43, 87, 72,0.1)', color: '#2B5748' }}>
-                      &quot;Tag-ulan na naman! ☔️ Perfect time para mag-emote with our Hot Choco. Yakap in a cup, bes! ☕️ #BedWeather&quot;
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-white rounded-[1.75rem] p-8 relative overflow-hidden group hover:-translate-y-1 transition-all duration-400 reveal reveal--scale reveal-d1" style={{ background: '#15352A' }}>
-              <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl -mr-12 -mt-12 opacity-25 group-hover:opacity-40 transition-opacity" style={{ background: '#9CB080' }} />
-              <div className="dot-pattern-dark absolute inset-0 rounded-[1.75rem] opacity-50" />
-              <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-5" style={{ background: 'rgba(255,255,255,0.12)' }}>
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="font-display font-bold text-2xl mb-3 tracking-[-0.02em]">Trend Riding</h3>
-                <p className="text-white/55 text-sm leading-relaxed">Real-time alerts on what&apos;s trending in Manila. Never miss a viral wave.</p>
-                <div className="mt-5 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full animate-pulse-dot" style={{ background: '#9CB080' }} />
-                  <span className="text-xs font-semibold" style={{ color: '#C2D6B6' }}>Live trend tracking</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-[1.75rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm group hover:-translate-y-1 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-400 reveal reveal--scale reveal-d2">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-5 bg-emerald-500/10 border border-emerald-500/20">
-                <Calendar className="w-5 h-5" style={{ color: '#2B5748' }} />
-              </div>
-              <h3 className="font-display font-bold text-2xl text-slate-900 dark:text-white mb-2 tracking-[-0.02em]">Auto-Calendar</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mb-5 leading-relaxed">Plan 30 days of content in 1 click. Drag, drop, done.</p>
-              <div className="flex gap-1.5">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i < 4 ? '' : 'bg-slate-200 dark:bg-slate-700'}`} style={i < 4 ? { background: '#2B5748' } : {}} />
-                ))}
-              </div>
-            </div>
-          </div>
+          <Features />
         </div>
       </section>
 
@@ -484,7 +336,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
             {PLANS.map((plan, idx) => (
               <div
                 key={plan.name}
-                className={`relative rounded-[1.5rem] p-7 flex flex-col transition-all duration-300 reveal reveal--scale reveal-d${idx + 1} ${
+                className={`relative rounded-[1.5rem] p-7 flex flex-col transition duration-300 reveal reveal--scale reveal-d${idx + 1} ${
                   plan.featured
                     ? 'lp-glow-border text-white shadow-xl md:-translate-y-3 border border-white/10'
                     : 'bg-card border border-slate-200 dark:border-slate-800 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700'
@@ -492,9 +344,9 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                 style={plan.featured ? { background: '#15352A' } : undefined}
               >
                 {plan.featured && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.13em] bg-accent text-emerald-700 z-10">Recommended</span>
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold bg-accent text-emerald-700 z-10">Recommended</span>
                 )}
-                <span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${plan.featured ? 'text-sage-200' : 'text-emerald-500 dark:text-accent'}`}>{plan.tag}</span>
+                <span className={`eyebrow ${plan.featured ? 'text-sage-200' : 'text-emerald-500 dark:text-accent'}`}>{plan.tag}</span>
                 <h3 className={`font-display font-bold text-2xl mt-1.5 mb-4 tracking-[-0.02em] ${plan.featured ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h3>
                 <div className="flex items-baseline gap-2 mb-6">
                   <span className={`font-display font-bold text-4xl tracking-[-0.02em] ${plan.featured ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.price}</span>
@@ -510,7 +362,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
                 </ul>
                 <button
                   onClick={() => onNavigate(ViewState.SIGNUP)}
-                  className={`w-full py-3.5 rounded-full font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+                  className={`w-full py-3.5 rounded-full font-bold text-sm transition hover:-translate-y-0.5 active:translate-y-0 ${
                     plan.featured ? 'bg-accent text-emerald-700 hover:bg-sage-200' : 'bg-emerald-500 text-white hover:bg-primary-light'
                   }`}
                 >
@@ -587,7 +439,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
         <div className="absolute -bottom-32 -left-32 w-[400px] h-[400px] rounded-full blur-[100px] opacity-15" style={{ background: '#9CB080' }} data-parallax="0.08" />
 
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10 reveal">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-8 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ background: 'rgba(156,176,128,0.12)', color: '#FFFFFF', border: '1px solid rgba(156,176,128,0.28)' }}>
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-8 text-xs font-bold" style={{ background: 'rgba(156,176,128,0.12)', color: '#FFFFFF', border: '1px solid rgba(156,176,128,0.28)' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-dot" />
             1,000+ Filipino MSMEs and counting
           </span>
@@ -600,7 +452,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <button
               onClick={() => onNavigate(ViewState.SIGNUP)}
-              className="group px-10 py-4 rounded-full font-bold text-lg hover:-translate-y-0.5 active:translate-y-0 transition-all"
+              className="group px-10 py-4 rounded-full font-bold text-lg hover:-translate-y-0.5 active:translate-y-0 transition"
               style={{ background: '#FFFFFF', color: '#15352A', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.5)' }}
             >
               Get Started Free <ArrowRight className="inline-block w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />

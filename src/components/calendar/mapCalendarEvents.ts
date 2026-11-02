@@ -119,6 +119,8 @@ export interface TimelineCardItem {
   time?: string;
   post?: GeneratedPost;
   ideaIndex?: number;
+  /** Pages a scheduled or published post went to (month view's channel filter). */
+  platforms?: LaneId[];
 }
 
 /**
@@ -163,4 +165,53 @@ export function bucketByLane(
     if (i.kind === 'idea') add('plan', { key: i.key, day: i.day, status: 'idea', title: i.title, format: i.format, ideaIndex: i.index });
   });
   return { cells, laneCount };
+}
+
+/* ── Month grid ── */
+
+/**
+ * One entry per post (not per channel) plus the plan's ideas, keyed by day, for the month grid.
+ * `unsent` is everything that hasn't gone out yet (drafts, failed posts, ideas), for the side tray.
+ * With a channel filter, scheduled and published posts for other pages are left out; unsent items always show.
+ */
+export function monthItems(
+  posts: GeneratedPost[],
+  ideas: ContentIdea[],
+  month: Date,
+  channels: PostChannels,
+  accounts: SocialAccount[],
+  failedIds: string[],
+  channel: 'facebook' | 'instagram' | null = null,
+) {
+  const byDay = new Map<number, TimelineCardItem[]>();
+  const unsent: TimelineCardItem[] = [];
+  const add = (item: TimelineCardItem) => {
+    byDay.set(item.day, [...(byDay.get(item.day) ?? []), item]);
+    if (item.status === 'draft' || item.status === 'failed' || item.status === 'idea') unsent.push(item);
+  };
+  const prefix = `${month.getFullYear()}-${pad(month.getMonth() + 1)}-`;
+  posts.forEach((post) => {
+    if (!post.date.startsWith(prefix)) return;
+    const failed = post.status === 'Draft' && failedIds.includes(post.id);
+    const status: CardStatus = failed ? 'failed' : post.status === 'Published' ? 'published' : post.status === 'Scheduled' ? 'scheduled' : 'draft';
+    const sent = status === 'scheduled' || status === 'published';
+    const platforms = sent ? (platformsFor(post, channels, accounts) as LaneId[]) : [];
+    if (channel && sent && !platforms.includes(channel)) return;
+    add({
+      key: post.id,
+      day: Number(post.date.slice(8, 10)),
+      status,
+      title: post.topic,
+      format: post.format,
+      imageUrl: post.imageUrl,
+      time: status === 'scheduled' ? clockTime(channels[post.id]?.at) : undefined,
+      post,
+      platforms,
+    });
+  });
+  buildCalendarItems(posts, ideas, month).forEach((i) => {
+    if (i.kind === 'idea') add({ key: i.key, day: i.day, status: 'idea', title: i.title, format: i.format, ideaIndex: i.index });
+  });
+  unsent.sort((x, y) => x.day - y.day);
+  return { byDay, unsent };
 }

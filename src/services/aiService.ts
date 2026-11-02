@@ -2,6 +2,7 @@ import { BrandProfile, ContentIdea } from "../types";
 import { ValidationService } from "./validationService";
 import { logger } from "../utils/logger";
 import { normalizeIdeasToBatchCount } from "../utils/tierLimits";
+import { storePostImage } from "../utils/postImage";
 
 // The AI routes need a login: they spend the app's free AI allowance.
 const authHeaders = (): Record<string, string> => {
@@ -182,7 +183,7 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string | 
     });
     if (!response.ok) throw new Error(`Cloudflare image proxy error: ${response.status}`);
     const data = await response.json();
-    if (data.imageUrl) return data.imageUrl;
+    if (data.imageUrl) return await storePostImage(data.imageUrl);
     throw new Error('No image returned');
   } catch (e: any) {
     logger.error("Cloudflare image generation failed, falling back to Pollinations:", e.message);
@@ -196,6 +197,6 @@ export const chatWithSupportBot = async (message: string, history: {sender: 'use
     return await callTextAI(fullPrompt);
   } catch (e) {
     // FINAL REDUNDANCY: Tell user to talk to human instead of fake replies
-    return "I apologize, my AI systems are currently overloaded. Please click 'New Ticket' above or use the 'Call Us' button to speak with a human agent directly!";
+    return "The assistant can't answer right now. Tap **Talk to a person instead** below, or message or call our team from Home.";
   }
 };

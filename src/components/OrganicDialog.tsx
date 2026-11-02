@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useFocusTrap } from '../utils/useFocusTrap';
 
 export type OrganicDialogType = 'alert' | 'confirm' | 'prompt';
 
@@ -57,12 +58,19 @@ const OrganicDialogModal: React.FC<{
   onCancel: () => void;
 }> = ({ dialog, inputValue, setInputValue, onConfirm, onCancel }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const { type, options } = dialog;
 
+  useFocusTrap(sheetRef, true);
+
+  // Focus moves in (Cancel first, so Enter never confirms by accident) and back out on close.
   useEffect(() => {
-    if (type === 'prompt') {
-      inputRef.current?.focus();
-    }
+    const before = document.activeElement as HTMLElement | null;
+    if (type === 'prompt') inputRef.current?.focus();
+    else (cancelRef.current ?? confirmRef.current)?.focus();
+    return () => before?.focus?.();
   }, [type]);
 
   const title =
@@ -84,6 +92,7 @@ const OrganicDialogModal: React.FC<{
       onClick={onCancel}
     >
       <div
+        ref={sheetRef}
         className="kw-sheet p-6 sm:p-7 max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
       >
@@ -125,11 +134,11 @@ const OrganicDialogModal: React.FC<{
 
         <div className="flex flex-wrap justify-end gap-2.5">
           {showCancel && (
-            <button type="button" onClick={onCancel} className="btn btn-outline">
+            <button ref={cancelRef} type="button" onClick={onCancel} className="btn btn-outline">
               {options.cancelLabel ?? 'Cancel'}
             </button>
           )}
-          <button type="button" onClick={onConfirm} className="btn btn-primary">
+          <button ref={confirmRef} type="button" onClick={onConfirm} className="btn btn-primary">
             {confirmLabel}
           </button>
         </div>

@@ -5,13 +5,16 @@ import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
 import { socialService, SocialAccount, SocialPlatform } from '../services/socialService';
 import {
-  LayoutList, ChartGantt, ChevronLeft, ChevronRight, Layers, ArrowRight
+  ChevronLeft, ChevronRight, Layers, ArrowRight
 } from 'lucide-react';
 import ChannelTimelineTrack from './calendar/ChannelTimelineTrack';
 import AgendaView from './calendar/AgendaView';
+import MonthGrid from './calendar/MonthGrid';
+import Segmented from './calendar/Segmented';
+import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
 import PostDetailSheet from './calendar/PostDetailSheet';
 import { StatusBadge } from './calendar/TimelinePostCard';
-import { buildCalendarItems } from './calendar/mapCalendarEvents';
+import { buildCalendarItems, monthItems } from './calendar/mapCalendarEvents';
 import PostComposer from './calendar/PostComposer';
 import PlanningModal from './calendar/PlanningModal';
 import UpNext from './calendar/UpNext';
@@ -19,6 +22,7 @@ import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
 import { normalizeFormat } from '../services/validationService';
 import { FEED_EVENT, PostChannels, failedPostsKey, platformsFor, postChannelsKey, readStored } from '../utils/workspaceFeed';
+import { storePostImage } from '../utils/postImage';
 import {
   countPostsInMonth,
   getBatchLimitForSubscription,
@@ -40,14 +44,31 @@ interface Props {
   onIntentDone?: () => void;
 }
 
-export type CalendarIntent = { type: 'compose' } | { type: 'open'; postId: string };
+/** `date` (YYYY-MM-DD) lets the calendar switch to the post's month first; it only loads one month at a time. */
+export type CalendarIntent = { type: 'compose' } | { type: 'open'; postId: string; date?: string };
 
 const announceFeedChange = () => window.dispatchEvent(new Event(FEED_EVENT));
+
+type CalendarView = 'month' | 'timeline' | 'list';
+const VIEW_KEY = 'kawayan_calendar_view';
 
 const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
-  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
+  // Month grid first; the choice is remembered on this device.
+  const [viewMode, setViewModeState] = useState<CalendarView>(() => {
+    try {
+      const v = localStorage.getItem(VIEW_KEY);
+      return v === 'timeline' || v === 'list' ? v : 'month';
+    } catch {
+      return 'month';
+    }
+  });
+  const setViewMode = (v: CalendarView) => {
+    setViewModeState(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
+  };
+  const [channelFilter, setChannelFilter] = useState<'facebook' | 'instagram' | null>(null);
   const [batchStrategy, setBatchStrategy] = useState('');
   const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -60,7 +81,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
   useEffect(() => {
     // Sync input value when currentDate changes (e.g. via navigation buttons)
-    setDateInputValue(currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }));
+    setDateInputValue('');
   }, [currentDate]);
 
   const parseSmartDate = (input: string) => {
@@ -111,10 +132,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         setSelectedDay(result.date.getDate());
       }
       // Auto-correct the text to standard format
-      setDateInputValue(result.date.toLocaleString('default', { month: 'long', year: 'numeric' }));
+      setDateInputValue('');
     } else {
       // Invalid, revert to current
-      setDateInputValue(currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }));
+      setDateInputValue('');
     }
   };
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -129,6 +150,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const [loadingImage, setLoadingImage] = useState(false);
   const [posts, setPosts] = useState<GeneratedPost[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false); // first load done; the timeline shows a skeleton until then
+  const [loadedMonth, setLoadedMonth] = useState<string | null>(null); // "YYYY-MM" whose posts are in `posts`
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   // Scheduled posts that failed to publish come back as Drafts; remember which, so "Up next" can flag them.
   const failedKey = failedPostsKey(userId);
@@ -163,6 +185,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     });
   };
   const createCount = Math.min(pendingIdeas().length, Math.max(0, batchPostCount - monthlyPostCount));
+
+  // How many ideas "Plan month" makes: the owner picks, up to posts left and open days left
+  // (days from today on with no post). Defaults to the most that fits.
+  const scheduleRange = getScheduleDayRange(currentDate);
+  const takenDays = new Set(Object.keys(postStatusByDay).map(Number));
+  let openDayCount = 0;
+  for (let d = scheduleRange.minDay; d <= scheduleRange.maxDay; d++) if (!takenDays.has(d)) openDayCount++;
+  const maxPlanCount = Math.min(Math.max(0, batchPostCount - monthlyPostCount), openDayCount);
+  const [planCountChoice, setPlanCountChoice] = useState<number | null>(null);
+  const planCount = Math.min(planCountChoice ?? maxPlanCount, maxPlanCount);
+  useEffect(() => setPlanCountChoice(null), [monthPrefix]);
 
   const showTierLimitDialog = async () => {
     const upgrade = await dialog.confirm({
@@ -243,8 +276,14 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
   };
 
+  // The calendar only ever shows one month, so it only loads that month's posts.
+  const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  const lastMonth = useRef(monthKey);
+  const slide = monthKey === lastMonth.current ? 0 : monthKey > lastMonth.current ? 1 : -1;
+  useEffect(() => { lastMonth.current = monthKey; }, [monthKey]);
+
   const refreshPostsFromDb = async () => {
-    const savedPosts = await dbService.getUserPosts(userId);
+    const savedPosts = await dbService.getUserPosts(userId, monthKey);
     setPosts(savedPosts);
     setCalendarDataVersion((v) => v + 1);
     return savedPosts;
@@ -270,7 +309,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     // Posts + saved plan are what the calendar actually renders — load them
     // independently so one failing does not blank the other.
     const [postsRes, planRes] = await Promise.allSettled([
-      dbService.getUserPosts(userId),
+      dbService.getUserPosts(userId, monthKey),
       dbService.getPlan(userId, monthName),
     ]);
 
@@ -282,19 +321,22 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
 
     if (planRes.status === 'fulfilled' && planRes.value) {
-      const range = getScheduleDayRange(currentDate);
-      const normalized = normalizeIdeasToBatchCount(
-        planRes.value.map((i) => ({ ...i, format: normalizeFormat(i.format) })),
-        Math.max(planRes.value.length, 1),
-        range
+      // Ideas keep their day. Ones whose day already passed this month just drop out of view
+      // (they used to be pushed onto the last days, flooding the end of the month). One per day.
+      const { minDay, maxDay } = getScheduleDayRange(currentDate);
+      const seen = new Set<number>();
+      setIdeas(
+        planRes.value
+          .map((i) => ({ ...i, format: normalizeFormat(i.format) }))
+          .filter((i) => i.day >= minDay && i.day <= maxDay && !seen.has(i.day) && seen.add(i.day)),
       );
-      setIdeas(normalized);
     } else if (planRes.status === 'fulfilled') {
       setIdeas([]);
     }
 
     setCalendarDataVersion((v) => v + 1);
     setDataLoaded(true);
+    setLoadedMonth(monthKey);
   };
 
   const handleGeneratePlan = async () => {
@@ -311,8 +353,12 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     setLoadingPlan(true);
     try {
       const monthName = currentDate.toLocaleString('default', { month: 'long' });
-      let newIdeas = await generateContentPlan(profile, monthName, batchPostCount, batchStrategy);
-      newIdeas = normalizeIdeasToBatchCount(newIdeas, batchPostCount, getScheduleDayRange(currentDate));
+      if (planCount === 0) {
+        toast.info(maxPlanCount === 0 && openDayCount === 0 ? 'No open days left this month. Plan next month instead.' : 'No posts left in your plan this month.');
+        return;
+      }
+      let newIdeas = await generateContentPlan(profile, monthName, planCount, batchStrategy);
+      newIdeas = normalizeIdeasToBatchCount(newIdeas, planCount, scheduleRange, takenDays);
       setIdeas(newIdeas);
       setPlanningOpen(true);
       await dbService.savePlan(userId, monthName, newIdeas);
@@ -333,7 +379,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   };
 
   // Idea edits save once typing pauses, not once per keystroke.
-  const ideaSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const ideaSaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleUpdateIdea = (index: number, field: keyof ContentIdea, value: string | number) => {
     setIdeas((prev) => {
       const next = [...prev];
@@ -349,6 +395,62 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     const next = ideas.filter((_, i) => i !== index);
     setIdeas(next);
     persistIdeas(next).catch(() => toast.error('Could not save the plan. Please try again.'));
+  };
+
+  // ── Moving content to another day: drag on the timeline, or "Move to" in the post sheet ──
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  /** Drafts only: scheduled posts are already queued on Facebook/Instagram with their time. */
+  const movePost = async (post: GeneratedPost, date: string, isUndo = false) => {
+    if (date === post.date) return;
+    if (post.status !== 'Draft') {
+      toast.error(post.status === 'Scheduled'
+        ? 'Scheduled posts are already queued on your pages, so they keep their time.'
+        : 'Published posts stay on the day they went out.');
+      return;
+    }
+    if (!isUndo && date < ymd(new Date())) { toast.error('Pick today or a later day.'); return; }
+    // One post per day: check the target month (it may not be the one on screen).
+    const sameMonth = date.slice(0, 7) === monthKey;
+    const pool = sameMonth ? posts : await dbService.getUserPosts(userId, date.slice(0, 7));
+    const clash = pool.find((p) => p.id !== post.id && p.date === date);
+    if (clash) { toast.error(`${dayLabel(date)} already has a post (“${clash.topic}”). Pick another day.`); return; }
+    if (
+      !isUndo &&
+      !(await dialog.confirm({
+        title: 'Move this post?',
+        message: `“${post.topic}” will move from ${dayLabel(post.date)} to ${dayLabel(date)}.`,
+        confirmLabel: 'Move post',
+      }))
+    ) {
+      return;
+    }
+
+    const moved = { ...post, date };
+    try {
+      await dbService.savePost(moved);
+    } catch (e: any) {
+      toast.error(/already has a post/.test(e?.message) ? e.message : 'Could not move the post. Please try again.');
+      return;
+    }
+    if (sameMonth) mergePostIntoState(moved);
+    else {
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setCalendarDataVersion((v) => v + 1);
+    }
+    announceFeedChange();
+    if (!isUndo) toast.toast(`Moved to ${dayLabel(date)}`, { variant: 'success', action: { label: 'Undo', onClick: () => movePost(moved, post.date, true) } });
+  };
+
+  const moveIdea = (index: number, day: number) => {
+    const from = ideas[index]?.day;
+    if (from == null || from === day) return;
+    const date = ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
+    if (date < ymd(new Date())) { toast.error('Pick today or a later day.'); return; }
+    handleUpdateIdea(index, 'day', day);
+    // Undo sets the day straight back (handleUpdateIdea works on the latest list, not this render's).
+    toast.toast(`Idea moved to ${dayLabel(date)}`, { variant: 'success', action: { label: 'Undo', onClick: () => handleUpdateIdea(index, 'day', from) } });
   };
 
   const handleClosePanel = () => {
@@ -644,11 +746,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     await publishPost(post, accountIds);
   };
 
-  // Reconnecting re-runs the platform login, which refreshes the account's access token.
-  const handleConnect = (platform: SocialPlatform) => {
-    socialService.connect(platform).catch((e: any) => toast.error(e.message));
-  };
-
   const handleDisconnect = async (account: SocialAccount) => {
     const ok = await dialog.confirm(
       `Disconnect @${account.username}? Posts scheduled to this ${account.platform} account will no longer be published.`
@@ -714,16 +811,24 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
   // Shell requests: "Create post" opens the next free day from today; search and notifications open a post.
   useEffect(() => {
-    if (!intent || !dataLoaded) return;
+    if (!intent || !loadedMonth) return;
+    // Act on the month the request is about; switch to it first and come back once its posts load.
+    const now = new Date();
+    const target = intent.type === 'compose'
+      ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      : intent.date?.slice(0, 7) ?? loadedMonth;
+    if (target !== loadedMonth) {
+      if (target !== monthKey) setCurrentDate(new Date(Number(target.slice(0, 4)), Number(target.slice(5, 7)) - 1, 1));
+      return;
+    }
     if (intent.type === 'compose') {
-      const today = new Date();
+      const today = now;
       const y = today.getFullYear();
       const m = today.getMonth();
       const taken = new Set(posts.filter((p) => p.date.startsWith(`${y}-${String(m + 1).padStart(2, '0')}-`)).map((p) => Number(p.date.slice(8, 10))));
       let day = today.getDate();
       while (taken.has(day) && day < new Date(y, m + 1, 0).getDate()) day++;
       if (taken.has(day)) day = today.getDate();
-      if (y !== currentDate.getFullYear() || m !== currentDate.getMonth()) setCurrentDate(new Date(y, m, 1));
       setGeneratedContent(posts.find((p) => p.date === `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`) ?? null);
       setSelectedDay(day);
     } else {
@@ -731,18 +836,23 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     }
     onIntentDone?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent, dataLoaded]);
+  }, [intent, loadedMonth]);
 
   const agendaItems = useMemo(() => buildCalendarItems(posts, ideas, currentDate), [posts, ideas, currentDate, calendarDataVersion]);
+  const monthData = useMemo(
+    () => monthItems(posts, ideas, currentDate, postChannels, socialAccounts || [], failedIds, channelFilter),
+    [posts, ideas, currentDate, postChannels, socialAccounts, failedIds, channelFilter, calendarDataVersion],
+  );
   const sheetPost = posts.find((p) => p.id === sheetPostId) ?? null;
 
   const handlePhotoFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       if (typeof reader.result !== 'string') return;
+      const imageUrl = await storePostImage(reader.result);
       setGeneratedContent((prev) => {
         if (!prev) return prev;
-        const updated = { ...prev, imageUrl: reader.result as string };
+        const updated = { ...prev, imageUrl };
         persistPost(updated).catch((err) => console.error('Failed to persist uploaded photo:', err));
         return updated;
       });
@@ -751,24 +861,44 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   };
 
   const monthLabel = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const onCurrentMonth = currentDate.getFullYear() === new Date().getFullYear() && currentDate.getMonth() === new Date().getMonth();
   const now = new Date();
   const isPastMonth = currentDate.getFullYear() * 12 + currentDate.getMonth() < now.getFullYear() * 12 + now.getMonth();
   // A month with nothing in it gets the planner pitch right on the timeline.
-  const showEmptyCta = dataLoaded && viewMode === 'timeline' && !isPastMonth && monthlyPostCount === 0 && ideas.length === 0 && !loadingPlan;
+  const showEmptyCta = dataLoaded && viewMode !== 'list' && !isPastMonth && monthlyPostCount === 0 && ideas.length === 0 && !loadingPlan;
 
   return (
+    <MotionConfig reducedMotion="user">
+    <LazyMotion features={domMax}>
     <div className="relative w-full flex flex-col gap-4 pb-16 font-sans text-(--fg)">
 
       {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => setPlanningOpen(true)} />}
 
       {/* ─────────────  Channel timeline (primary)  ───────────── */}
-      <section className="w-full overflow-hidden rounded-2xl border border-(--border) bg-(--card) shadow-sm">
+      <section className="w-full overflow-hidden rounded-lg border border-(--border) bg-(--card)">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-(--border) px-3 py-3 sm:px-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-display text-xl font-bold text-(--fg) tracking-tight mr-1">
-              {monthLabel}
+            <h1 className="relative mr-1 grid overflow-hidden font-display text-xl font-bold tracking-tight text-(--fg)">
+              <AnimatePresence mode="popLayout" initial={false} custom={slide}>
+                <m.span
+                  key={monthLabel}
+                  custom={slide}
+                  variants={{
+                    enter: (d: number) => ({ y: d >= 0 ? 18 : -18, opacity: 0 }),
+                    center: { y: 0, opacity: 1 },
+                    exit: (d: number) => ({ y: d >= 0 ? -18 : 18, opacity: 0 }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  className="col-start-1 row-start-1 whitespace-nowrap"
+                >
+                  {monthLabel}
+                </m.span>
+              </AnimatePresence>
             </h1>
-            <div className="flex items-center rounded-lg border border-(--border-strong) overflow-hidden">
+            <div className="flex items-center rounded-lg border border-(--border-strong) overflow-hidden" data-tour="month-nav">
               <button
                 type="button"
                 aria-label="Previous month"
@@ -777,12 +907,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
+              {/* Jumps back to the current month: quiet when you're already there, highlighted when you've moved away. */}
               <button
                 type="button"
-                className="px-2.5 py-1.5 text-xs font-semibold text-(--fg-muted) hover:text-(--primary) border-x border-(--border-strong) hover:bg-(--bg-alt) transition-colors"
+                disabled={onCurrentMonth}
+                title={onCurrentMonth ? 'You’re on this month' : `Back to ${new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })}`}
+                className={`border-x border-(--border-strong) px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  onCurrentMonth ? 'cursor-default text-(--fg-subtle)' : 'bg-(--kw-green-pale) text-(--primary) hover:bg-(--bg-alt)'
+                }`}
                 onClick={() => setCurrentDate(new Date())}
               >
-                Today
+                {onCurrentMonth ? 'Today' : 'Back to today'}
               </button>
               <button
                 type="button"
@@ -800,17 +935,17 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                 onChange={(e) => setDateInputValue(e.target.value)}
                 onBlur={handleDateInputBlur}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                placeholder="Jump to date…"
+                placeholder="Jump to…"
                 aria-label="Jump to date"
-                className="text-sm text-(--fg-muted) bg-(--bg-alt) border border-(--border-strong) rounded-lg px-3 py-1.5 w-36 outline-hidden focus:ring-2 focus:ring-(--ring) focus:border-(--primary) placeholder:text-(--fg-subtle)"
+                className="text-sm text-(--fg) bg-transparent border border-(--border) rounded-md px-2.5 py-1.5 w-28 outline-hidden focus:ring-2 focus:ring-(--ring) focus:border-(--primary) placeholder:text-(--fg-subtle)"
               />
-              <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-(--kw-forest) text-white text-[10px] px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              <div className="absolute opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 bg-(--kw-forest) text-white text-xs px-2 py-1 rounded-lg -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
               </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="kw-usage w-full sm:w-auto">
+            <span className="kw-usage w-full sm:w-auto lg:hidden">
               <span className="kw-usage__bar" aria-hidden>
                 <b style={{ width: `${Math.min(100, (monthlyPostCount / Math.max(batchPostCount, 1)) * 100)}%` }} />
               </span>
@@ -819,35 +954,21 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                 <button type="button" onClick={onOpenBilling}>· Pro gives 16</button>
               )}
             </span>
-            <div className="flex gap-0.5 p-0.5 bg-(--bg-alt) rounded-lg border border-(--border-strong)">
-              <button
-                onClick={() => setViewMode('timeline')}
-                aria-pressed={viewMode === 'timeline'}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'timeline' ? 'bg-(--card) shadow-sm text-(--primary)' : 'text-(--fg-muted) hover:text-(--fg)'}`}
-                title="Channel timeline"
-              >
-                <ChartGantt className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                aria-pressed={viewMode === 'list'}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-(--card) shadow-sm text-(--primary)' : 'text-(--fg-muted) hover:text-(--fg)'}`}
-                title="Month list"
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-            </div>
+            {viewMode === 'month' && (socialAccounts?.length ?? 0) > 0 && (
+              <Segmented id="channel" label="Show posts for" value={channelFilter} onChange={(v) => setChannelFilter(v as typeof channelFilter)} options={[[null, 'All'], ['facebook', 'Facebook'], ['instagram', 'Instagram']] as const} />
+            )}
+            <span data-tour="calendar-views" className="inline-flex"><Segmented id="view" label="Calendar view" value={viewMode} onChange={setViewMode} options={[['month', 'Month'], ['timeline', 'Timeline'], ['list', 'List']] as const} /></span>
             <button
               type="button"
               data-tour="plan-month"
               onClick={() => setPlanningOpen(true)}
-              className="btn btn-primary"
+              className="btn btn-glass"
               aria-label="Plan month"
             >
               <Layers className="w-4 h-4" />
               <span className="hidden sm:inline">Plan month</span>
               {ideas.length > 0 && (
-                <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.35rem] h-[1.35rem] px-1 rounded-full bg-white/25 text-[11px] font-black">
+                <span className="text-xs font-semibold text-(--fg-muted) tabular-nums">
                   {ideas.length}
                 </span>
               )}
@@ -855,8 +976,33 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           </div>
         </div>
 
-        <div data-tour="calendar-grid" className="relative">
-          {viewMode === 'timeline' || !dataLoaded ? (
+        <div data-tour="calendar-grid" className="relative overflow-hidden">
+          <AnimatePresence mode="wait" initial={false} custom={slide}>
+          <m.div
+            key={`${viewMode}:${monthKey}`}
+            custom={slide}
+            variants={{
+              enter: (d: number) => ({ opacity: 0, x: d * 36, y: d ? 0 : 8 }),
+              center: { opacity: 1, x: 0, y: 0 },
+              exit: (d: number) => ({ opacity: 0, x: d * -36, y: 0 }),
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+          {viewMode === 'month' && dataLoaded ? (
+            <MonthGrid
+              currentDate={currentDate}
+              byDay={monthData.byDay}
+              unsent={monthData.unsent}
+              postsLimitText={<><b className="font-semibold text-(--fg) tabular-nums">{monthlyPostCount}</b> of {batchPostCount} posts this month</>}
+              onOpenPost={(post) => setSheetPostId(post.id)}
+              onOpenDay={handleDayClick}
+              onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
+              onMoveIdea={moveIdea}
+            />
+          ) : viewMode === 'timeline' || !dataLoaded ? (
             <ChannelTimelineTrack
               currentDate={currentDate}
               posts={posts}
@@ -869,15 +1015,19 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
               onEditPost={openPost}
               onRetryPost={retryPost}
               onOpenDay={handleDayClick}
-              onConnect={handleConnect}
+              onConnect={onOpenSocial}
               onDisconnect={handleDisconnect}
               onManageAccounts={onOpenSocial}
+              onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
+              onMoveIdea={moveIdea}
             />
           ) : (
             <div className="p-3 sm:p-5">
               <AgendaView items={agendaItems} currentDate={currentDate} selectedDay={selectedDay} onDayClick={handleDayClick} />
             </div>
           )}
+          </m.div>
+          </AnimatePresence>
           {showEmptyCta && (
             <div className="kw-empty-cta">
               <div className="kw-empty-cta__card">
@@ -895,7 +1045,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             {(['idea', 'draft', 'scheduled', 'published', 'failed'] as const).map((s) => <StatusBadge key={s} status={s} />)}
           </div>
           <p className="text-xs text-(--fg-muted) hidden md:block">
-            Click a post for details, or an empty slot to write one. Extra posts are ₱{ADDON_POST_PRICE_PHP} each.
+            Click a post for details, or an empty slot to write one.
           </p>
         </div>
       </section>
@@ -916,6 +1066,11 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         creatingDay={creatingDay}
         ideas={ideas}
         postStatusByDay={postStatusByDay}
+        planCount={planCount}
+        maxPlanCount={maxPlanCount}
+        openDayCount={openDayCount}
+        onPlanCountChange={setPlanCountChoice}
+        onPlanNextMonth={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
         createCount={createCount}
         scheduleRange={getScheduleDayRange(currentDate)}
         paused={selectedDay !== null}
@@ -974,8 +1129,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         onClose={() => setSheetPostId(null)}
         onEdit={editPost}
         onRetry={retryPost}
+        onMove={(post, date) => {
+          // Close the sheet so the confirm dialog isn't stuck behind it.
+          setSheetPostId(null);
+          movePost(post, date);
+        }}
       />
     </div>
+    </LazyMotion>
+    </MotionConfig>
   );
 };
 

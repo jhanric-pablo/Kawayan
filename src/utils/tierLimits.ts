@@ -58,72 +58,46 @@ export function getScheduleDayRange(calendarMonth: Date, now: Date = new Date())
 const FORMATS: ContentIdea['format'][] = ['Image', 'Video', 'Text'];
 
 /**
- * Pad or trim ideas so batch generation always targets exactly `targetCount` slots.
- * AI plans often return 5–7 items; trial requires 8 and pro requires 16.
- * When `range` is set, days are clamped to [minDay, maxDay] (e.g. today onward).
+ * Place a plan's ideas on the calendar: one idea per open day, never two on the same day.
+ * Open days are [minDay, maxDay] minus `taken` (days that already have a post). With more ideas
+ * than open days the extras are left out; with fewer ideas than `targetCount` the plan is padded
+ * with variations. An idea keeps its own day when that day is open; the rest spread evenly.
  */
 export function normalizeIdeasToBatchCount(
   ideas: ContentIdea[],
   targetCount: number,
-  range?: ScheduleDayRange
+  range?: ScheduleDayRange,
+  taken: Set<number> = new Set()
 ): ContentIdea[] {
   const minDay = range?.minDay ?? 1;
   const maxDay = range?.maxDay ?? 28;
-  const daySpan = maxDay - minDay + 1;
+  const open: number[] = [];
+  for (let d = minDay; d <= maxDay; d++) if (!taken.has(d)) open.push(d);
+  const count = Math.min(targetCount, open.length);
+  if (count <= 0) return [];
 
-  if (targetCount <= 0 || daySpan <= 0) return [];
-  if (!ideas.length) {
-    return buildDefaultIdeas(targetCount, minDay, maxDay);
-  }
+  const source = ideas.length ? ideas : buildDefaultIdeas(count, minDay, maxDay);
+  const picked = Array.from({ length: count }, (_, i) => {
+    const idea = source[i % source.length];
+    return i < source.length ? { ...idea } : { ...idea, topic: `${idea.topic} · Batch angle ${i + 1}` };
+  });
 
-  const usedDays = new Set<number>();
+  const used = new Set<number>();
+  const unplaced: ContentIdea[] = [];
   const result: ContentIdea[] = [];
-
-  const assignDay = (index: number): number => {
-    const slotCount = Math.min(targetCount, daySpan);
-    const slotIndex = index % slotCount;
-    let day: number;
-    if (slotCount === 1) {
-      day = minDay;
-    } else {
-      day = minDay + Math.round((slotIndex / (slotCount - 1)) * (maxDay - minDay));
-    }
-    day = Math.min(maxDay, Math.max(minDay, day));
-    while (usedDays.has(day) && day < maxDay) day += 1;
-    if (usedDays.has(day)) {
-      day = minDay;
-      while (usedDays.has(day) && day <= maxDay) day += 1;
-    }
-    if (day > maxDay) {
-      day = minDay + (index % daySpan);
-      while (usedDays.has(day) && day <= maxDay) day += 1;
-    }
-    usedDays.add(day);
-    return day;
-  };
-
-  const isValidDay = (day: number) => day >= minDay && day <= maxDay;
-
-  for (let i = 0; i < targetCount; i++) {
-    const source = ideas[i % ideas.length];
-    if (i < ideas.length && isValidDay(ideas[i].day) && !usedDays.has(ideas[i].day)) {
-      usedDays.add(ideas[i].day);
-      result.push({ ...ideas[i] });
-      continue;
-    }
-
-    result.push({
-      day: assignDay(i),
-      title: source.title,
-      topic:
-        i < ideas.length
-          ? source.topic
-          : `${source.topic} · Batch angle ${i + 1}`,
-      format: source.format || FORMATS[i % FORMATS.length],
-    });
-  }
-
-  return result;
+  picked.forEach((idea) => {
+    if (open.includes(idea.day) && !used.has(idea.day)) {
+      used.add(idea.day);
+      result.push(idea);
+    } else unplaced.push(idea);
+  });
+  const free = open.filter((d) => !used.has(d));
+  unplaced.forEach((idea, j) => {
+    // Evenly spaced picks are distinct because there are at least as many free days as ideas left.
+    const at = unplaced.length === 1 ? 0 : Math.round((j * (free.length - 1)) / (unplaced.length - 1));
+    result.push({ ...idea, day: free[at], format: idea.format || FORMATS[j % FORMATS.length] });
+  });
+  return result.sort((a, b) => a.day - b.day);
 }
 
 function buildDefaultIdeas(count: number, minDay: number, maxDay: number): ContentIdea[] {

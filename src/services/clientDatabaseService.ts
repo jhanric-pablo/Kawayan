@@ -196,20 +196,25 @@ export class ClientDatabaseService {
     }
   }
 
+  /**
+   * The brand profile, or undefined only when the server says this account has none (404).
+   * Any other failure throws: "couldn't reach the server" must never look like "new account",
+   * or a backend restart sends existing users to brand setup.
+   */
   async getProfile(userId: string): Promise<BrandProfile | undefined> {
-    try {
-      const response = await fetch(`${this.baseUrl}/profiles/${userId}`, {
-        headers: this.getHeaders()
-      });
-
-      if (response.status === 404) return undefined;
-      if (!response.ok) throw new Error('Failed to fetch profile');
-
-      return await response.json();
-    } catch (error) {
-      logger.error('Error getting profile (api)', { userId, error });
-      return undefined;
+    let response: Response | null = null;
+    // While the backend restarts, the dev proxy answers 5xx for a few seconds; wait it out.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      response = await fetchWithRetry(`${this.baseUrl}/profiles/${userId}`, { headers: this.getHeaders() }).catch(() => null);
+      if (response && response.status < 500) break;
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 800));
     }
+    if (response?.status === 404) return undefined;
+    if (!response?.ok) {
+      logger.error('Error getting profile (api)', { userId, status: response?.status });
+      throw new Error('Could not load the brand profile');
+    }
+    return await response.json();
   }
 
   // --- Posts ---
@@ -228,6 +233,12 @@ export class ClientDatabaseService {
         }
       }
 
+      // One post per day: the server says which post already has the day.
+      if (response.status === 409) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'That day already has a post.');
+      }
+
       if (!response.ok) throw new Error('Failed to save post');
     } catch (error) {
       logger.error('Error saving post (api)', { postId: post.id, error });
@@ -235,9 +246,10 @@ export class ClientDatabaseService {
     }
   }
 
-  async getUserPosts(userId: string): Promise<GeneratedPost[]> {
+  /** `month` ("YYYY-MM") limits the result to that month; leave it out for every post. */
+  async getUserPosts(userId: string, month?: string): Promise<GeneratedPost[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/posts/user/${userId}`, {
+      const response = await fetch(`${this.baseUrl}/posts/user/${userId}${month ? `?month=${month}` : ''}`, {
         headers: this.getHeaders()
       });
 

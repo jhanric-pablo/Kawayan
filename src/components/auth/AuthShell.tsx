@@ -1,65 +1,83 @@
 import React from 'react';
+import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
+import { ArrowLeft, Moon, Sun } from 'lucide-react';
 import './authShell.css';
+import KawayanLogo from '../KawayanLogo';
 
 interface Props {
   onBack: () => void;
-  eyebrow?: React.ReactNode;
-  title: React.ReactNode;
+  title: string;
+  /** Under the title: the "Already have an account? Sign in" switch, or a line of context. */
   subtitle?: React.ReactNode;
   darkMode?: boolean;
   toggleTheme?: () => void;
+  /** Under the subtitle (the sign-up steps). */
+  headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Beside the form on wide screens (sign-up's "what happens next"). */
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }
 
 /**
- * Centred auth stage: ambient dot field (with a spotlight that tracks the
- * cursor), a slim top bar, a brand header and one card. Shared by sign-in,
- * sign-up and password reset so all three have the same footprint.
+ * Open page: logo top-left, the form centred, and an optional panel beside it.
+ * Switching modes animates: the title slides, the form resizes, the panel glides in.
+ * Shared by sign-in, sign-up, staff login and password reset.
  */
 const AuthShell: React.FC<Props> = ({
-  onBack, eyebrow, title, subtitle, darkMode, toggleTheme, footer, children,
+  onBack, title, subtitle, darkMode, toggleTheme, headerExtra, footer, aside, children,
 }) => (
-  <div
-    className="ax"
-    onMouseMove={(e) => {
-      const r = e.currentTarget.getBoundingClientRect();
-      e.currentTarget.style.setProperty('--ax-mx', `${e.clientX - r.left}px`);
-      e.currentTarget.style.setProperty('--ax-my', `${e.clientY - r.top}px`);
-    }}
-  >
-    <div className="ax__field" aria-hidden="true">
-      <span className="ax__orb ax__orb--1" />
-      <span className="ax__orb ax__orb--2" />
-      <span className="ax__dots" />
-      <span className="ax__dots ax__dots--glow" />
-    </div>
+  <MotionConfig reducedMotion="user">
+    <LazyMotion features={domMax} strict>
+      <div className="ax">
+        <header className="ax__bar">
+          <button type="button" className="ax__brand" onClick={onBack} aria-label="Kawayan home">
+            <KawayanLogo size={24} />
+          </button>
+          <div className="ax__tools">
+            <button type="button" className="ax__back" onClick={onBack}>
+              <ArrowLeft aria-hidden /> Home
+            </button>
+            {toggleTheme && (
+              <m.button
+                type="button"
+                className="ax__theme"
+                onClick={toggleTheme}
+                whileTap={{ scale: 0.88, rotate: -20 }}
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {darkMode ? <Sun aria-hidden /> : <Moon aria-hidden />}
+              </m.button>
+            )}
+          </div>
+        </header>
 
-    <div className="ax__bar">
-      <button type="button" className="ax__back" onClick={onBack}>← Kawayan</button>
-      {toggleTheme && (
-        <button type="button" className="ax__theme" onClick={toggleTheme}>
-          {darkMode ? 'Light' : 'Dark'}
-        </button>
-      )}
-    </div>
-
-    <div className="ax__stage">
-      <header className="ax__head">
-        <button type="button" className="ax__mark" onClick={onBack} title="Back to home">
-          <img src="/logo.png" alt="" />
-          <span>Kawayan AI</span>
-        </button>
-        {eyebrow && <div><span className="ax__eyebrow">{eyebrow}</span></div>}
-        <h1 className="ax__title">{title}</h1>
-        {subtitle && <p className="ax__sub">{subtitle}</p>}
-      </header>
-
-      <div className="ax__card">{children}</div>
-
-      {footer}
-    </div>
-  </div>
+        <main className="ax__stage">
+          <m.section layout className="ax__panel" transition={{ type: 'spring', stiffness: 260, damping: 32 }}>
+            <div className="ax__head">
+              <AnimatePresence mode="wait" initial={false}>
+                <m.h1
+                  key={title}
+                  className="ax__title"
+                  initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -12, filter: 'blur(4px)' }}
+                  transition={{ duration: 0.22 }}
+                >
+                  {title}
+                </m.h1>
+              </AnimatePresence>
+              {subtitle && <p className="ax__sub">{subtitle}</p>}
+              {headerExtra}
+            </div>
+            {children}
+            {footer}
+          </m.section>
+          <AnimatePresence>{aside}</AnimatePresence>
+        </main>
+      </div>
+    </LazyMotion>
+  </MotionConfig>
 );
 
 export default AuthShell;

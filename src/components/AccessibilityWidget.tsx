@@ -16,6 +16,7 @@ import {
   resetAccessibilitySettings,
   updateAccessibilitySettings,
 } from '../utils/accessibility';
+import { Switch } from './ui/switch';
 
 const FONT_LABELS = ['Default', 'Large', 'Larger', 'Largest'] as const;
 
@@ -27,33 +28,20 @@ const ToggleRow: React.FC<{
   onChange: (checked: boolean) => void;
   icon: React.ReactNode;
 }> = ({ id, label, description, checked, onChange, icon }) => (
-  <label
-    htmlFor={id}
-    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-emerald-500/5 dark:hover:bg-accent/10"
+  // The whole row toggles; the switch itself carries the name and description for screen readers.
+  <div
+    onClick={(e) => { if (!(e.target as HTMLElement).closest('[role="switch"]')) onChange(!checked); }}
+    className="flex items-center gap-3 rounded-xl p-3 cursor-pointer transition-colors hover:bg-(--bg-alt)"
   >
-    <span
-      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-      style={{ background: 'rgba(43,87,72,0.1)', color: 'var(--kw-green, #2B5748)' }}
-      aria-hidden
-    >
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-badge text-badge-text" aria-hidden>
       {icon}
     </span>
-    <span className="flex-1 min-w-0">
-      <span className="block text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-        {label}
-      </span>
-      <span className="block text-xs mt-0.5 leading-snug" style={{ color: 'var(--fg-muted)' }}>
-        {description}
-      </span>
+    <span className="min-w-0 flex-1">
+      <span id={`${id}-label`} className="block text-sm font-semibold text-(--fg)">{label}</span>
+      <span id={`${id}-desc`} className="mt-0.5 block text-xs leading-snug text-(--fg-muted)">{description}</span>
     </span>
-    <input
-      id={id}
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="mt-2 w-4 h-4 accent-emerald-500 shrink-0"
-    />
-  </label>
+    <Switch id={id} checked={checked} onCheckedChange={onChange} aria-labelledby={`${id}-label`} aria-describedby={`${id}-desc`} />
+  </div>
 );
 
 /** Text size, contrast, link, font and motion options. Lives in Settings → Appearance. */
@@ -79,7 +67,7 @@ export const AccessibilityOptions: React.FC = () => {
             <Minus className="w-4 h-4" />
           </button>
           <span
-            className="flex-1 text-center text-sm font-medium py-1.5 rounded-(--r)"
+            className="flex-1 text-center text-sm font-medium py-1.5 rounded-(--radius)"
             style={{ background: 'var(--bg-alt)', color: 'var(--fg)' }}
             aria-live="polite"
           >
@@ -184,7 +172,7 @@ const AccessibilityWidget: React.FC = () => {
 
           <div className="p-3 space-y-1 max-h-[min(70vh,480px)] overflow-y-auto">
             <div className="px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--fg-muted)' }}>
+              <p className="eyebrow mb-2" style={{ color: 'var(--fg-muted)' }}>
                 Text size
               </p>
               <div className="flex items-center gap-2">
@@ -260,7 +248,7 @@ const AccessibilityWidget: React.FC = () => {
               <RotateCcw className="w-4 h-4" aria-hidden />
               Reset accessibility settings
             </button>
-            <p className="text-[10px] text-center mt-2 px-2 leading-snug" style={{ color: 'var(--fg-subtle)' }}>
+            <p className="text-xs text-center mt-2 px-2 leading-snug" style={{ color: 'var(--fg-subtle)' }}>
               Settings are saved in your browser for this device.
             </p>
           </div>

@@ -142,7 +142,7 @@ const Billing: React.FC = () => {
   const labelStyle = { color: 'var(--fg-muted)' };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl space-y-6 animate-fade-in">
       <div className="page-head">
         <div>
           <h1 className="page-head__title">Billing</h1>
@@ -151,7 +151,7 @@ const Billing: React.FC = () => {
       </div>
 
       {wallet.paymentsTestMode && (
-        <p className="text-[13px] -mt-2" style={{ color: 'var(--fg-muted)' }}>
+        <p className="text-ui -mt-2" style={{ color: 'var(--fg-muted)' }}>
           <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: 'var(--warning)' }} />
           Test mode: payments use PayMongo's sandbox, so no real money is charged. Pay with card 4343 4343 4343 4345 (any future
           expiry, any CVC), or pick GCash or Maya and click Authorize on PayMongo's test page.
@@ -160,7 +160,7 @@ const Billing: React.FC = () => {
 
       {pending && (
         <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--r-lg) px-4 py-3"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-lg) px-4 py-3"
           style={{ background: 'var(--bg-alt)', border: '1px solid var(--border)' }}
           role="status"
         >
@@ -188,7 +188,7 @@ const Billing: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-2">
         {/* Plan */}
         <section className="surface p-6 flex flex-col">
-          <p className="text-[13px] font-medium" style={labelStyle}>Current plan</p>
+          <p className="text-ui font-medium" style={labelStyle}>Current plan</p>
           <h2 className="font-display text-2xl font-semibold mt-1" style={{ color: 'var(--fg)' }}>{isPro ? 'Pro' : 'Free'}</h2>
           <p className="text-sm mt-1" style={labelStyle}>
             {isPro ? `${PRO_POST_LIMIT} posts a month · ${peso(PRO_PRICE_PHP)}/month` : `${TRIAL_POST_LIMIT} posts a month · ₱0`}
@@ -197,7 +197,7 @@ const Billing: React.FC = () => {
           <div className="mt-6 pt-5 flex-1 flex flex-col" style={{ borderTop: '1px solid var(--border)' }}>
             <table className="w-full text-sm tabular-nums">
               <thead>
-                <tr className="text-[13px]" style={labelStyle}>
+                <tr className="text-ui" style={labelStyle}>
                   <th className="text-left font-medium pb-2" />
                   <th className="text-right font-medium pb-2 w-20" style={!isPro ? { color: 'var(--fg)' } : undefined}>Free</th>
                   <th className="text-right font-medium pb-2 w-24" style={isPro ? { color: 'var(--fg)' } : undefined}>Pro</th>
@@ -240,19 +240,19 @@ const Billing: React.FC = () => {
 
         {/* Wallet */}
         <section className="surface p-6">
-          <p className="text-[13px] font-medium" style={labelStyle}>Wallet balance</p>
+          <p className="text-ui font-medium" style={labelStyle}>Wallet balance</p>
           <p className="font-display text-3xl font-semibold mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
           <p className="text-sm mt-1" style={labelStyle}>For extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
 
           <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
-            <label htmlFor="topup-amount" className="text-[13px] font-medium" style={labelStyle}>Add funds</label>
+            <label htmlFor="topup-amount" className="text-ui font-medium" style={labelStyle}>Add funds</label>
             <div className="flex gap-2 mt-2">
               {QUICK_AMOUNTS.map((v) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setAmount(String(v))}
-                  className="flex-1 rounded-(--r) py-1.5 text-sm font-medium tabular-nums transition-colors"
+                  className="flex-1 rounded-(--radius) py-1.5 text-sm font-medium tabular-nums transition-colors"
                   style={
                     amount === String(v)
                       ? { border: '1px solid var(--primary)', color: 'var(--primary)', background: 'var(--card)' }

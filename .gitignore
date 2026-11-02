@@ -51,3 +51,6 @@ uploads/
 # Local Impeccable design-tool cache/config
 .impeccable/
 .claude/
+
+# Backups written by scripts/migrate-post-images.mjs (contain post images)
+scripts/backups/

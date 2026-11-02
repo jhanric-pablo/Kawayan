@@ -5,27 +5,27 @@ import type { CaptionRewrite } from '../../services/aiService';
 import {
   X, RefreshCcw, Loader2, Upload, Image as ImageIcon, Send, Facebook, Instagram, Scissors, Smile, Briefcase, Megaphone,
   Languages, Hash, ArrowUp, ArrowUpRight, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine,
-  CircleAlert, History, Clock, Globe, AudioLines, Sparkles,
+  CircleAlert, Clock, Globe, AudioLines, Sparkles,
 } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import clsx from 'clsx';
+import { m } from 'motion/react';
 import FormatPicker, { PostFormat } from './FormatPicker';
 import PhonePreview from './PhonePreview';
 import { StatusBadge } from './TimelinePostCard';
 import { normalizeFormat } from '../../services/validationService';
+import { useFocusTrap } from '../../utils/useFocusTrap';
 
 /* ── Shared looks ── */
 
-const CARD = 'rounded-2xl border border-(--border) bg-(--card) p-4';
-const CARD_HEAD = 'mb-3 flex items-center justify-between gap-2 text-[13px] font-semibold text-(--fg)';
 /** The frameless writing surface: one hairline, emerald when focused. */
 const FIELD =
   'rounded-xl border border-(--border) bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)] transition-colors focus-within:border-brand focus-within:ring-2 focus-within:ring-(--ring)';
 const CHIP =
-  'inline-flex items-center gap-1.5 rounded-full border border-(--border) bg-(--bg-alt) px-3 py-1.5 text-xs font-semibold text-(--fg-muted) transition-colors hover:border-(--border-strong) hover:text-(--fg) disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex items-center gap-1.5 rounded-md border border-(--border) bg-(--card) px-2.5 py-1.5 text-xs font-semibold text-(--fg-muted) transition-colors hover:border-(--border-strong) hover:text-(--fg) disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 export const PRIMARY_BTN =
-  'inline-flex items-center justify-center gap-2 rounded-full bg-(--primary-accent) px-5 py-2.5 text-sm font-semibold text-(--primary-accent-fg) transition-colors hover:bg-(--primary-accent-hover) disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4';
-const LABEL = 'text-[11px] font-bold uppercase tracking-[0.08em] text-(--fg-subtle)';
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-(--primary-accent) px-4 py-2.5 text-sm font-semibold text-(--primary-accent-fg) transition-colors hover:bg-(--primary-accent-hover) disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4';
+const LABEL = 'eyebrow text-(--fg-subtle)';
 
 /* ── AI helpers ── */
 
@@ -43,24 +43,39 @@ const IG_CAPTION_LIMIT = 2200;
 
 const scoreWord = (s: number) => (s >= 75 ? 'Strong' : s >= 50 ? 'Promising' : 'Needs work');
 
-const ScoreRing: React.FC<{ score: number }> = ({ score }) => {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  const color = score >= 75 ? 'var(--primary)' : score >= 50 ? 'var(--warning)' : 'var(--danger)';
-  return (
-    <div className="relative h-16 w-16 shrink-0">
-      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--border-strong)" strokeWidth="6" />
-        <circle
-          cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)}
-          className="transition-[stroke-dashoffset] duration-500"
-        />
-      </svg>
-      <span className="absolute inset-0 grid place-items-center font-display text-lg font-bold">{score}</span>
+type StepState = 'active' | 'done' | 'locked';
+
+/** One of the studio's three steps (Idea, Caption, Image): a numbered header, then its tools. */
+const Step: React.FC<{ n: number; title: string; state: StepState; summary?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }> = ({
+  n, title, state, summary, action, children,
+}) => (
+  <section className={clsx('rounded-xl border bg-(--card)', state === 'locked' ? 'border-dashed border-(--border)' : 'border-(--border)')}>
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span
+        className={clsx(
+          'grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold',
+          state === 'done' ? 'bg-(--primary) text-(--on-accent)' : state === 'active' ? 'bg-(--kw-green-pale) text-(--primary)' : 'bg-(--bg-alt) text-(--fg-subtle)',
+        )}
+      >
+        {state === 'done' ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : n}
+      </span>
+      <h3 className={clsx('shrink-0 text-ui font-semibold', state === 'locked' && 'text-(--fg-subtle)')}>{title}</h3>
+      {summary && <span className="min-w-0 truncate text-xs text-(--fg-muted)">{summary}</span>}
+      {action && <span className="ml-auto shrink-0">{action}</span>}
     </div>
-  );
-};
+    {children && (
+      // Unfolds when a step opens (e.g. once the AI has written the caption).
+      <m.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1 }}
+        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+        className="overflow-hidden"
+      >
+        <div className="border-t border-(--border) px-4 py-4">{children}</div>
+      </m.div>
+    )}
+  </section>
+);
 
 /** Narrates the first draft while it's made (caption, then image), so the wait reads as progress. */
 const GeneratingSteps: React.FC = () => {
@@ -80,7 +95,7 @@ const GeneratingSteps: React.FC = () => {
         <li
           key={s}
           className={clsx(
-            'flex items-center gap-2.5 text-[13.5px] transition-colors',
+            'flex items-center gap-2.5 text-ui transition-colors',
             i < step ? 'text-(--fg-muted)' : i === step ? 'font-semibold text-(--fg)' : 'text-(--fg-subtle)',
           )}
         >
@@ -268,11 +283,16 @@ const PostComposer: React.FC<Props> = ({
     latest.current.onClose();
   };
 
+  useFocusTrap(dialogRef, open);
+
   // Esc closes the open popover first, then the studio; background scroll is locked while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // A confirm or menu stacked on top handles its own Escape.
+      const target = e.target as Node;
+      if (target !== document.body && !dialogRef.current?.contains(target)) return;
       if (latest.current.planOpen) setPlanOpen(false);
       else close();
     };
@@ -458,6 +478,8 @@ const PostComposer: React.FC<Props> = ({
       imageUrl={post?.imageUrl}
       loadingImage={loadingImage}
       onDropImage={canEditVisual ? onPhotoFile : undefined}
+      tabs={['facebook', 'instagram']}
+      defaultPlatform="facebook"
     />
   );
 
@@ -489,17 +511,16 @@ const PostComposer: React.FC<Props> = ({
       >
         {/* ── Header ── */}
         <header className="flex items-start gap-3 border-b border-(--border) bg-(--card) px-5 py-4 sm:px-6">
-          <span className="mt-0.5 shrink-0 rounded-full border border-badge-border bg-badge px-2.5 py-1 text-xs font-bold text-badge-text">
-            {dateLabel}
-          </span>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-bold leading-snug" title={heading}>{heading}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--fg-muted)">
               {post ? (
                 <StatusBadge status={isPublished ? 'published' : isScheduled ? 'scheduled' : 'draft'} />
               ) : (
-                <span className="rounded-full border border-dashed border-(--border-strong) px-1.5 text-[10.5px] font-semibold leading-4">New</span>
+                <span className="rounded-full border border-dashed border-(--border-strong) px-1.5 text-xs font-semibold leading-4">New</span>
               )}
+              <span className="font-semibold text-(--fg)">{dateLabel}</span>
+              {currentIdea && !post && <span>From your {monthName} plan</span>}
               {post?.format && <span>{normalizeFormat(post.format)} post</span>}
               {profile.brandVoice && (
                 <span className="inline-flex items-center gap-1" title={profile.targetAudience ? `Written for ${profile.targetAudience}` : undefined}>
@@ -507,314 +528,315 @@ const PostComposer: React.FC<Props> = ({
                   Tuned to: <b className="font-semibold text-(--fg)">{profile.brandVoice}</b>
                 </span>
               )}
-              {saveIndicator}
             </div>
           </div>
           <button
             type="button"
             onClick={close}
             aria-label="Close composer"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
           >
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        {/* ── Body: studio | phone ── */}
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-h-0 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
-            {!post ? (
-              <form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy}>
-                <p className="text-xs font-semibold text-(--fg-muted)">{currentIdea ? `From your ${monthName} plan` : `${dateLabel} · nothing planned yet`}</p>
-                <h3 className="mb-4 mt-1 font-display text-2xl font-bold tracking-tight">
-                  {limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'}
-                </h3>
-                {limitReached && <p className="-mt-2 mb-4 text-sm text-(--fg-muted)">Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>}
+        {/* ── Body: three steps | phone ── */}
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-h-0 space-y-3 overflow-y-auto bg-(--bg) px-5 py-5 sm:px-6">
+            {isPublished && post && (
+              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-2.5 text-ui text-(--fg)">
+                <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
+                {post.externalLink && (
+                  <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-(--primary) hover:underline">
+                    View post <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </p>
+            )}
+            {isScheduled && post && (
+              <p className="flex items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-50 px-4 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
+              </p>
+            )}
 
-                <div className={clsx(FIELD, 'p-4')}>
-                  <TextareaAutosize
-                    className="block w-full resize-none bg-transparent text-[15px] leading-relaxed outline-hidden placeholder:text-(--fg-subtle)"
-                    minRows={4}
-                    maxRows={12}
-                    maxLength={400}
-                    value={brief}
-                    onChange={(e) => setBrief(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitBrief();
-                    }}
-                    readOnly={generatingPost || extraBusy}
-                    placeholder="e.g. Behind the scenes of our 5 AM bake, and 10% off pandesal this weekend"
-                    aria-label="What the post is about"
-                    aria-invalid={!!extraError}
-                    aria-describedby="ps-brief-msg"
+            {/* 1 · Idea */}
+            {!post ? (
+              <Step n={1} title={limitReached ? `You’ve used all ${planPostCount} posts for ${monthName}` : 'What should this post say?'} state="active">
+                <form onSubmit={submitBrief} aria-busy={generatingPost || extraBusy}>
+                  {limitReached && <p className="mb-3 text-sm text-(--fg-muted)">Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>}
+                  <div className={clsx(FIELD, 'p-3.5')}>
+                    <TextareaAutosize
+                      className="block w-full resize-none bg-transparent text-sm leading-relaxed outline-hidden placeholder:text-(--fg-subtle)"
+                      minRows={3}
+                      maxRows={10}
+                      maxLength={400}
+                      value={brief}
+                      onChange={(e) => setBrief(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitBrief();
+                      }}
+                      readOnly={generatingPost || extraBusy}
+                      placeholder="e.g. Behind the scenes of our 5 AM bake, and 10% off pandesal this weekend"
+                      aria-label="What the post is about"
+                      aria-invalid={!!extraError}
+                      aria-describedby="ps-brief-msg"
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {!limitReached && <FormatPicker value={format} onChange={setFormat} disabled={generatingPost} />}
+                    <button
+                      type="submit"
+                      disabled={brief.trim().length < 3 || generatingPost || extraBusy}
+                      className={clsx(PRIMARY_BTN, 'ml-auto')}
+                    >
+                      {generatingPost || extraBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                      {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
+                      <span className="ml-1 hidden gap-0.5 opacity-70 sm:inline-flex" aria-hidden>
+                        <kbd className="rounded border border-white/30 px-1 font-sans text-xs">{MOD_KEY}</kbd>
+                        <kbd className="rounded border border-white/30 px-1 font-sans text-xs">↵</kbd>
+                      </span>
+                    </button>
+                  </div>
+                  {generatingPost ? (
+                    <GeneratingSteps />
+                  ) : limitReached ? (
+                    <p
+                      id="ps-brief-msg"
+                      className={clsx('mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui [&_button]:font-semibold [&_button]:text-(--primary) [&_button:hover]:underline', extraError ? 'text-(--danger)' : 'text-(--fg-muted)')}
+                      role={extraError ? 'alert' : undefined}
+                    >
+                      {extraError || (walletBalance != null ? `Wallet balance: ₱${walletBalance.toLocaleString('en-PH')}.` : 'Paid from your Kawayan wallet.')}
+                      {(extraError || (walletBalance != null && walletBalance < addOnPrice)) && (
+                        <button type="button" onClick={onOpenBilling}>Top up</button>
+                      )}
+                      {planPostCount < 16 && (
+                        <button type="button" onClick={onOpenBilling}>Or upgrade to Pro for 16 posts a month</button>
+                      )}
+                    </p>
+                  ) : (
+                    <p id="ps-brief-msg" className="mt-3 text-xs text-(--fg-muted)">
+                      Kawayan writes the caption, scores it and makes a matching image. About 20 seconds.
+                    </p>
+                  )}
+                </form>
+              </Step>
+            ) : (
+              <Step
+                n={1}
+                title="Idea"
+                state="done"
+                summary={`${post.topic}${post.format ? ` · ${normalizeFormat(post.format)}` : ''}`}
+                action={
+                  !isPublished && (
+                    <button
+                      type="button"
+                      className={CHIP}
+                      onClick={() => {
+                        setRedoing(true);
+                        runGenerate();
+                      }}
+                      disabled={generatingPost || rewritesLeft === 0}
+                      title="New caption, score and image from the same idea"
+                    >
+                      {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
+                      {rewritesLeft === 0 ? 'No rewrites left' : `Start over · ${rewritesLeft} left`}
+                    </button>
+                  )
+                }
+              />
+            )}
+
+            {/* 2 · Caption */}
+            {!post ? (
+              <Step n={2} title="Caption" state="locked" summary="Kawayan writes this from your idea." />
+            ) : (
+              <Step
+                n={2}
+                title="Caption"
+                state="done"
+                action={
+                  counts && (
+                    <span className={clsx('text-xs tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-subtle)')}>
+                      {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
+                    </span>
+                  )
+                }
+              >
+                <div className={clsx(FIELD, 'relative')}>
+                  <textarea
+                    id="ps-caption-text"
+                    rows={6}
+                    value={post.caption}
+                    readOnly={isPublished || !!busyLabel}
+                    onChange={(e) => setGeneratedContent({ ...post, caption: e.target.value })}
+                    placeholder="Write your Taglish caption…"
+                    aria-label="Caption"
+                    className="block min-h-[148px] w-full resize-y bg-transparent p-3.5 text-sm leading-relaxed outline-hidden placeholder:text-(--fg-subtle)"
                   />
+                  {busyLabel && (
+                    <div className="absolute inset-0 grid place-items-center rounded-xl bg-[color-mix(in_srgb,var(--card)_78%,transparent)] text-sm font-semibold" aria-live="polite">
+                      <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin text-(--primary)" /> {busyLabel}</span>
+                    </div>
+                  )}
                 </div>
 
-                {!limitReached && (
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <span className={LABEL}>Format</span>
-                    <FormatPicker value={format} onChange={setFormat} disabled={generatingPost} />
+                {lastEdit && !busyLabel && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-(--fg-muted)">
+                    <Check className="h-3.5 w-3.5 text-(--primary)" />
+                    <span>{lastEdit.label}</span>
+                    {lastEdit.delta != null && lastEdit.delta !== 0 && (
+                      <span className={clsx('rounded-full px-1.5 font-semibold', lastEdit.delta > 0 ? 'bg-brand/15 text-(--primary)' : 'bg-red-500/10 text-(--danger)')}>
+                        Score {lastEdit.delta > 0 ? '+' : '−'}{Math.abs(lastEdit.delta)}
+                      </span>
+                    )}
+                    {undoStack.length > 0 && (
+                      <button type="button" onClick={undo} className="ml-auto inline-flex items-center gap-1 font-semibold text-(--fg) hover:underline">
+                        <Undo2 className="h-3.5 w-3.5" /> Undo
+                      </button>
+                    )}
                   </div>
                 )}
 
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={brief.trim().length < 3 || generatingPost || extraBusy}
-                    className="inline-flex items-center gap-2 rounded-full border border-brand/50 bg-brand/10 px-4 py-2 text-sm font-semibold text-(--primary) transition-colors hover:bg-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {generatingPost || extraBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
-                    <span className="ml-1 inline-flex gap-0.5 opacity-70" aria-hidden>
-                      <kbd className="rounded border border-brand/40 px-1 font-sans text-[10.5px]">{MOD_KEY}</kbd>
-                      <kbd className="rounded border border-brand/40 px-1 font-sans text-[10.5px]">↵</kbd>
-                    </span>
-                  </button>
+                {!isPublished && (
+                  <div className="mt-3 space-y-2.5">
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick AI edits">
+                      {QUICK_EDITS.map(({ label, Icon, instruction }) => (
+                        <button key={label} type="button" className={CHIP} disabled={!!aiBusy} onClick={() => runEdit(label, instruction)}>
+                          {aiBusy === label ? <Loader2 className="animate-spin" /> : <Icon />} {label}
+                        </button>
+                      ))}
+                    </div>
+                    <form onSubmit={submitAsk} className={clsx(FIELD, 'flex items-center gap-2 py-1 pl-3 pr-1')}>
+                      <PencilLine className="h-4 w-4 shrink-0 text-(--fg-subtle)" aria-hidden />
+                      <input
+                        value={ask}
+                        onChange={(e) => setAsk(e.target.value)}
+                        maxLength={200}
+                        disabled={!!aiBusy}
+                        placeholder="Tell Kawayan what to change, e.g. “mention our 20% weekend promo”"
+                        aria-label="Tell Kawayan what to change"
+                        className="min-w-0 flex-1 bg-transparent py-1.5 text-ui outline-hidden placeholder:text-(--fg-subtle)"
+                      />
+                      <button type="submit" disabled={!ask.trim() || !!aiBusy} aria-label="Rewrite with this instruction" className={clsx(PRIMARY_BTN, 'h-8 w-8 p-0')}>
+                        <ArrowUp />
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-start gap-3 rounded-lg bg-(--bg-alt) px-3 py-2.5">
+                  <b className="text-xl tabular-nums leading-none">{score}</b>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex justify-between text-xs font-semibold">
+                      Reach score <span className={score >= 75 ? 'text-(--primary)' : score >= 50 ? 'text-amber-600 dark:text-amber-300' : 'text-(--danger)'}>{scoreWord(score)}</span>
+                    </p>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--border)">
+                      <div className="h-full rounded-full bg-(--primary) transition-[width] duration-500" style={{ width: `${score}%` }} />
+                    </div>
+                    {post.viralityReason && <p className="mt-1.5 text-xs leading-relaxed text-(--fg-muted)">{post.viralityReason}</p>}
+                  </div>
                 </div>
 
-                {generatingPost ? (
-                  <GeneratingSteps />
-                ) : limitReached ? (
-                  <p
-                    id="ps-brief-msg"
-                    className={clsx('mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] [&_button]:font-semibold [&_button]:text-(--primary) [&_button:hover]:underline', extraError ? 'text-(--danger)' : 'text-(--fg-muted)')}
-                    role={extraError ? 'alert' : undefined}
-                  >
-                    {extraError || (walletBalance != null ? `Wallet balance: ₱${walletBalance.toLocaleString('en-PH')}.` : 'Paid from your Kawayan wallet.')}
-                    {(extraError || (walletBalance != null && walletBalance < addOnPrice)) && (
-                      <button type="button" onClick={onOpenBilling}>Top up</button>
-                    )}
-                    {planPostCount < 16 && (
-                      <button type="button" onClick={onOpenBilling}>Or upgrade to Pro for 16 posts a month</button>
-                    )}
-                  </p>
-                ) : (
-                  <p id="ps-brief-msg" className="mt-4 text-[13px] text-(--fg-muted)">
-                    Kawayan writes the caption, scores it and makes a matching image. About 20 seconds.
-                  </p>
+                {post.history?.length > 0 && (
+                  <details className="mt-3 text-ui">
+                    <summary className="cursor-pointer text-xs font-semibold text-(--fg-muted) hover:text-(--fg)">Earlier versions ({post.history.length})</summary>
+                    <div className="mt-2 space-y-2">
+                      {post.history.map((v, i) => (
+                        <div key={`${v.createdAt}-${i}`} className="rounded-lg border border-(--border) p-3">
+                          <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
+                          <div className="mt-2 flex items-center justify-between">
+                            {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
+                            {!isPublished && (
+                              <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-semibold text-(--primary) hover:underline">Use this</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
-              </form>
-            ) : (
-              <>
-                {isPublished && (
-                  <p className="flex flex-wrap items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-[13px] text-(--fg)">
-                    <Check className="h-4 w-4 text-(--primary)" /> This post is live, so editing is turned off.
-                    {post.externalLink && (
-                      <a href={post.externalLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-(--primary) hover:underline">
-                        View post <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </p>
-                )}
-                {isScheduled && (
-                  <p className="flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-                    <Clock className="h-4 w-4 shrink-0" /> Scheduled for {longDate(post.date)}. Edits here don’t change the copy already queued.
-                  </p>
-                )}
+              </Step>
+            )}
 
-                {/* Caption + AI co-writer */}
-                <section className={CARD}>
-                  <div className={CARD_HEAD}>
-                    <label htmlFor="ps-caption-text">Caption</label>
-                    {counts && (
-                      <span className={clsx('text-xs font-normal tabular-nums', counts.chars > IG_CAPTION_LIMIT ? 'text-(--danger)' : 'text-(--fg-subtle)')}>
-                        {counts.chars.toLocaleString()} / {IG_CAPTION_LIMIT.toLocaleString()} · {counts.tags} hashtag{counts.tags === 1 ? '' : 's'}
+            {/* 3 · Image */}
+            {!post ? (
+              <Step n={3} title="Image" state="locked" summary="Made to match the caption, or upload your own photo." />
+            ) : (
+              <Step n={3} title="Image" state={post.imageUrl ? 'done' : 'active'}>
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-(--border) bg-(--bg-alt)">
+                    {post.imageUrl ? (
+                      <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
+                    ) : (
+                      <ImageIcon className="absolute inset-0 m-auto h-7 w-7 text-(--fg-subtle)" aria-hidden />
+                    )}
+                    {loadingImage && (
+                      <span className="absolute inset-0 grid place-items-center bg-black/45 text-white">
+                        <Loader2 className="h-5 w-5 animate-spin" aria-label="Creating a new image" />
                       </span>
                     )}
                   </div>
-                  <div className={clsx(FIELD, 'relative')}>
-                    <textarea
-                      id="ps-caption-text"
-                      rows={7}
-                      value={post.caption}
-                      readOnly={isPublished || !!busyLabel}
-                      onChange={(e) => setGeneratedContent({ ...post, caption: e.target.value })}
-                      placeholder="Write your Taglish caption…"
-                      className="block min-h-[168px] w-full resize-y bg-transparent p-4 text-[14.5px] leading-relaxed outline-hidden placeholder:text-(--fg-subtle)"
-                    />
-                    {busyLabel && (
-                      <div className="absolute inset-0 grid place-items-center rounded-xl bg-[color-mix(in_srgb,var(--card)_78%,transparent)] text-sm font-semibold" aria-live="polite">
-                        <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin text-(--primary)" /> {busyLabel}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {lastEdit && !busyLabel && (
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-(--fg-muted)">
-                      <Check className="h-3.5 w-3.5 text-(--primary)" />
-                      <span>{lastEdit.label}</span>
-                      {lastEdit.delta != null && lastEdit.delta !== 0 && (
-                        <span className={clsx('rounded-full px-1.5 font-semibold', lastEdit.delta > 0 ? 'bg-brand/15 text-(--primary)' : 'bg-red-500/10 text-(--danger)')}>
-                          Score {lastEdit.delta > 0 ? '+' : '−'}{Math.abs(lastEdit.delta)}
-                        </span>
-                      )}
-                      {undoStack.length > 0 && (
-                        <button type="button" onClick={undo} className="ml-auto inline-flex items-center gap-1 font-semibold text-(--fg) hover:underline">
-                          <Undo2 className="h-3.5 w-3.5" /> Undo
-                        </button>
-                      )}
-                    </div>
-                  )}
-
                   {!isPublished && (
-                    <div className="mt-3 space-y-2.5">
-                      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick AI edits">
-                        {QUICK_EDITS.map(({ label, Icon, instruction }) => (
-                          <button key={label} type="button" className={CHIP} disabled={!!aiBusy} onClick={() => runEdit(label, instruction)}>
-                            {aiBusy === label ? <Loader2 className="animate-spin" /> : <Icon />} {label}
-                          </button>
-                        ))}
-                      </div>
-                      <form onSubmit={submitAsk} className={clsx(FIELD, 'flex items-center gap-2 py-1 pl-3 pr-1')}>
-                        <PencilLine className="h-4 w-4 shrink-0 text-(--fg-subtle)" aria-hidden />
-                        <input
-                          value={ask}
-                          onChange={(e) => setAsk(e.target.value)}
-                          maxLength={200}
-                          disabled={!!aiBusy}
-                          placeholder="Tell Kawayan what to change, e.g. “mention our 20% weekend promo”"
-                          aria-label="Tell Kawayan what to change"
-                          className="min-w-0 flex-1 bg-transparent py-1.5 text-[13.5px] outline-hidden placeholder:text-(--fg-subtle)"
-                        />
-                        <button type="submit" disabled={!ask.trim() || !!aiBusy} aria-label="Rewrite with this instruction" className={clsx(PRIMARY_BTN, 'h-8 w-8 p-0')}>
-                          <ArrowUp />
-                        </button>
-                      </form>
-                    </div>
-                  )}
-                </section>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Visual */}
-                  <section className={CARD}>
-                    <div className={CARD_HEAD}><span>Visual</span></div>
-                    <div className="relative aspect-square overflow-hidden rounded-xl bg-(--bg-alt)">
-                      {post.imageUrl ? (
-                        <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
-                      ) : (
-                        <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-(--fg-subtle)" aria-hidden />
-                      )}
-                      {loadingImage && (
-                        <span className="absolute inset-0 grid place-items-center bg-black/45 text-sm font-semibold text-white">
-                          <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Creating a new visual…</span>
-                        </span>
-                      )}
-                    </div>
-                    {!isPublished && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
                         <button type="button" className={CHIP} onClick={onGenerateImage} disabled={loadingImage}>
-                          <RefreshCcw /> {post.imageUrl ? 'New image' : 'Create image'}
+                          <RefreshCcw /> {post.imageUrl ? 'Try another image' : 'Create image'}
                         </button>
                         <button type="button" className={CHIP} onClick={() => photoInputRef.current?.click()}>
                           <Upload /> Upload photo
                         </button>
                         <button type="button" className={CHIP} onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
-                          <PencilLine /> Prompt <ChevronDown className={clsx('transition-transform', showPrompt && 'rotate-180')} />
+                          <PencilLine /> Describe it <ChevronDown className={clsx('transition-transform', showPrompt && 'rotate-180')} />
                         </button>
                       </div>
-                    )}
-                    {showPrompt && (
-                      <div className="mt-3">
-                        <div className={FIELD}>
-                          <textarea
-                            rows={3}
-                            value={post.imagePrompt}
-                            onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })}
-                            aria-label="Image prompt"
-                            className="block w-full resize-y bg-transparent p-3 text-[13px] outline-hidden"
-                          />
-                        </div>
-                        <span className="mt-1.5 block text-xs text-(--fg-muted)">Describe the picture in English. “New image” uses this.</span>
-                      </div>
-                    )}
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) onPhotoFile(file);
-                        e.target.value = '';
-                      }}
-                    />
-                  </section>
-
-                  {/* Score, start over, versions */}
-                  <div className="space-y-4">
-                    <section className={CARD}>
-                      <div className={CARD_HEAD}>
-                        <span>Virality score</span>
-                        <span className="text-xs font-semibold text-(--primary)">{scoreWord(score)}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <ScoreRing score={score} />
-                        <p className="text-[13px] leading-relaxed text-(--fg-muted)">{post.viralityReason || 'Kawayan’s AI rates how likely the caption is to get shared.'}</p>
-                      </div>
-                    </section>
-
-                    {!isPublished && (
-                      <section className={clsx(CARD, 'flex flex-wrap items-center justify-between gap-3')}>
-                        <div className="text-[13px]">
-                          <b className="block font-semibold">Start over</b>
-                          <span className="text-(--fg-muted)">New caption, score and visual from the same idea.</span>
-                        </div>
-                        <button
-                          type="button"
-                          className={CHIP}
-                          onClick={() => {
-                            setRedoing(true);
-                            runGenerate();
-                          }}
-                          disabled={generatingPost || rewritesLeft === 0}
-                        >
-                          {redoing ? <Loader2 className="animate-spin" /> : <Zap />}
-                          {rewritesLeft === 0 ? 'No rewrites left' : `New version · ${rewritesLeft} left`}
-                        </button>
-                      </section>
-                    )}
-
-                    {post.history?.length > 0 && (
-                      <section className={CARD}>
-                        <div className={CARD_HEAD}>
-                          <span className="inline-flex items-center gap-1.5"><History className="h-4 w-4 text-(--fg-muted)" /> Earlier versions</span>
-                        </div>
-                        <div className="space-y-2">
-                          {post.history.map((v, i) => (
-                            <div key={`${v.createdAt}-${i}`} className="rounded-xl bg-(--bg-alt) p-3 text-[13px]">
-                              <p className="line-clamp-3 text-(--fg-muted)">{v.caption}</p>
-                              <div className="mt-2 flex items-center justify-between">
-                                {v.viralityScore != null && <span className="text-xs font-semibold">Score {v.viralityScore}</span>}
-                                {!isPublished && (
-                                  <button type="button" onClick={() => restoreVersion(i)} className="text-xs font-semibold text-(--primary) hover:underline">Use this</button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
+                      <p className="text-xs text-(--fg-muted)">You can also drop a photo onto the preview.</p>
+                    </div>
+                  )}
                 </div>
-              </>
+                {showPrompt && (
+                  <div className="mt-3">
+                    <div className={FIELD}>
+                      <textarea
+                        rows={3}
+                        value={post.imagePrompt}
+                        onChange={(e) => setGeneratedContent({ ...post, imagePrompt: e.target.value })}
+                        aria-label="Image description"
+                        className="block w-full resize-y bg-transparent p-3 text-ui outline-hidden"
+                      />
+                    </div>
+                    <span className="mt-1.5 block text-xs text-(--fg-muted)">Describe the picture in English. “Try another image” uses this.</span>
+                  </div>
+                )}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onPhotoFile(file);
+                    e.target.value = '';
+                  }}
+                />
+              </Step>
             )}
 
-            <details className="rounded-2xl border border-(--border) bg-(--card) p-4 lg:hidden">
-              <summary className="cursor-pointer text-[13px] font-semibold">Preview on Instagram, Facebook and TikTok</summary>
-              <div className="mt-4">{preview}</div>
+            <details className="rounded-xl border border-(--border) bg-(--card) p-4 lg:hidden">
+              <summary className="cursor-pointer text-ui font-semibold">Preview on Facebook and Instagram</summary>
+              <div className="mt-4 flex justify-center">{preview}</div>
             </details>
           </div>
 
-          <aside className="hidden min-h-0 flex-col items-center gap-3 overflow-y-auto border-l border-(--border) bg-(--bg-alt) px-6 py-5 lg:flex">
-            <span className={clsx(LABEL, 'self-start')}>Live preview</span>
+          <aside className="hidden min-h-0 flex-col items-center overflow-y-auto border-l border-(--border) bg-(--bg-alt) px-5 py-5 lg:flex">
             {preview}
+            <p className="mt-3 text-center text-xs text-(--fg-subtle)">Preview only. Reactions show up after it posts.</p>
           </aside>
         </div>
 
         {/* ── Where + when, paired with publish ── */}
         <footer className="flex flex-wrap items-center gap-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
-          <p className="hidden text-xs text-(--fg-muted) md:block">
-            {post ? 'Drafts save as you type.' : 'Draft the post, then pick where and when it goes out.'}
+          <p className="text-xs text-(--fg-muted)">
+            {post ? saveIndicator : 'Draft the post first, then pick where and when it goes out.'}
           </p>
           {isPublished ? (
             <div className="ml-auto flex items-center gap-3">
@@ -829,7 +851,12 @@ const PostComposer: React.FC<Props> = ({
             <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300">
               <CalendarClock className="h-4 w-4" /> Scheduled for {longDate(post!.date)}
             </span>
-          ) : (
+          ) : accounts && accounts.length === 0 ? (
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <span className="text-xs text-(--fg-muted)">{post ? 'Connect a page to publish. Your draft is saved.' : 'Connect a page to publish.'}</span>
+              <button type="button" className="btn btn-glass btn-sm" onClick={onOpenSocial}>Connect a page</button>
+            </div>
+          ) : !post ? null : (
             <div className="relative ml-auto flex items-stretch" ref={planRef}>
               <button
                 type="button"
@@ -837,7 +864,7 @@ const PostComposer: React.FC<Props> = ({
                 disabled={!post}
                 aria-expanded={planOpen}
                 aria-haspopup="dialog"
-                className="flex items-center gap-2.5 rounded-l-full border border-r-0 border-(--border-strong) bg-(--bg-alt) py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-(--card-hover) disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex items-center gap-2.5 rounded-l-lg border border-r-0 border-(--border-strong) bg-(--bg-alt) py-1.5 pl-3 pr-3 text-left transition-colors hover:bg-(--card-hover) disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <span className="flex -space-x-1" aria-hidden>
                   {chosenAccounts.length > 0
@@ -849,8 +876,8 @@ const PostComposer: React.FC<Props> = ({
                     : <span className="grid h-6 w-6 place-items-center rounded-full bg-(--card)"><Globe className="h-3.5 w-3.5 text-(--fg-muted)" /></span>}
                 </span>
                 <span className="min-w-0">
-                  <b className="block max-w-[180px] truncate text-[13px] font-semibold">{whereLabel}</b>
-                  <small className="block text-[11px] text-(--fg-muted)">{whenLabel}</small>
+                  <b className="block max-w-[180px] truncate text-ui font-semibold">{whereLabel}</b>
+                  <small className="block text-xs text-(--fg-muted)">{whenLabel}</small>
                 </span>
                 <ChevronDown className={clsx('h-4 w-4 text-(--fg-muted) transition-transform', planOpen && 'rotate-180')} />
               </button>
@@ -894,7 +921,7 @@ const PostComposer: React.FC<Props> = ({
                     {accounts === null ? (
                       <span className="flex items-center gap-1.5 text-xs text-(--fg-muted)"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading your pages…</span>
                     ) : accounts.length === 0 ? (
-                      <div className="space-y-2 text-[13px] text-(--fg-muted)">
+                      <div className="space-y-2 text-ui text-(--fg-muted)">
                         <p>{accountsError || 'Connect your Facebook Page or Instagram account first.'}</p>
                         <button type="button" className="btn btn-outline btn-sm" onClick={onOpenSocial}>Connect a page</button>
                       </div>
@@ -910,13 +937,13 @@ const PostComposer: React.FC<Props> = ({
                               aria-checked={on}
                               onClick={() => setChosen((ids) => (on ? ids.filter((id) => id !== a.id) : [...ids, a.id]))}
                               className={clsx(
-                                'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors',
+                                'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-ui transition-colors',
                                 on ? 'border-brand/50 bg-brand/10' : 'border-(--border) hover:border-(--border-strong)',
                               )}
                             >
                               <PlatformIcon platform={a.platform} className="h-4 w-4" />
                               <span className="flex-1 font-medium">@{a.username}</span>
-                              {!a.isActive && <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-300">Needs reconnecting</span>}
+                              {!a.isActive && <span className="text-xs font-semibold text-amber-600 dark:text-amber-300">Needs reconnecting</span>}
                               <span className={clsx('grid h-4 w-4 place-items-center rounded border', on ? 'border-transparent bg-brand text-on-brand' : 'border-(--border-strong)')}>
                                 {on && <Check className="h-3 w-3" strokeWidth={3} />}
                               </span>
@@ -945,16 +972,16 @@ const PostComposer: React.FC<Props> = ({
                                 time === s.time ? 'border-brand/60 bg-brand/10' : 'border-(--border) hover:border-(--border-strong)',
                               )}
                             >
-                              <b className="block text-[13px] font-semibold">{to12h(s.time)}</b>
-                              <small className="block text-[11px] text-(--fg-muted)">{past ? 'Passed' : s.label}</small>
+                              <b className="block text-ui font-semibold">{to12h(s.time)}</b>
+                              <small className="block text-xs text-(--fg-muted)">{past ? 'Passed' : s.label}</small>
                               {s.best && !past && (
-                                <em className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 text-[9.5px] font-bold not-italic text-on-brand">Best</em>
+                                <em className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 text-xs font-bold not-italic text-on-brand">Best</em>
                               )}
                             </button>
                           );
                         })}
                       </div>
-                      <label className="flex items-center gap-2 text-[13px] text-(--fg-muted)">
+                      <label className="flex items-center gap-2 text-ui text-(--fg-muted)">
                         <Clock className="h-4 w-4" /> Other time
                         <input
                           type="time"

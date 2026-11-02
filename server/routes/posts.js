@@ -78,6 +78,14 @@ router.post('/api/posts', authenticateToken, validate(postSchema), async (req, r
   if (!isSelfOrAdmin(req.user, post.userId)) return res.status(403).json({ error: 'Unauthorized' });
 
   try {
+    // One post per day. A post already saved on this date may still be updated in place
+    // (older accounts can have two on one day); a new post, or a move, onto a taken day is refused.
+    const sameMonth = await dbService.getUserPosts(post.userId, post.date.slice(0, 7));
+    const existing = sameMonth.find((p) => p.id === post.id);
+    const clash = sameMonth.find((p) => p.id !== post.id && p.date === post.date);
+    if (clash && !(existing && existing.date === post.date)) {
+      return res.status(409).json({ error: `That day already has a post (“${clash.topic}”). Pick another day.` });
+    }
     await dbService.savePost(post);
     res.json({ message: 'Post saved successfully' });
   } catch (error) {
@@ -99,8 +107,11 @@ router.get('/api/posts/user/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
   if (!isSelfOrAdmin(req.user, userId) && !isStaff(req.user)) return res.status(403).json({ error: 'Unauthorized' });
 
+  // ?month=YYYY-MM returns just that month (the calendar); without it, everything (insights, search).
+  const month = typeof req.query.month === 'string' &&/^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.month) ? req.query.month : undefined;
+
   try {
-    res.json(await dbService.getUserPosts(userId));
+    res.json(await dbService.getUserPosts(userId, month));
   } catch (error) {
     logger.error('Get posts error', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch posts' });

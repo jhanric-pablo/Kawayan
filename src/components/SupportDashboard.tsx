@@ -1,682 +1,606 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { MessageSquare, Clock, User as UserIcon, PhoneCall, Search, Loader2, Send, ArrowLeft, MoreVertical, CheckCircle, History, ArrowUpDown, ChevronDown, AlertTriangle, Download, RefreshCw } from 'lucide-react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import type { Channel } from 'stream-chat';
+import { BarChart3, Check, Clock, Inbox, Loader2, MessageSquareText, Phone, PhoneCall, Search, Video, X } from 'lucide-react';
+import clsx from 'clsx';
+import type { CannedReply, Ticket, TicketNote } from '../types';
 import { supportService } from '../services/supportService';
 import { supportRealtime } from '../services/supportRealtime';
-import { Ticket, User } from '../types';
-import CallOverlay from './CallOverlay';
+import { REPLY_TARGET_MIN, callIdFor, streamSession, supportApi, ticketChannel, type StreamSession } from '../services/supportChat';
+import { getStoredToken, readCachedUser } from '../utils/authSession';
+import ChatThread, { type CallInfo } from './support/ChatThread';
+import { useToast } from './ui/Toast';
+import './support/support.css';
 
-type SortKey = 'date' | 'user' | 'priority' | 'duration';
-type SortDirection = 'asc' | 'desc';
+const CallWindow = lazy(() => import('./support/CallWindow'));
 
+type View = 'inbox' | 'calls' | 'reports' | 'replies';
+type Scope = 'mine' | 'unassigned' | 'all';
+type StatusTab = 'open' | 'waiting' | 'snoozed' | 'resolved';
+
+const PRIORITIES: Ticket['priority'][] = ['Low', 'Medium', 'High', 'Critical'];
+const SNOOZES = [{ label: '1 hour', h: 1 }, { label: '4 hours', h: 4 }, { label: 'Tomorrow', h: 24 }, { label: 'Next week', h: 168 }];
+
+const isSnoozed = (t: Ticket) => !!t.snoozedUntil && new Date(t.snoozedUntil) > new Date() && t.status !== 'Resolved';
+const statusOf = (t: Ticket): StatusTab => (t.status === 'Resolved' ? 'resolved' : isSnoozed(t) ? 'snoozed' : t.status === 'Pending' ? 'waiting' : 'open');
+const DOT: Record<StatusTab, string> = { open: 'bg-(--primary)', waiting: 'bg-amber-500', snoozed: 'bg-sky-500', resolved: 'bg-(--border-strong)' };
+const owner = (t: Ticket) => t.ownerName || t.userEmail.split('@')[0];
+const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+const mins = (ms: number) => Math.round(ms / 60000);
+const span = (m: number) => (m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`);
+const ago = (iso?: string) => {
+  if (!iso) return '';
+  const m = mins(Date.now() - new Date(iso).getTime());
+  return m < 1 ? 'now' : m < 1440 ? span(m) : new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+};
+
+/** "Reply due in 12m" / "Overdue 5m" until the first staff reply; null after. */
+const dueText = (t: Ticket) => {
+  if (t.firstResponseAt || t.status === 'Resolved') return null;
+  const left = mins(new Date(t.createdAt).getTime() + (REPLY_TARGET_MIN[t.priority] ?? 240) * 60000 - Date.now());
+  return left >= 0 ? { text: `Reply due in ${span(left)}`, late: false } : { text: `Overdue ${span(-left)}`, late: true };
+};
+
+const authJson = async <T,>(url: string): Promise<T | null> => {
+  const token = getStoredToken();
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  return res.ok ? res.json() : null;
+};
+
+/**
+ * The support team's workspace. Inbox: every conversation is a ticket; filter by who has it and its
+ * state, reply or call from the conversation, keep private notes, insert saved replies with "/".
+ * Calls: owners waiting on a call, and past calls. Reports: reply and resolve times, ratings.
+ */
 const SupportDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'tickets' | 'calls'>('overview');
-  const [user] = useState<User | null>(() => {
-    const saved = localStorage.getItem('kawayan_session');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [activeCalls, setActiveCalls] = useState<any[]>([]);
-  const [callHistory, setCallHistory] = useState<any[]>([]);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [filter, setFilter] = useState<'All' | 'Open' | 'Resolved' | 'History'>('All');
-  const [categoryFilter, setCategoryFilter] = useState<'All' | 'Technical' | 'Billing' | 'General'>('All');
-  const [isLoading, setIsLoading] = useState(true);
-  const [reply, setReply] = useState('');
-  const [isSending, setIsTyping] = useState(false);
-  const [activeCallRoom, setActiveCallRoom] = useState<{room: string, reason?: string, userId?: string} | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Sorting State
-  const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const toast = useToast();
+  const me = readCachedUser();
+  const [view, setView] = useState<View>('inbox');
+  const [tickets, setTickets] = useState<Ticket[] | null>(null);
+  const [scope, setScope] = useState<Scope>('mine');
+  const [statusTab, setStatusTab] = useState<StatusTab>('open');
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [channel, setChannel] = useState<Channel | null>(null);
+  const [session, setSession] = useState<StreamSession | null>(null);
+  const [chatError, setChatError] = useState('');
+  const [notes, setNotes] = useState<TicketNote[]>([]);
+  const [canned, setCanned] = useState<CannedReply[]>([]);
+  const [biz, setBiz] = useState<{ profile: any; wallet: any } | null>(null);
+  const [calls, setCalls] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [call, setCall] = useState<(CallInfo & { title: string }) | null>(null);
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [, setClock] = useState(0);
+
+  const selected = tickets?.find((t) => t.id === selectedId) ?? null;
+
+  const load = useCallback(async () => setTickets(await supportService.getAllTickets()), []);
+  const loadCalls = useCallback(async () => {
+    setCalls((await authJson<any[]>('/api/support/calls')) ?? []);
+    setHistory((await authJson<any[]>('/api/support/call-history')) ?? []);
+  }, []);
+  const loadNotes = useCallback(async (id: string) => setNotes(await supportApi<TicketNote[]>(`/tickets/${encodeURIComponent(id)}/notes`).catch(() => [])), []);
 
   useEffect(() => {
-    loadTickets();
+    load();
     loadCalls();
-    if (filter === 'History' || activeTab === 'calls') loadCallHistory();
-
+    supportApi<CannedReply[]>('/canned').then(setCanned).catch(() => setCanned([]));
     supportRealtime.connect();
-
-    const unsubs = [
-      supportRealtime.onTicketCreated((ticket) => {
-        setTickets((prev) => {
-          if (prev.some((t) => t.id === ticket.id)) return prev;
-          return [ticket, ...prev];
-        });
-      }),
-      supportRealtime.onTicketUpdated((ticket) => {
-        setTickets((prev) => {
-          const idx = prev.findIndex((t) => t.id === ticket.id);
-          if (idx === -1) return [ticket, ...prev];
-          const next = [...prev];
-          next[idx] = ticket;
-          return next;
-        });
-        setSelectedTicket((prev) => (prev?.id === ticket.id ? ticket : prev));
-      }),
-      supportRealtime.onCallsChanged(() => {
-        loadCalls();
-        if (activeTab === 'calls' || filter === 'History') loadCallHistory();
-      }),
+    const offs = [
+      supportRealtime.onTicketCreated((t) => setTickets((list) => (list ? [t, ...list.filter((x) => x.id !== t.id)] : [t]))),
+      supportRealtime.onTicketUpdated((t) => setTickets((list) => list?.map((x) => (x.id === t.id ? { ...x, ...t } : x)) ?? list)),
+      supportRealtime.onCallsChanged(loadCalls),
     ];
+    const tick = setInterval(() => setClock((c) => c + 1), 30_000); // keeps "due in" fresh
+    return () => { offs.forEach((off) => off()); clearInterval(tick); };
+  }, [load, loadCalls]);
 
-    // Rare fallback if websocket disconnects
-    const fallback = setInterval(() => {
-      loadTickets();
-      loadCalls();
-    }, 60000);
-
-    return () => {
-      unsubs.forEach((u) => u());
-      clearInterval(fallback);
-    };
-  }, [filter, activeTab]);
-
-  // Keep selected ticket in sync when polling finds new messages
+  // Open the selected ticket: its chat, notes and the business behind it.
   useEffect(() => {
-    if (!selectedTicket) return;
-    const fresh = tickets.find((t) => t.id === selectedTicket.id);
-    if (fresh && JSON.stringify(fresh.messages) !== JSON.stringify(selectedTicket.messages)) {
-      setSelectedTicket(fresh);
-    }
-  }, [tickets, selectedTicket]);
+    if (!selected) { setChannel(null); setNotes([]); setBiz(null); return; }
+    let cancelled = false;
+    setChannel(null);
+    setChatError('');
+    Promise.all([ticketChannel(selected.id), streamSession()])
+      .then(([ch, s]) => { if (!cancelled) { setChannel(ch); setSession(s); } })
+      .catch(() => !cancelled && setChatError('Could not open this conversation. Check your connection, then pick it again.'));
+    loadNotes(selected.id);
+    Promise.all([authJson(`/api/profiles/${selected.userId}`), authJson(`/api/wallet/${selected.userId}`)]).then(([profile, wallet]) => !cancelled && setBiz({ profile, wallet }));
+    setLabelDraft((selected.labels || []).join(', '));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
+  // Ticket history lines (assigned, resolved…) come back with each ticket update.
+  useEffect(() => { if (selectedId) loadNotes(selectedId); }, [selected?.updatedAt, selectedId, loadNotes]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (tickets ?? [])
+      .filter((t) => (scope === 'mine' ? t.assigneeId === me?.id : scope === 'unassigned' ? !t.assigneeId : true))
+      .filter((t) => statusOf(t) === statusTab)
+      .filter((t) => !q || `${t.subject} ${owner(t)} ${t.userEmail} ${t.ticketNum} ${(t.labels || []).join(' ')}`.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const da = dueText(a), db = dueText(b);
+        if (da?.late !== db?.late) return da?.late ? -1 : 1; // overdue first
+        return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+      });
+  }, [tickets, scope, statusTab, query, me?.id]);
+
+  const counts = useMemo(() => {
+    const base = (tickets ?? []).filter((t) => statusOf(t) === 'open' || statusOf(t) === 'waiting');
+    return { mine: base.filter((t) => t.assigneeId === me?.id).length, unassigned: base.filter((t) => !t.assigneeId).length, all: base.length };
+  }, [tickets, me?.id]);
+
+  const update = async (body: Record<string, unknown>) => {
+    if (!selected) return;
+    try {
+      const fresh = await supportApi<Ticket>(`/tickets/${encodeURIComponent(selected.id)}`, { method: 'PATCH', body: JSON.stringify(body) });
+      setTickets((list) => list?.map((t) => (t.id === fresh.id ? { ...t, ...fresh } : t)) ?? list);
+      loadNotes(selected.id);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const replied = () => {
+    if (!selected) return;
+    supportApi<Ticket>(`/tickets/${encodeURIComponent(selected.id)}/replied`, { method: 'POST' })
+      .then((fresh) => setTickets((list) => list?.map((t) => (t.id === fresh.id ? { ...t, ...fresh } : t)) ?? list))
+      .catch(() => undefined);
+  };
+
+  const addNote = async (body: string) => {
+    if (!selected) return;
+    await supportApi(`/tickets/${encodeURIComponent(selected.id)}/notes`, { method: 'POST', body: JSON.stringify({ body }) });
+    await loadNotes(selected.id);
+  };
+
+  const startCall = async (kind: CallInfo['kind']) => {
+    if (!selected || !channel || call) return;
+    const info: CallInfo = { id: callIdFor(selected.id), kind, status: 'started' };
+    try {
+      await channel.sendMessage({ text: '', call: info } as never);
+      setCall({ ...info, title: `${owner(selected)} · ${selected.subject}` });
+    } catch {
+      toast.error('Could not start the call.');
+    }
+  };
+
+  const endCall = async (durationSec: number) => {
+    const ended = call;
+    setCall(null);
+    if (!ended) return;
+    if (channel && selected && callIdFor(selected.id) === ended.id) {
+      channel.sendMessage({ text: '', call: { id: ended.id, kind: ended.kind, status: 'ended', durationSec } } as never).catch(() => undefined);
+    }
+    const waiting = calls.find((c) => c.room_name === ended.id);
+    if (waiting) await supportApi('/calls/unregister', { method: 'POST', body: JSON.stringify({ userId: waiting.user_id }) }).catch(() => undefined);
+    loadCalls();
+  };
+
+  // Keyboard: E resolves or reopens, J/K move through the list (not while typing).
   useEffect(() => {
-    if (selectedTicket) {
-      loadUserProfile(selectedTicket.userId, selectedTicket.userEmail);
-    } else {
-      setUserProfile(null);
-    }
-  }, [selectedTicket]);
-
-  const loadUserProfile = async (userId: string, userEmail: string) => {
-    try {
-      const jwt = localStorage.getItem('kawayan_jwt');
-      const [profileRes, walletRes] = await Promise.all([
-        fetch(`/api/profiles/${userId}`, { headers: { 'Authorization': `Bearer ${jwt}` } }),
-        fetch(`/api/wallet/${userId}`, { headers: { 'Authorization': `Bearer ${jwt}` } })
-      ]);
-      
-      const profile = profileRes.ok ? await profileRes.json() : null;
-      const wallet = walletRes.ok ? await walletRes.json() : null;
-      
-      setUserProfile({ 
-        ...profile, 
-        wallet, 
-        email: userEmail,
-        // Ensure we have a name to show
-        businessName: profile?.businessName || userEmail.split('@')[0]
-      });
-    } catch (e) {
-      console.error("Failed to load user info", e);
-      setUserProfile({ email: userEmail, wallet: { balance: 0 } });
-    }
-  };
-
-  const loadTickets = async () => {
-    setIsLoading(true);
-    const all = await supportService.getAllTickets();
-    setTickets(all);
-    setIsLoading(false);
-  };
-
-  const loadCalls = async () => {
-    try {
-      const response = await fetch('/api/support/calls', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('kawayan_jwt')}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setActiveCalls(data);
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (view !== 'inbox' || e.metaKey || e.ctrlKey || e.altKey || el.closest('input, textarea, select, [contenteditable]')) return;
+      if (e.key === 'e' && selected) update({ status: selected.status === 'Resolved' ? 'Open' : 'Resolved' });
+      if (e.key === 'j' || e.key === 'k') {
+        const i = visible.findIndex((t) => t.id === selectedId);
+        const next = visible[Math.min(visible.length - 1, Math.max(0, i + (e.key === 'j' ? 1 : -1)))];
+        if (next) setSelectedId(next.id);
       }
-    } catch (e) { console.error("Failed to load calls", e); }
-  };
-
-  const loadCallHistory = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/support/call-history', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('kawayan_jwt')}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCallHistory(data);
-      }
-    } catch (e) { console.error("Failed to load call history", e); }
-    setIsLoading(false);
-  };
-
-  const handleJoinCall = (roomName: string, reason?: string, userId?: string) => {
-    setActiveCallRoom({ room: roomName, reason, userId });
-  };
-
-  const handleStatusUpdate = async (id: string, status: 'Open' | 'Pending' | 'Resolved') => {
-    await supportService.updateTicketStatus(id, status);
-    if (selectedTicket?.id === id) {
-      setSelectedTicket({ ...selectedTicket, status });
-    }
-    loadTickets();
-  };
-
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTicket || !reply.trim()) return;
-
-    setIsTyping(true);
-    try {
-      const newMessage = {
-        sender: 'agent' as const,
-        text: reply,
-        timestamp: new Date().toISOString()
-      };
-
-      const updatedMessages = [...(selectedTicket.messages || []), newMessage];
-      
-      const response = await fetch(`/api/support/tickets/${selectedTicket.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('kawayan_jwt')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          status: selectedTicket.status === 'Open' ? 'Pending' : selectedTicket.status,
-          messages: updatedMessages 
-        })
-      });
-
-      if (response.ok) {
-        setSelectedTicket({ 
-          ...selectedTicket, 
-          messages: updatedMessages,
-          status: selectedTicket.status === 'Open' ? 'Pending' : selectedTicket.status 
-        });
-        setReply('');
-        loadTickets();
-      }
-    } catch (e) {
-      console.error("Failed to send reply", e);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  const formatDuration = (seconds: number) => {
-    if (!seconds) return '0s';
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
-
-  const priorityWeight = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
-
-  const stats = useMemo(() => {
-    return {
-      total: tickets.length,
-      open: tickets.filter(t => t.status === 'Open').length,
-      pending: tickets.filter(t => t.status === 'Pending').length,
-      resolved: tickets.filter(t => t.status === 'Resolved').length,
-      activeCalls: activeCalls.length,
-      critical: tickets.filter(t => t.priority === 'Critical' && t.status !== 'Resolved').length
     };
-  }, [tickets, activeCalls]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
-  const activityData = useMemo(() => {
-    const hours = ['9 AM', '12 PM', '3 PM', '6 PM', '9 PM', '12 AM'];
-    return hours.map((hour, index) => {
-      const count = tickets.filter(t => {
-        const h = new Date(t.createdAt).getHours();
-        // Map 24h to these slots: 9AM(8-11), 12PM(12-14), 3PM(15-17), 6PM(18-20), 9PM(21-23), 12AM(0-7)
-        if (index === 0) return h >= 8 && h < 12;
-        if (index === 1) return h >= 12 && h < 15;
-        if (index === 2) return h >= 15 && h < 18;
-        if (index === 3) return h >= 18 && h < 21;
-        if (index === 4) return h >= 21 && h < 24;
-        if (index === 5) return h >= 0 && h < 8;
-        return false;
-      }).length;
-      return { 
-        name: hour, 
-        tickets: count 
-      };
-    });
-  }, [tickets]);
-
-  const processedTickets = useMemo(() => {
-    let result = tickets.filter(t => {
-      const matchesFilter = filter === 'All' || filter === 'History' || t.status === filter;
-      const matchesCategory = categoryFilter === 'All' || t.category === categoryFilter;
-      const matchesSearch = t.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           t.subject.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesFilter && matchesCategory && matchesSearch;
-    });
-
-    return result.sort((a, b) => {
-      let comparison = 0;
-      if (sortKey === 'date') {
-        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      } else if (sortKey === 'user') {
-        comparison = a.userEmail.localeCompare(b.userEmail);
-      } else if (sortKey === 'priority') {
-        comparison = (priorityWeight[a.priority as keyof typeof priorityWeight] || 0) - 
-                     (priorityWeight[b.priority as keyof typeof priorityWeight] || 0);
-      }
-      return sortDirection === 'desc' ? -comparison : comparison;
-    });
-  }, [tickets, filter, categoryFilter, searchQuery, sortKey, sortDirection]);
+  const waitingCall = selected ? calls.find((c) => c.user_id === selected.userId) : null;
+  const due = selected ? dueText(selected) : null;
+  const earlier = selected ? (tickets ?? []).filter((t) => t.userId === selected.userId && t.id !== selected.id).slice(0, 5) : [];
 
   return (
-    <div className="h-[calc(100vh-120px)] flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden">
-      {activeCallRoom && (
-        <CallOverlay 
-          roomId={activeCallRoom.room} 
-          reason={activeCallRoom.reason}
-          targetUserId={activeCallRoom.userId}
-          isAgent={true} 
-          onEndCall={() => {
-            setActiveCallRoom(null);
-            loadTickets();
-            if (filter === 'History') loadCallHistory();
-          }} 
-        />
+    <div className="sp-inbox grid h-[calc(100dvh-3.5rem)] min-h-[560px] grid-cols-[3.5rem_minmax(0,1fr)] bg-(--card) text-[13px] 2xl:grid-cols-[12rem_minmax(0,1fr)]">
+      {call && session && (
+        <Suspense fallback={null}>
+          <CallWindow apiKey={session.apiKey} token={session.token} user={{ id: session.userId, name: session.name }} callId={call.id} kind={call.kind} title={call.title} onLeave={endCall} />
+        </Suspense>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-end gap-4 shrink-0 px-2">
-        <div>
-           <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Support Help Desk</h1>
-           <p className="text-slate-500 dark:text-slate-400 mt-1">Manage user concerns and session logs.</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <button 
-             onClick={() => { loadTickets(); loadCalls(); loadCallHistory(); }}
-             className="p-2 bg-card border border-slate-200 dark:border-accent/20 rounded-xl text-slate-500 hover:text-emerald-600 transition shadow-sm"
-             title="Refresh Data"
-           >
-             <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-           </button>
-           <div className="flex gap-1 p-1 bg-slate-850/5 dark:bg-emerald-500/40 rounded-2xl overflow-x-auto border border-slate-850/10 dark:border-accent/20">
-              {[ 
-                { id: 'overview', label: 'Overview', icon: History },
-                { id: 'tickets', label: 'Tickets', icon: MessageSquare },
-                { id: 'calls', label: 'Call Center', icon: PhoneCall },
-              ].map(tab => (
-                <button 
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition whitespace-nowrap ${ 
-                    activeTab === tab.id 
-                    ? 'bg-card shadow-sm' 
-                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'
-                  }`}
-                  style={activeTab === tab.id ? { color: '#2B5748' } : {}}
-                >
-                  <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+      {/* ── Navigation ── */}
+      <nav className="flex flex-col gap-0.5 border-r border-(--border) bg-(--bg) p-2 2xl:p-3" aria-label="Support">
+        {([
+          ['inbox', 'Inbox', Inbox, counts.all],
+          ['calls', 'Calls', PhoneCall, calls.length],
+          ['reports', 'Reports', BarChart3, 0],
+          ['replies', 'Saved replies', MessageSquareText, 0],
+        ] as const).map(([id, label, Icon, n]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setView(id)}
+            aria-current={view === id ? 'page' : undefined}
+            title={label}
+            className={clsx('flex h-9 items-center justify-center gap-2.5 rounded-lg px-2.5 font-medium transition-colors 2xl:justify-start', view === id ? 'bg-(--card) font-semibold text-(--fg) shadow-[0_0_0_1px_var(--border)]' : 'text-(--fg-muted) hover:text-(--fg)')}
+          >
+            <Icon className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="hidden flex-1 text-left 2xl:inline">{label}</span>
+            {n > 0 && <span className="hidden text-xs tabular-nums text-(--fg-subtle) 2xl:inline">{n}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {view === 'inbox' && (
+        <div className="grid min-h-0 grid-cols-1 md:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)_17rem]">
+          {/* ── List ── */}
+          <section className={clsx('flex min-h-0 flex-col border-r border-(--border)', selected && 'max-md:hidden')} aria-label="Conversations">
+            <div className="flex items-center gap-2 px-3.5 pb-2 pt-3.5">
+              <h1 className="text-base font-bold">Inbox</h1>
+              <div className="ml-auto flex items-center gap-1.5 rounded-md border border-(--border) bg-(--bg) px-2">
+                <Search className="h-3.5 w-3.5 text-(--fg-subtle)" aria-hidden />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search conversations" className="h-7 w-28 bg-transparent text-[13px] outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-3.5 border-b border-(--border) px-3.5 text-[12.5px]" role="tablist" aria-label="Whose">
+              {([['mine', 'Mine'], ['unassigned', 'Unassigned'], ['all', 'All']] as const).map(([id, label]) => (
+                <button key={id} type="button" role="tab" aria-selected={scope === id} onClick={() => setScope(id)} className={clsx('-mb-px border-b-2 pb-2 pt-1 font-semibold', scope === id ? 'border-(--fg) text-(--fg)' : 'border-transparent text-(--fg-subtle) hover:text-(--fg)')}>
+                  {label} <span className="font-normal tabular-nums text-(--fg-subtle)">{counts[id]}</span>
                 </button>
               ))}
-           </div>
-        </div>
-      </div>
+            </div>
+            <div className="flex gap-0.5 overflow-x-auto px-2.5 py-2 [scrollbar-width:none]">
+              {([['open', 'Open'], ['waiting', 'Waiting'], ['snoozed', 'Snoozed'], ['resolved', 'Resolved']] as const).map(([id, label]) => (
+                <button key={id} type="button" aria-pressed={statusTab === id} onClick={() => setStatusTab(id)} className={clsx('inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold', statusTab === id ? 'bg-(--bg-alt) text-(--fg)' : 'text-(--fg-subtle) hover:text-(--fg)')}>
+                  <i className={clsx('h-1.5 w-1.5 rounded-full', DOT[id])} aria-hidden />{label}
+                </button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {tickets === null ? (
+                <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-(--fg-subtle)" aria-label="Loading" />
+              ) : visible.length === 0 ? (
+                <p className="px-4 py-8 text-center text-(--fg-subtle)">Nothing here.</p>
+              ) : (
+                visible.map((t) => {
+                  const d = dueText(t);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setSelectedId(t.id)}
+                      className={clsx('relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5 border-b border-(--border) px-3.5 py-3 text-left transition-colors', t.id === selectedId ? 'bg-(--bg)' : 'hover:bg-(--bg)')}
+                    >
+                      {t.id === selectedId && <span className="absolute inset-y-0 left-0 w-0.5 bg-(--primary)" aria-hidden />}
+                      <i className={clsx('h-2 w-2 rounded-full', DOT[statusOf(t)])} aria-hidden />
+                      <span className="truncate font-semibold">{owner(t)}</span>
+                      <span className="text-xs tabular-nums text-(--fg-subtle)">{ago(t.updatedAt || t.createdAt)}</span>
+                      <span className="col-start-2 col-end-4 truncate text-(--fg-muted)">{t.subject}</span>
+                      <span className="col-start-2 col-end-4 flex flex-wrap gap-x-2.5 text-xs text-(--fg-subtle)">
+                        <span>#{t.ticketNum}</span>
+                        {(t.priority === 'High' || t.priority === 'Critical') && <span className="text-(--fg-muted)">{t.priority}</span>}
+                        {calls.some((c) => c.user_id === t.userId) && <span className="font-semibold text-(--primary)">Waiting on a call</span>}
+                        {d && <span className={clsx(d.late && 'font-semibold text-(--danger)')}>{d.text}</span>}
+                        {!t.assigneeId && scope !== 'unassigned' && <span>Unassigned</span>}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </section>
 
-      {activeTab === 'overview' && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 overflow-y-auto pr-2 scrollbar-hide">
-          <div className="rounded-[2rem] p-8 text-white relative overflow-hidden" style={{ background: '#1C2320', boxShadow: '0 12px 40px -8px rgba(0,0,0,0.25)' }}>
-             <div className="absolute inset-0 dot-pattern-dark opacity-50 rounded-[2rem]"></div>
-             <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl opacity-15" style={{ background: "#2B5748", transform: 'translate(20%, -20%)' }}></div>
-             <div className="relative z-10">
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold mb-3 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-white">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-dot inline-block"></span>
-                  Support Dashboard
-                </span>
-                <h2 className="font-display text-3xl text-white mb-2">Welcome back, {user?.email.split('@')[0]}!</h2>
-                <p className="text-slate-400 font-medium text-sm">You have <span className="font-bold text-emerald-500">{stats.open}</span> tickets waiting for your response.</p>
-             </div>
-             <MessageSquare className="absolute -right-8 -bottom-8 w-44 h-44 text-white/5 rotate-12" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {[
-              { label: 'Total Tickets', value: stats.total, icon: MessageSquare, color: 'text-slate-600', bg: 'bg-slate-50' },
-              { label: 'Open', value: stats.open, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { label: 'Awaiting', value: stats.pending, icon: Send, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'Resolved', value: stats.resolved, icon: CheckCircle, color: 'text-slate-400', bg: 'bg-slate-50' },
-              { label: 'Live Calls', value: stats.activeCalls, icon: PhoneCall, color: 'text-rose-600', bg: 'bg-rose-50' },
-              { label: 'Critical', value: stats.critical, icon: AlertTriangle, color: 'text-rose-700', bg: 'bg-rose-100 animate-pulse' },
-            ].map((s, i) => (
-              <div key={i} className="bg-card p-6 rounded-2xl border border-slate-100 dark:border-accent/20 shadow-sm">
-                <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-4`}>
-                  <s.icon className={`w-5 h-5 ${s.color}`} />
+          {/* ── Conversation ── */}
+          <section className={clsx('flex min-h-0 flex-col bg-(--bg)', !selected && 'max-md:hidden')} aria-label="Conversation">
+            {!selected ? (
+              <div className="m-auto grid justify-items-center gap-2 p-8 text-center text-(--fg-subtle)">
+                <Inbox className="h-6 w-6" aria-hidden />
+                <p>Pick a conversation. <kbd className="rounded border border-(--border-strong) px-1 text-xs">J</kbd> <kbd className="rounded border border-(--border-strong) px-1 text-xs">K</kbd> move through the list.</p>
+              </div>
+            ) : (
+              <>
+                <header className="flex flex-wrap items-center gap-2.5 border-b border-(--border) bg-(--card) px-4 py-2.5">
+                  <button type="button" className="sp-ib md:hidden" onClick={() => setSelectedId(null)} aria-label="Back to list"><X aria-hidden /></button>
+                  <span className="sp-av" aria-hidden>{initials(owner(selected))}</span>
+                  <div className="min-w-[14rem] flex-1 leading-tight">
+                    <p className="truncate text-[14.5px] font-bold">{selected.subject}</p>
+                    <p className="truncate text-xs text-(--fg-subtle)">{owner(selected)} · #{selected.ticketNum} · opened {ago(selected.createdAt)}{selected.status !== 'Resolved' && due ? ` · ${due.text}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {waitingCall && !call ? (
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => setCall({ id: waitingCall.room_name, kind: 'video', status: 'started', title: `${owner(selected)} · ${selected.subject}` })}>
+                        <PhoneCall className="h-4 w-4" aria-hidden /> Join their call
+                      </button>
+                    ) : (
+                      <>
+                        <button type="button" className="sp-ib" onClick={() => startCall('voice')} disabled={!channel || !!call} aria-label="Voice call"><Phone aria-hidden /></button>
+                        <button type="button" className="sp-ib" onClick={() => startCall('video')} disabled={!channel || !!call} aria-label="Video call"><Video aria-hidden /></button>
+                      </>
+                    )}
+                    {selected.status !== 'Resolved' && (
+                      <div className="relative">
+                        <button type="button" className="btn btn-glass btn-sm" onClick={() => setSnoozeOpen((v) => !v)} aria-expanded={snoozeOpen}>
+                          <Clock className="h-4 w-4" aria-hidden /> {isSnoozed(selected) ? 'Snoozed' : 'Snooze'}
+                        </button>
+                        {snoozeOpen && (
+                          <div className="absolute right-0 top-[calc(100%+4px)] z-10 grid w-40 rounded-lg border border-(--border-strong) bg-(--card) p-1 shadow-lg" role="menu">
+                            {SNOOZES.map((s) => (
+                              <button key={s.h} type="button" role="menuitem" className="rounded-md px-2.5 py-1.5 text-left hover:bg-(--bg-alt)" onClick={() => { setSnoozeOpen(false); update({ snoozeHours: s.h }); }}>{s.label}</button>
+                            ))}
+                            {isSnoozed(selected) && <button type="button" role="menuitem" className="rounded-md px-2.5 py-1.5 text-left hover:bg-(--bg-alt)" onClick={() => { setSnoozeOpen(false); update({ snoozeHours: 0 }); }}>Unsnooze</button>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <button type="button" className={clsx('btn btn-sm', selected.status === 'Resolved' ? 'btn-glass' : 'btn-primary')} onClick={() => update({ status: selected.status === 'Resolved' ? 'Open' : 'Resolved' })} title="E">
+                      {selected.status === 'Resolved' ? 'Reopen' : <><Check className="h-4 w-4" aria-hidden /> Resolve</>}
+                    </button>
+                  </div>
+                </header>
+                <div className="min-h-0 flex-1">
+                  {chatError ? (
+                    <p className="p-6 text-center text-(--fg-muted)">{chatError}</p>
+                  ) : channel && session ? (
+                    <ChatThread
+                      key={selected.id}
+                      channel={channel}
+                      meId={session.userId}
+                      variant="agent"
+                      notes={notes}
+                      canned={canned}
+                      onSent={replied}
+                      onAddNote={addNote}
+                      onJoinCall={(c) => setCall({ ...c, title: `${owner(selected)} · ${selected.subject}` })}
+                      activeCallId={call?.id ?? null}
+                    />
+                  ) : (
+                    <div className="grid h-full place-items-center"><Loader2 className="h-5 w-5 animate-spin text-(--fg-subtle)" aria-label="Opening" /></div>
+                  )}
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 dark:text-white">{s.value}</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">{s.label}</p>
+              </>
+            )}
+          </section>
+
+          {/* ── Details ── */}
+          {selected && (
+            <aside className="hidden min-h-0 overflow-y-auto border-l border-(--border) xl:block" aria-label="Details">
+              <details className="border-b border-(--border)" open>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Ticket</summary>
+                <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2.5 gap-y-2 px-4 pb-4">
+                  <dt className="text-(--fg-subtle)">Status</dt>
+                  <dd className="flex items-center gap-1.5"><i className={clsx('h-1.5 w-1.5 rounded-full', DOT[statusOf(selected)])} aria-hidden />{{ open: 'Open', waiting: 'Waiting on owner', snoozed: 'Snoozed', resolved: 'Resolved' }[statusOf(selected)]}</dd>
+                  <dt className="text-(--fg-subtle)"><label htmlFor="sd-priority">Priority</label></dt>
+                  <dd>
+                    <select id="sd-priority" value={selected.priority} onChange={(e) => update({ priority: e.target.value })} className="h-7 w-full rounded-md border border-(--border) bg-(--bg) px-1.5 text-[13px]">
+                      {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                    </select>
+                  </dd>
+                  <dt className="text-(--fg-subtle)">Assignee</dt>
+                  <dd className="flex items-center gap-2">
+                    <span className="truncate">{selected.assigneeName || 'Nobody'}</span>
+                    {selected.assigneeId === me?.id ? (
+                      <button type="button" className="ml-auto text-xs font-semibold text-(--fg-subtle) hover:text-(--fg)" onClick={() => update({ assignee: 'none' })}>Unassign</button>
+                    ) : (
+                      <button type="button" className="ml-auto text-xs font-semibold text-(--primary) hover:underline" onClick={() => update({ assignee: 'me' })}>Take it</button>
+                    )}
+                  </dd>
+                  <dt className="text-(--fg-subtle)">Category</dt><dd>{selected.category}</dd>
+                  <dt className="text-(--fg-subtle)"><label htmlFor="sd-labels">Labels</label></dt>
+                  <dd>
+                    <input
+                      id="sd-labels"
+                      value={labelDraft}
+                      onChange={(e) => setLabelDraft(e.target.value)}
+                      onBlur={() => { const next = labelDraft.split(',').map((l) => l.trim().toLowerCase()).filter(Boolean); if (next.join(',') !== (selected.labels || []).join(',')) update({ labels: next }); }}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      placeholder="e.g. facebook, billing"
+                      className="h-7 w-full rounded-md border border-(--border) bg-(--bg) px-2 text-[13px]"
+                    />
+                  </dd>
+                  <dt className="text-(--fg-subtle)">First reply</dt>
+                  <dd>{selected.firstResponseAt ? `${span(mins(new Date(selected.firstResponseAt).getTime() - new Date(selected.createdAt).getTime()))} (target ${span(REPLY_TARGET_MIN[selected.priority] ?? 240)})` : due ? <span className={clsx(due.late && 'font-semibold text-(--danger)')}>{due.text}</span> : '—'}</dd>
+                  {selected.rating ? <><dt className="text-(--fg-subtle)">Rating</dt><dd>{selected.rating} of 5</dd></> : null}
+                </dl>
+              </details>
+              <details className="border-b border-(--border)" open>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Business</summary>
+                <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-2.5 gap-y-2 px-4 pb-4">
+                  <dt className="text-(--fg-subtle)">Name</dt><dd className="truncate">{biz?.profile?.businessName || owner(selected)}</dd>
+                  <dt className="text-(--fg-subtle)">Industry</dt><dd className="truncate">{biz?.profile?.industry || '—'}</dd>
+                  <dt className="text-(--fg-subtle)">Plan</dt><dd>{biz?.wallet?.subscription ? (biz.wallet.subscription === 'PRO' ? 'Pro' : biz.wallet.subscription === 'FREE' ? 'Free' : biz.wallet.subscription) : '—'}</dd>
+                  <dt className="text-(--fg-subtle)">Wallet</dt><dd>{biz?.wallet?.balance != null ? `₱${Number(biz.wallet.balance).toLocaleString('en-PH')}` : '—'}</dd>
+                  <dt className="text-(--fg-subtle)">Email</dt><dd className="truncate">{selected.userEmail}</dd>
+                </dl>
+              </details>
+              <details open>
+                <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-(--fg-muted)">Earlier tickets</summary>
+                <div className="grid gap-1 px-2 pb-4">
+                  {earlier.length === 0 ? <p className="px-2 text-(--fg-subtle)">None</p> : earlier.map((t) => (
+                    <button key={t.id} type="button" onClick={() => setSelectedId(t.id)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-(--bg)">
+                      <i className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', DOT[statusOf(t)])} aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">{t.subject}</span>
+                      <span className="text-xs text-(--fg-subtle)">{t.rating ? `${t.rating}/5` : ago(t.createdAt)}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            </aside>
+          )}
+        </div>
+      )}
+
+      {view === 'calls' && <CallsView calls={calls} history={history} tickets={tickets ?? []} onJoin={(c) => setCall({ id: c.room_name, kind: 'video', status: 'started', title: `${c.user_email} · ${c.reason || 'Support call'}` })} />}
+      {view === 'reports' && <ReportsView tickets={tickets ?? []} />}
+      {view === 'replies' && <RepliesView replies={canned} onChange={setCanned} />}
+    </div>
+  );
+};
+
+/* ── Calls ── */
+const CallsView: React.FC<{ calls: any[]; history: any[]; tickets: Ticket[]; onJoin: (c: any) => void }> = ({ calls, history, tickets, onJoin }) => {
+  const nameOf = (userId: string, email: string) => tickets.find((t) => t.userId === userId)?.ownerName || email.split('@')[0];
+  return (
+    <div className="min-h-0 overflow-y-auto p-5 lg:p-7">
+      <h1 className="text-lg font-bold">Calls</h1>
+      <p className="mt-0.5 text-(--fg-muted)">Owners waiting for someone to join, and past calls.</p>
+      <h2 className="mt-6 text-xs font-bold text-(--fg-muted)">Waiting now</h2>
+      <div className="mt-2 grid gap-2">
+        {calls.length === 0 ? <p className="rounded-lg border border-dashed border-(--border) p-4 text-(--fg-subtle)">Nobody is waiting.</p> : calls.map((c) => (
+          <div key={c.user_id} className="flex items-center gap-3 rounded-xl border border-(--primary) bg-(--bg) p-3 shadow-[0_0_0_3px_var(--ring)]">
+            <span className="sp-av" aria-hidden>{initials(nameOf(c.user_id, c.user_email))}</span>
+            <div className="min-w-0 flex-1"><b className="block font-semibold">{nameOf(c.user_id, c.user_email)}</b><span className="block truncate text-(--fg-muted)">{c.reason || 'Support call'} · waiting {ago(c.started_at)}</span></div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => onJoin(c)}><PhoneCall className="h-4 w-4" aria-hidden /> Join</button>
+          </div>
+        ))}
+      </div>
+      <h2 className="mt-7 text-xs font-bold text-(--fg-muted)">Past calls</h2>
+      <div className="mt-2 overflow-x-auto rounded-xl border border-(--border)">
+        <table className="w-full min-w-[34rem] text-left">
+          <thead className="text-xs text-(--fg-subtle)"><tr><th className="px-3 py-2 font-semibold">Who</th><th className="px-3 py-2 font-semibold">About</th><th className="px-3 py-2 font-semibold">When</th><th className="px-3 py-2 text-right font-semibold">Length</th></tr></thead>
+          <tbody>
+            {history.length === 0 ? <tr><td colSpan={4} className="px-3 py-4 text-(--fg-subtle)">No calls yet.</td></tr> : history.slice(0, 50).map((h) => (
+              <tr key={h.id} className="border-t border-(--border)">
+                <td className="px-3 py-2 font-medium">{nameOf(h.user_id, h.user_email)}</td>
+                <td className="max-w-[16rem] truncate px-3 py-2 text-(--fg-muted)">{h.reason || '—'}</td>
+                <td className="px-3 py-2 text-(--fg-muted)">{new Date(h.started_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{h.duration_seconds != null ? `${Math.floor(h.duration_seconds / 60)}:${String(h.duration_seconds % 60).padStart(2, '0')}` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+/* ── Reports ── */
+const ReportsView: React.FC<{ tickets: Ticket[] }> = ({ tickets }) => {
+  const r = useMemo(() => {
+    const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    const firstReplies = tickets.filter((t) => t.firstResponseAt).map((t) => mins(new Date(t.firstResponseAt!).getTime() - new Date(t.createdAt).getTime()));
+    const resolves = tickets.filter((t) => t.resolvedAt).map((t) => mins(new Date(t.resolvedAt!).getTime() - new Date(t.createdAt).getTime()));
+    const ratings = tickets.filter((t) => t.rating).map((t) => t.rating!);
+    const onTime = tickets.filter((t) => t.firstResponseAt).filter((t) => mins(new Date(t.firstResponseAt!).getTime() - new Date(t.createdAt).getTime()) <= (REPLY_TARGET_MIN[t.priority] ?? 240)).length;
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (13 - i));
+      return { d, n: tickets.filter((t) => new Date(t.createdAt).toDateString() === d.toDateString()).length };
+    });
+    const byCat = (['Technical', 'Billing', 'General'] as const).map((c) => ({ c, n: tickets.filter((t) => t.category === c).length }));
+    return {
+      open: tickets.filter((t) => t.status !== 'Resolved').length,
+      overdue: tickets.filter((t) => dueText(t)?.late).length,
+      firstReply: avg(firstReplies), resolve: avg(resolves), rating: avg(ratings), ratingN: ratings.length,
+      onTime: firstReplies.length ? Math.round((onTime / firstReplies.length) * 100) : null,
+      days, byCat, max: Math.max(1, ...days.map((x) => x.n)),
+    };
+  }, [tickets]);
+  const kpis = [
+    { label: 'Open now', value: String(r.open), sub: r.overdue ? `${r.overdue} overdue` : 'None overdue', bad: r.overdue > 0 },
+    { label: 'First reply', value: r.firstReply == null ? '—' : span(Math.round(r.firstReply)), sub: r.onTime == null ? 'No replies yet' : `${r.onTime}% within target` },
+    { label: 'Time to resolve', value: r.resolve == null ? '—' : span(Math.round(r.resolve)), sub: 'Average' },
+    { label: 'Rating', value: r.rating == null ? '—' : r.rating.toFixed(1), sub: r.ratingN ? `From ${r.ratingN} rating${r.ratingN === 1 ? '' : 's'}` : 'No ratings yet' },
+  ];
+  return (
+    <div className="min-h-0 overflow-y-auto p-5 lg:p-7">
+      <h1 className="text-lg font-bold">Reports</h1>
+      <p className="mt-0.5 text-(--fg-muted)">All tickets so far. Reply targets: Critical 15m, High 1h, Medium 4h, Low 1 day.</p>
+      <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-xl border border-(--border) lg:grid-cols-4">
+        {kpis.map((k, i) => (
+          <div key={k.label} className={clsx('p-4', i > 0 && 'border-l border-(--border)', i === 2 && 'max-lg:border-l-0 max-lg:border-t', i === 3 && 'max-lg:border-t')}>
+            <p className="text-xs font-semibold text-(--fg-muted)">{k.label}</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{k.value}</p>
+            <p className={clsx('text-xs', k.bad ? 'font-semibold text-(--danger)' : 'text-(--fg-subtle)')}>{k.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="rounded-xl border border-(--border) p-4">
+          <p className="text-xs font-semibold text-(--fg-muted)">New tickets, last 14 days</p>
+          <div className="mt-4 flex h-32 items-end gap-1.5" role="img" aria-label="New tickets per day for the last 14 days">
+            {r.days.map((x) => (
+              <div key={x.d.toISOString()} className="flex flex-1 flex-col items-center gap-1" title={`${x.d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}: ${x.n}`}>
+                <span className="text-[10px] tabular-nums text-(--fg-subtle)">{x.n || ''}</span>
+                <div className="w-full rounded-t-sm bg-(--primary)" style={{ height: `${Math.max(2, (x.n / r.max) * 100)}px`, opacity: x.n ? 1 : 0.2 }} />
               </div>
             ))}
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 bg-card p-6 rounded-2xl border border-slate-100 dark:border-accent/20 shadow-sm h-[320px] flex flex-col">
-              <h3 className="font-bold text-slate-800 dark:text-white mb-6">Support Activity</h3>
-              <div className="flex-1 min-h-0">
-                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={activityData}>
-                    <defs>
-                      <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10"/>
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={10} />
-                    <YAxis hide />
-                    <RechartsTooltip contentStyle={{borderRadius: '12px', border: 'none', backgroundColor: '#0f172a', color: '#fff', fontSize: '10px'}} itemStyle={{color: '#10b981', fontWeight: 'bold'}} />
-                    <Area type="monotone" dataKey="tickets" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTickets)" animationDuration={1500} />
-                  </AreaChart>
-                </ResponsiveContainer>
+          <div className="mt-1.5 flex justify-between text-[10px] text-(--fg-subtle)"><span>{r.days[0].d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span><span>Today</span></div>
+        </div>
+        <div className="rounded-xl border border-(--border) p-4">
+          <p className="text-xs font-semibold text-(--fg-muted)">By topic</p>
+          <div className="mt-3 grid gap-3">
+            {r.byCat.map(({ c, n }) => (
+              <div key={c}>
+                <div className="flex justify-between text-[13px]"><span>{c}</span><span className="tabular-nums text-(--fg-muted)">{n}</span></div>
+                <div className="mt-1 h-1.5 rounded-full bg-(--bg-alt)"><div className="h-full rounded-full bg-(--primary)" style={{ width: `${tickets.length ? (n / tickets.length) * 100 : 0}%` }} /></div>
               </div>
-            </div>
-
-            <div className="lg:col-span-4 bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col justify-between">
-              <div>
-                <h3 className="font-bold text-emerald-400 mb-2">Support Performance</h3>
-                <p className="text-xs text-slate-400">Response time and resolution rate.</p>
-              </div>
-              <div className="space-y-4 my-6">
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1 uppercase tracking-widest">
-                    <span>Resolution Rate</span>
-                    <span className="text-emerald-400">88%</span>
-                  </div>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full" style={{ width: '88%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1 uppercase tracking-widest">
-                    <span>Avg Response Time</span>
-                    <span className="text-emerald-400">4.2m</span>
-                  </div>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full" style={{ width: '75%' }}></div>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setActiveTab('tickets')} className="w-full py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
-                Go to Ticket Queue <ArrowUpDown className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Recent open tickets — live queue preview */}
-          <div className="bg-card p-6 rounded-2xl border border-slate-100 dark:border-accent/20 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-800 dark:text-white">Recent Open Tickets</h3>
-              <button onClick={() => setActiveTab('tickets')} className="text-xs font-bold text-emerald-500 hover:underline">View all</button>
-            </div>
-            {tickets.filter((t) => t.status === 'Open' || t.status === 'Pending').length === 0 ? (
-              <p className="text-sm text-slate-400 italic py-4 text-center">No open tickets — new client requests appear here automatically.</p>
-            ) : (
-              <ul className="space-y-2">
-                {tickets
-                  .filter((t) => t.status === 'Open' || t.status === 'Pending')
-                  .slice(0, 5)
-                  .map((t) => (
-                    <li key={t.id}>
-                      <button
-                        type="button"
-                        onClick={() => { setActiveTab('tickets'); setSelectedTicket(t); }}
-                        className="w-full text-left p-3 rounded-xl border border-slate-100 dark:border-accent/20 hover:bg-slate-50 dark:hover:bg-slate-850/30 transition flex justify-between items-center gap-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">#{t.ticketNum} — {t.subject}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{t.userEmail} · {t.category}</p>
-                        </div>
-                        <span className={`shrink-0 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${t.status === 'Open' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            )}
+            ))}
           </div>
         </div>
-      )}
-
-      {activeTab === 'calls' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden animate-in slide-in-from-right-4 duration-500">
-           <div className="lg:col-span-4 flex flex-col bg-slate-900 rounded-2xl shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-white/10 flex justify-between items-center bg-emerald-600/10">
-                 <div className="flex items-center gap-3 text-white">
-                    <PhoneCall className="w-5 h-5 text-emerald-400" />
-                    <h3 className="font-bold uppercase tracking-widest text-sm">Live Queue</h3>
-                 </div>
-                 {activeCalls.length > 0 && <span className="bg-rose-500 text-[10px] px-2 py-0.5 rounded-full animate-pulse font-black text-white">LIVE</span>}
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-                 {activeCalls.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-40">
-                       <PhoneCall className="w-12 h-12 mb-4 text-slate-500" />
-                       <p className="text-sm font-medium text-slate-400">No active calls in queue</p>
-                    </div>
-                 ) : (
-                    activeCalls.map(call => (
-                       <div key={call.user_id} className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition group">
-                          <div className="flex justify-between items-start mb-3">
-                             <div>
-                                <h4 className="font-bold text-white text-sm truncate max-w-[200px]">{call.user_email}</h4>
-                                <p className="text-[10px] text-slate-400 font-mono">ID: {call.room_name.split('-')[1]}</p>
-                             </div>
-                             <span className="text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full">
-                                {Math.max(0, Math.floor((Date.now() - new Date(call.started_at).getTime()) / 60000))}m wait
-                             </span>
-                          </div>
-                          <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="w-full py-3 rounded-full text-xs font-black uppercase transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-white bg-emerald-500" style={{ boxShadow: '0 4px 16px -4px rgba(43, 87, 72,0.35)' }}>
-                             <PhoneCall className="w-4 h-4" /> Connect Now
-                          </button>
-                       </div>
-                    ))
-                 )}
-              </div>
-           </div>
-
-           <div className="lg:col-span-8 flex flex-col bg-card rounded-2xl border border-slate-200 dark:border-accent/20 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-accent/20 flex justify-between items-center bg-slate-50 dark:bg-slate-850/20">
-                 <div className="flex items-center gap-3">
-                    <History className="w-5 h-5 text-slate-400" />
-                    <h3 className="font-bold text-slate-800 dark:text-white">Recent Call Logs</h3>
-                 </div>
-              </div>
-              <div className="flex-1 overflow-y-auto scrollbar-hide">
-                 <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-slate-50 dark:bg-slate-850 z-10 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-accent/20">
-                       <tr>
-                          <th className="px-6 py-4">User</th>
-                          <th className="px-6 py-4">Date</th>
-                          <th className="px-6 py-4 text-center">Duration</th>
-                          <th className="px-6 py-4 text-right">Status</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                       {callHistory.length === 0 ? (
-                          <tr><td colSpan={4} className="py-20 text-center text-slate-400 text-sm italic px-10">No call history logs found.</td></tr>
-                       ) : (
-                          callHistory.map(call => (
-                             <tr key={call.id} className="hover:bg-slate-50 dark:hover:bg-emerald-500/15 transition group">
-                                <td className="px-6 py-4 font-bold text-slate-900 dark:text-white text-xs">{call.user_email}</td>
-                                <td className="px-6 py-4 text-[11px] text-slate-500">{new Date(call.started_at).toLocaleString()}</td>
-                                <td className="px-6 py-4 text-center">
-                                   <span className="text-[10px] font-bold bg-slate-100 dark:bg-emerald-500/50 px-2 py-1 rounded text-slate-600 dark:text-slate-300">
-                                      {formatDuration(call.duration_seconds)}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                   <span className="text-[10px] font-black uppercase tracking-tighter text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">Completed</span>
-                                </td>
-                             </tr>
-                          ))
-                       )}
-                    </tbody>
-                 </table>
-              </div>
-           </div>
-        </div>
-      )}
-
-      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden ${activeTab !== 'tickets' ? 'hidden' : ''}`}>
-         <div className={`lg:col-span-4 flex flex-col gap-6 overflow-hidden ${selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex-1 flex flex-col bg-card rounded-2xl border border-slate-200 dark:border-accent/20 shadow-sm overflow-hidden min-h-0">
-               <div className="p-4 border-b border-slate-100 dark:border-accent/20 space-y-4 bg-slate-50/50 dark:bg-slate-850/20">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                     {(['All', 'Open', 'Resolved'] as const).map(f => (
-                       <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap ${filter === f ? 'bg-emerald-500 dark:bg-accent text-white dark:text-slate-850' : 'bg-slate-850/5 dark:bg-slate-850 text-slate-400 hover:text-slate-600'}`} style={filter === f ? { boxShadow: '0 4px 12px -3px rgba(43, 87, 72,0.3)' } : {}}>
-                         {f}
-                       </button>
-                     ))}
-                  </div>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                     {(['All', 'Technical', 'Billing', 'General'] as const).map(c => (
-                       <button key={c} onClick={() => setCategoryFilter(c)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition whitespace-nowrap ${categoryFilter === c ? 'bg-[#618764] text-white' : 'bg-slate-850/5 dark:bg-slate-850 text-slate-400'}`}>
-                         {c === 'All' ? 'All Types' : c}
-                       </button>
-                     ))}
-                  </div>
-                  <div className="relative">
-                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tickets..." className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-850 border border-transparent focus:border-emerald-500 rounded-xl text-sm outline-hidden transition-all" />
-                  </div>
-               </div>
-
-               <div className="flex-1 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700 scrollbar-hide">
-                  {isLoading ? (
-                     <div className="flex items-center justify-center py-20">
-                       <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                     </div>
-                  ) : processedTickets.length === 0 ? (
-                     <div className="py-20 text-center text-slate-400 text-sm italic px-10">No tickets found.</div>
-                  ) : (
-                     processedTickets.map(ticket => (
-                        <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} className={`p-4 cursor-pointer transition relative group border-l-4 ${selectedTicket?.id === ticket.id ? 'bg-emerald-500/5 dark:bg-emerald-500/8' : 'hover:bg-slate-850/5 dark:hover:bg-emerald-500/15 border-l-transparent'}`} style={selectedTicket?.id === ticket.id ? { borderLeftColor: '#2B5748' } : {}}>
-                           <div className="flex justify-between items-start mb-1">
-                              <span className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[150px]">{ticket.userEmail}</span>
-                              <span className="text-[10px] text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
-                           </div>
-                           <h4 className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{ticket.subject}</h4>
-                           <div className="mt-2 flex items-center gap-2 flex-wrap">
-                              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                ticket.category === 'Billing' ? 'bg-emerald-100 text-emerald-700' :
-                                ticket.category === 'Technical' ? 'bg-amber-100 text-amber-700' :
-                                'bg-slate-100 text-slate-600'
-                              }`}>{ticket.category || 'General'}</span>
-                              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-700' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{ticket.priority}</span>
-                              <span className={`text-[10px] font-black uppercase tracking-wider ${ticket.status === 'Open' ? 'text-emerald-600' : ticket.status === 'Resolved' ? 'text-slate-400' : 'text-blue-500'}`}>{ticket.status}</span>
-                           </div>
-                        </div>
-                     ))
-                  )}
-               </div>
-            </div>
-
-            <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl shrink-0 max-h-[200px] flex flex-col">
-               <div className="flex items-center gap-3 mb-4 shrink-0">
-                  <PhoneCall className="w-5 h-5 text-emerald-400" />
-                  <span className="font-bold text-sm uppercase tracking-wider">Live Queue</span>
-                  {activeCalls.length > 0 && <span className="ml-auto bg-rose-500 text-[10px] px-2 py-0.5 rounded-full animate-pulse font-black">LIVE</span>}
-               </div>
-               <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
-                  {activeCalls.length === 0 ? <p className="text-[10px] text-slate-400 italic">No active requests.</p> : activeCalls.map(call => (
-                    <div key={call.user_id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
-                       <span className="text-[10px] font-bold truncate max-w-[120px]">{call.user_email}</span>
-                       <button onClick={() => handleJoinCall(call.room_name, call.reason, call.user_id)} className="px-3 py-1 rounded-full text-[10px] font-black uppercase text-white hover:scale-105 transition-all bg-emerald-500">Connect</button>
-                    </div>
-                  ))}
-               </div>
-            </div>
-         </div>
-
-         <div className={`lg:col-span-8 flex flex-col bg-card rounded-2xl border border-slate-200 dark:border-accent/20 shadow-xl overflow-hidden min-h-0 ${!selectedTicket ? 'hidden lg:flex' : 'flex'}`}>
-            {selectedTicket ? (
-               <div className="flex flex-1 overflow-hidden">
-                  <div className="flex-1 flex flex-col min-w-0">
-                     <div className="p-4 border-b border-slate-100 dark:border-accent/20 bg-slate-50 dark:bg-slate-850 flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-3">
-                           <button onClick={() => setSelectedTicket(null)} className="lg:hidden p-1.5 hover:bg-slate-200 dark:hover:bg-emerald-500/50 rounded-lg transition"><ArrowLeft className="w-5 h-5" /></button>
-                           <div>
-                              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">{selectedTicket.subject} <span className="text-[10px] text-slate-400">#{selectedTicket.ticketNum}</span></h3>
-                              <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                                 <span className="flex items-center gap-1"><UserIcon className="w-3 h-3" /> {selectedTicket.userEmail}</span>
-                              </div>
-                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <div className="relative group/status">
-                              <button className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition border ${selectedTicket.status === 'Open' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : selectedTicket.status === 'Pending' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                 <div className={`w-2 h-2 rounded-full ${selectedTicket.status === 'Open' ? 'bg-emerald-500' : selectedTicket.status === 'Pending' ? 'bg-blue-500' : 'bg-slate-400'}`} />
-                                 {selectedTicket.status} <ChevronDown className="w-3 h-3" />
-                              </button>
-                              <div className="absolute right-0 top-full mt-1 w-32 bg-card border border-slate-200 rounded-xl shadow-xl py-1 z-50 opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all">
-                                 {(['Open', 'Pending', 'Resolved'] as const).map(s => (
-                                    <button key={s} onClick={() => handleStatusUpdate(selectedTicket.id, s)} className="w-full text-left px-4 py-2 text-xs font-bold hover:bg-slate-50 text-slate-600 transition">{s}</button>
-                                 ))}
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 dark:bg-slate-850/30 scrollbar-hide">
-                        {selectedTicket.messages?.map((msg, idx) => (
-                           <div key={idx} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${msg.sender === 'agent' ? 'text-white rounded-tr-none' : 'bg-card text-slate-800 dark:text-white border border-slate-850/10 dark:border-accent/20 rounded-tl-none'}`} style={msg.sender === 'agent' ? { background: '#2B5748' } : {}}>
-                                 {msg.text}
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-
-                     {selectedTicket.status !== 'Resolved' && (
-                        <div className="p-4 bg-card border-t border-slate-100 dark:border-accent/20 shrink-0 space-y-3">
-                           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                              {[{ label: 'Greeting', text: 'Mabuhay! How can I help you?' }, { label: 'Checking', text: 'Wait lang po, let me check.' }, { label: 'Resolved', text: 'Resolved na po!' }].map((qr, i) => (
-                                 <button key={i} onClick={() => setReply(qr.text)} className="px-2 py-1 bg-slate-100 dark:bg-slate-850 text-slate-500 rounded-md text-[10px] font-bold hover:bg-emerald-50 transition whitespace-nowrap">{qr.label}</button>
-                              ))}
-                           </div>
-                           <form onSubmit={handleSendReply} className="flex gap-3">
-                              <textarea rows={1} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type reply..." className="flex-1 bg-slate-100 dark:bg-slate-850 border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden resize-none" />
-                              <button type="submit" disabled={isSending || !reply.trim()} className="bg-emerald-600 text-white rounded-xl px-4 py-2.5 font-bold text-sm hover:bg-emerald-700 transition shadow-lg flex items-center gap-2 disabled:opacity-50">
-                                 {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                 <span className="hidden sm:inline">Reply</span>
-                              </button>
-                           </form>
-                        </div>
-                     )}
-                  </div>
-
-                  <div className="hidden xl:flex w-72 border-l border-slate-100 dark:border-accent/20 flex-col bg-slate-50 dark:bg-slate-850/10">
-                     <div className="p-6 border-b border-slate-100 dark:border-accent/20 text-center">
-                        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner"><UserIcon className="w-8 h-8" /></div>
-                        <h4 className="font-bold text-slate-800 dark:text-white truncate">{userProfile?.businessName || 'Anonymous'}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{userProfile?.industry || 'General SME'}</p>
-                     </div>
-                     <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                        <div>
-                           <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Wallet Info</h5>
-                           <div className="p-3 bg-card rounded-xl border border-slate-100 shadow-sm">
-                              <p className="text-xs text-slate-500 mb-1">Current Balance</p>
-                              <p className="text-lg font-black text-slate-800 dark:text-white">₱{userProfile?.wallet?.balance?.toLocaleString() || '0'}</p>
-                           </div>
-                        </div>
-                        <button onClick={() => { const suffix = selectedTicket.userId.substring(selectedTicket.userId.length - 4); handleJoinCall(`KawayanSupport-${suffix}`, selectedTicket.subject, selectedTicket.userId); }} className="w-full py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition">
-                           <PhoneCall className="w-3.5 h-3.5" /> Call Customer
-                        </button>
-                     </div>
-                  </div>
-               </div>
-            ) : (
-               <div className="flex-1 flex flex-col items-center justify-center text-center p-10 space-y-4">
-                  <div className="w-20 h-20 bg-slate-100 dark:bg-emerald-500/50 rounded-full flex items-center justify-center shadow-inner"><MessageSquare className="w-10 h-10 text-slate-300" /></div>
-                  <h3 className="text-xl font-bold text-slate-800 dark:text-white">Select a Ticket</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Pick a user from the left to start the conversation.</p>
-               </div>
-            )}
-         </div>
       </div>
+    </div>
+  );
+};
+
+/* ── Saved replies ── */
+const RepliesView: React.FC<{ replies: CannedReply[]; onChange: (r: CannedReply[]) => void }> = ({ replies, onChange }) => {
+  const toast = useToast();
+  const empty = { id: '', shortcut: '', title: '', body: '' };
+  const [form, setForm] = useState<CannedReply>(empty);
+  const [saving, setSaving] = useState(false);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      onChange(await supportApi<CannedReply[]>('/canned', { method: 'POST', body: JSON.stringify({ ...form, id: form.id || undefined }) }));
+      setForm(empty);
+      toast.success('Saved reply stored');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const remove = async (id: string) => {
+    try { onChange(await supportApi<CannedReply[]>(`/canned/${encodeURIComponent(id)}`, { method: 'DELETE' })); } catch (err: any) { toast.error(err.message); }
+  };
+  return (
+    <div className="grid min-h-0 gap-6 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-7">
+      <div>
+        <h1 className="text-lg font-bold">Saved replies</h1>
+        <p className="mt-0.5 text-(--fg-muted)">Type <kbd className="rounded border border-(--border-strong) px-1 text-xs">/</kbd> and the shortcut in any reply to insert one.</p>
+        <div className="mt-5 grid overflow-hidden rounded-xl border border-(--border)">
+          {replies.length === 0 ? <p className="p-4 text-(--fg-subtle)">No saved replies yet. If the list stays empty, run the support SQL in Supabase first.</p> : replies.map((r, i) => (
+            <div key={r.id} className={clsx('grid gap-1 p-4', i > 0 && 'border-t border-(--border)')}>
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-semibold text-(--primary)">/{r.shortcut}</code>
+                <b className="font-semibold">{r.title}</b>
+                <button type="button" className="ml-auto text-xs font-semibold text-(--fg-subtle) hover:text-(--fg)" onClick={() => setForm(r)}>Edit</button>
+                <button type="button" className="text-xs font-semibold text-(--fg-subtle) hover:text-(--danger)" onClick={() => remove(r.id)}>Delete</button>
+              </div>
+              <p className="line-clamp-2 text-(--fg-muted)">{r.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <form onSubmit={save} className="grid h-max gap-3 rounded-xl border border-(--border) bg-(--bg) p-4">
+        <b className="font-semibold">{form.id ? 'Edit saved reply' : 'New saved reply'}</b>
+        <label className="grid gap-1 text-xs font-semibold text-(--fg-muted)">Shortcut
+          <span className="flex items-center rounded-md border border-(--border) bg-(--card) px-2"><span className="text-(--fg-subtle)">/</span>
+            <input required value={form.shortcut} onChange={(e) => setForm({ ...form, shortcut: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} maxLength={30} className="h-8 flex-1 bg-transparent px-1 text-[13px] font-normal text-(--fg) outline-none" placeholder="reconnect" />
+          </span>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-(--fg-muted)">Title
+          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} className="h-8 rounded-md border border-(--border) bg-(--card) px-2 text-[13px] font-normal text-(--fg)" placeholder="Reconnect your Facebook Page" />
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-(--fg-muted)">Reply
+          <textarea required value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={6} maxLength={4000} className="rounded-md border border-(--border) bg-(--card) p-2 text-[13px] font-normal text-(--fg)" />
+        </label>
+        <div className="flex gap-2">
+          {form.id && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(empty)}>Cancel</button>}
+          <button type="submit" className="btn btn-primary btn-sm ml-auto" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </form>
     </div>
   );
 };

@@ -19,6 +19,7 @@ import AccountMenu from './AccountMenu';
 import AdminVerification, { VerifFilter } from './admin/AdminVerification';
 import { parseUtc, timeAgo } from '../utils/adminJobs';
 import './admin/adminConsole.css';
+import KawayanLogo from './KawayanLogo';
 
 interface Props {
   darkMode: boolean;
@@ -101,7 +102,7 @@ const AdminModal: React.FC<{ title: string; sub?: string; onClose: () => void; c
 );
 
 const FieldLabel: React.FC<{ htmlFor?: string; children: React.ReactNode }> = ({ htmlFor, children }) => (
-  <label htmlFor={htmlFor} className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-(--fg-muted)">{children}</label>
+  <label htmlFor={htmlFor} className="eyebrow mb-1.5 block text-(--fg-muted)">{children}</label>
 );
 
 const RoleBadge: React.FC<{ role: string }> = ({ role }) => (
@@ -110,7 +111,7 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => (
 
 const PlanBadge: React.FC<{ plan?: string }> = ({ plan = 'FREE' }) =>
   plan === 'FREE' ? (
-    <span className="inline-flex rounded-full border border-(--border-strong) px-2.5 text-[11px] font-bold uppercase leading-5 tracking-wide text-(--fg-muted)">Free</span>
+    <span className="inline-flex rounded-full border border-(--border-strong) px-2.5 text-xs font-bold leading-5 text-(--fg-muted)">Free</span>
   ) : (
     <span className="badge badge-green">{plan === 'PRO' ? 'Pro' : 'Enterprise'}</span>
   );
@@ -221,9 +222,9 @@ const AdminSearch: React.FC<{ hitsFor: (q: string) => SearchHit[]; onPick: (hit:
           }}
           placeholder="Search accounts and verifications…"
           aria-label="Search the admin console"
-          className="min-w-0 flex-1 bg-transparent text-[13px] outline-hidden placeholder:text-(--fg-subtle)"
+          className="min-w-0 flex-1 bg-transparent text-ui outline-hidden placeholder:text-(--fg-subtle)"
         />
-        <kbd className="hidden rounded-md border border-(--border-strong) px-1.5 font-mono text-[10px] text-(--fg-subtle) sm:inline">⌘K</kbd>
+        <kbd className="hidden rounded-md border border-(--border-strong) px-1.5 font-mono text-xs text-(--fg-subtle) sm:inline">⌘K</kbd>
       </label>
       {open && q.trim().length >= 2 && (
         <ul onMouseDown={(e) => e.preventDefault()} className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-(--border-strong) bg-(--card) p-1 shadow-lg" role="listbox">
@@ -243,7 +244,7 @@ const AdminSearch: React.FC<{ hitsFor: (q: string) => SearchHit[]; onPick: (hit:
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-(--fg)">{hit.label}</span>
-                    <span className="block truncate text-[11px] text-(--fg-muted)">{hit.sub}</span>
+                    <span className="block truncate text-xs text-(--fg-muted)">{hit.sub}</span>
                   </span>
                 </button>
               </li>
@@ -660,20 +661,19 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const pendingTotal = pendingTxns.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   return (
-    <div className="adm flex min-h-screen bg-(--bg) text-(--fg)">
+    <div className="adm flex min-h-screen bg-(--bg) text-sm text-(--fg)">
       {/* ── Sidebar ── */}
       <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-(--border) bg-(--card) md:flex">
         <div className="flex h-16 shrink-0 items-center gap-2.5 px-4">
-          <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg object-contain" />
           <div className="leading-tight">
-            <p className="font-display text-[15px] font-bold">Kawayan</p>
-            <p className="text-[11px] font-medium text-(--fg-muted)">Admin console</p>
+            <KawayanLogo size={24} />
+            <p className="mt-1 text-xs font-medium text-(--fg-muted)">Admin console</p>
           </div>
         </div>
         <nav aria-label="Admin" className="flex-1 overflow-y-auto px-3 pb-4">
           {(['Workspace', 'System'] as const).map((group) => (
             <div key={group} className="mt-3">
-              <p className="px-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-(--fg-subtle)">{group}</p>
+              <p className="eyebrow px-2.5 pb-1.5 text-(--fg-subtle)">{group}</p>
               <div className="space-y-0.5">
                 {NAV.filter((item) => item.group === group).map((item) => (
                   <button
@@ -707,7 +707,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar ── */}
         <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-4 border-b border-(--border) bg-(--card)/90 px-4 backdrop-blur md:px-6">
-          <nav aria-label="Breadcrumb" className="hidden shrink-0 items-center gap-1.5 text-[13px] text-(--fg-muted) lg:flex">
+          <nav aria-label="Breadcrumb" className="hidden shrink-0 items-center gap-1.5 text-ui text-(--fg-muted) lg:flex">
             <span>Admin</span>
             <ChevronRight className="h-3.5 w-3.5 text-(--fg-subtle)" aria-hidden />
             <span className="font-semibold text-(--fg)">{head.title}</span>
@@ -737,8 +737,8 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
         <div className="mx-auto w-full max-w-[1440px] min-w-0 flex-1 p-4 md:p-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="font-display text-[22px] font-bold tracking-tight">{head.title}</h1>
-              <p className="mt-0.5 text-[13px] text-(--fg-muted)">{head.sub}</p>
+              <h1 className="font-display text-xl font-bold tracking-tight">{head.title}</h1>
+              <p className="mt-0.5 text-ui text-(--fg-muted)">{head.sub}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'overview' && (
@@ -913,7 +913,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                     aria-label="Search users"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-[13px] outline-hidden placeholder:text-(--fg-subtle)"
+                    className="min-w-0 flex-1 bg-transparent text-ui outline-hidden placeholder:text-(--fg-subtle)"
                   />
                 </label>
                 <span className="ml-auto text-xs text-(--fg-muted)">{getFilteredAndSortedUsers().length} of {users.length} accounts</span>
@@ -1153,7 +1153,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                     aria-label="Search audit logs"
                     value={logSearch}
                     onChange={(e) => setLogSearch(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-[13px] outline-hidden placeholder:text-(--fg-subtle)"
+                    className="min-w-0 flex-1 bg-transparent text-ui outline-hidden placeholder:text-(--fg-subtle)"
                   />
                 </label>
                 <DropdownMenu>
@@ -1181,7 +1181,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                 ) : (
                   getGroupedLogs().map(({ day, entries }) => (
                     <div key={day} className="mb-7 last:mb-0">
-                      <p className="mb-3.5 text-[11px] font-bold uppercase tracking-wider text-(--fg-subtle)">{day}</p>
+                      <p className="eyebrow mb-3.5 text-(--fg-subtle)">{day}</p>
                       <ol className="ml-1.5 space-y-5 border-l-2 border-(--border) pl-5">
                         {entries.map((log) => {
                           const meta = ACTION_META[log.action] || DEFAULT_ACTION_META;
@@ -1199,7 +1199,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                                     <span className="whitespace-nowrap text-xs text-(--fg-subtle)" title={parseUtc(log.timestamp).toLocaleString()}>{timeAgo(log.timestamp)}</span>
                                   </div>
                                   {log.details && <p className="mt-1 wrap-break-word text-xs leading-relaxed text-(--fg-muted)">{log.details}</p>}
-                                  <p className="adm-table__mono mt-1.5 text-[10px]!">account id: {log.user_id}</p>
+                                  <p className="adm-table__mono mt-1.5 text-xs!">account id: {log.user_id}</p>
                                 </div>
                               </div>
                             </li>
@@ -1302,7 +1302,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             </TabsList>
             <TabsContent value="balance" className="space-y-3">
               <div className="rounded-xl border border-(--border) bg-(--bg-alt) p-4 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-(--fg-subtle)">Current balance</span>
+                <span className="eyebrow text-(--fg-subtle)">Current balance</span>
                 <p className="mt-1 font-display text-2xl font-bold">{peso(managingUser.balance)}</p>
               </div>
               <div>

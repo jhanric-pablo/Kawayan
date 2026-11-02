@@ -83,7 +83,36 @@ export interface Ticket {
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   status: 'Open' | 'Pending' | 'Resolved';
   createdAt: string;
+  updatedAt?: string;
+  /** Messages from before chat moved to Stream; new ones live in the ticket's Stream channel. */
   messages: {sender: 'user'|'agent', text: string, timestamp: string}[];
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  labels?: string[];
+  snoozedUntil?: string | null;
+  firstResponseAt?: string | null;
+  resolvedAt?: string | null;
+  rating?: number | null;
+  /** Staff lists only: the owner's business name. */
+  ownerName?: string | null;
+}
+
+/** A staff-only note on a ticket, or a line of its history ("assigned to Marco"). */
+export interface TicketNote {
+  id: string;
+  ticketId: string;
+  authorId: string | null;
+  authorName: string;
+  kind: 'note' | 'activity';
+  body: string;
+  createdAt: string;
+}
+
+export interface CannedReply {
+  id: string;
+  shortcut: string;
+  title: string;
+  body: string;
 }
 
 export enum ViewState {

@@ -1,17 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, m, useAnimationControls } from 'motion/react';
 import { User, ViewState } from '../types';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { ValidationService } from '../services/validationService';
 import { TOS_VERSION } from '../constants/termsOfService';
-import TermsOfServiceModal from './TermsOfServiceModal';
 import AuthShell from './auth/AuthShell';
 import AuthField from './auth/AuthField';
-import AuthTabs from './auth/AuthTabs';
-import Stepper, { Step } from './ui/Stepper';
+import StepProgress from './auth/StepProgress';
 import PasswordMeter from './auth/PasswordMeter';
+import SignupStory from './auth/SignupStory';
 import {
-  ArrowRight, X, Mail, Lock, Building2, MapPin, Phone, Eye, EyeOff,
-  ShieldCheck, UploadCloud, Check, Sparkles, Wallet,
+  ArrowRight, X, Eye, EyeOff, Loader2,
+  ShieldCheck, UploadCloud, Check, Wallet, KeyRound,
 } from 'lucide-react';
 
 interface Props {
@@ -24,26 +24,6 @@ interface Props {
 }
 
 const SIGNUP_STEPS = ['Account', 'Business', 'Verify'];
-
-/* Honest, on-brand cycling line — the kinds of shops Kawayan is built for. */
-const BUILT_FOR = [
-  'sari-sari stores', 'panaderias', 'milk tea kiosks', 'carinderias',
-  'barbershops', 'ukay boutiques', 'hardware stores', 'plant shops',
-];
-
-const BuiltForTicker: React.FC = () => {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI((n) => (n + 1) % BUILT_FOR.length), 2600);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <span className="ax__built">
-      <b>Built for</b>
-      <span key={i} className="ax__built-line">{BUILT_FOR[i]}</span>
-    </span>
-  );
-};
 
 const Login: React.FC<Props> = ({
   onLogin,
@@ -63,7 +43,6 @@ const Login: React.FC<Props> = ({
   const [businessPhone, setBusinessPhone] = useState('');
   const [document, setDocument] = useState<File | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +55,15 @@ const Login: React.FC<Props> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clearMessages = () => { setError(''); setValidationErrors([]); };
+
+  const lastStep = useRef(step);
+  const stepDir = step >= lastStep.current ? 1 : -1;
+  useEffect(() => { lastStep.current = step; }, [step]);
+
+  const shake = useAnimationControls();
+  useEffect(() => {
+    if (error || validationErrors.length) shake.start({ x: [0, -9, 8, -5, 4, 0], transition: { duration: 0.42 } });
+  }, [error, validationErrors, shake]);
 
   const switchMode = (next: boolean) => {
     setIsSignUp(next);
@@ -262,20 +250,39 @@ const Login: React.FC<Props> = ({
       onClick={() => setShowPassword((s) => !s)}
       aria-label={showPassword ? 'Hide password' : 'Show password'}
     >
-      {showPassword ? <EyeOff /> : <Eye />}
+      <AnimatePresence mode="wait" initial={false}>
+        <m.span
+          key={showPassword ? 'hide' : 'show'}
+          className="grid"
+          initial={{ opacity: 0, rotate: -60, scale: 0.6 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={{ opacity: 0, rotate: 60, scale: 0.6 }}
+          transition={{ duration: 0.16 }}
+        >
+          {showPassword ? <EyeOff /> : <Eye />}
+        </m.span>
+      </AnimatePresence>
     </button>
   );
 
+  // Errors slide open under the fields instead of popping in.
+  const reveal = { initial: { opacity: 0, height: 0 }, animate: { opacity: 1, height: 'auto' }, exit: { opacity: 0, height: 0 }, transition: { duration: 0.22 } };
   const messages = (
-    <>
+    <AnimatePresence initial={false}>
       {validationErrors.length > 0 && (
-        <div className="ax-error">
-          <strong>Password needs</strong>
-          <ul>{validationErrors.map((err, i) => <li key={i}>{err}</li>)}</ul>
-        </div>
+        <m.div key="pw" {...reveal} className="overflow-hidden">
+          <div className="ax-error">
+            <strong>Password needs</strong>
+            <ul>{validationErrors.map((err, i) => <li key={i}>{err}</li>)}</ul>
+          </div>
+        </m.div>
       )}
-      {error && <div className="ax-error">{error}</div>}
-    </>
+      {error && (
+        <m.div key="err" {...reveal} className="overflow-hidden">
+          <div className="ax-error">{error}</div>
+        </m.div>
+      )}
+    </AnimatePresence>
   );
 
   // Email + password: the whole sign-in form, and step 1 of sign-up.
@@ -284,13 +291,13 @@ const Login: React.FC<Props> = ({
       <AuthField
         id="af-email"
         label="Email address"
+        placeholder="you@yourshop.ph"
         type="email"
         inputMode="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
         autoComplete="email"
-        icon={<Mail />}
       />
       <AuthField
         id="af-pw"
@@ -300,7 +307,6 @@ const Login: React.FC<Props> = ({
         onChange={(e) => setPassword(e.target.value)}
         required
         autoComplete={isSignUp ? 'new-password' : 'current-password'}
-        icon={<Lock />}
         trailing={eyeToggle}
       />
       {isSignUp && !isAdminLogin && <PasswordMeter password={password} />}
@@ -309,12 +315,18 @@ const Login: React.FC<Props> = ({
 
   /* ── Heading copy per mode ── */
   const heading = forgotMode
-    ? { eyebrow: 'Account recovery', title: <>Reset your <em>password.</em></>, sub: 'We’ll email you a secure link to set a new one.' }
+    ? { title: 'Reset your password', sub: 'We’ll email you a secure link to set a new one.' }
     : isAdminLogin
-      ? { eyebrow: 'Staff access', title: <>Staff <em>console.</em></>, sub: 'Admin and support accounts only. Access is logged and monitored.' }
+      ? { title: 'Staff sign in', sub: 'Admin and support accounts only.' }
       : isSignUp
-        ? { eyebrow: 'Free to start', title: <>Set up shop <em>in minutes.</em></>, sub: 'Three quick steps — account, business details, then verification.' }
-        : { eyebrow: 'Welcome back', title: <>Back to <em>business.</em></>, sub: 'Your calendar, drafts and analytics are right where you left them.' };
+        ? {
+            title: 'Create your account',
+            sub: <>Already have an account? <button type="button" className="ax__switch" onClick={() => switchMode(false)}>Sign in</button></>,
+          }
+        : {
+            title: 'Welcome back',
+            sub: <>New to Kawayan? <button type="button" className="ax__switch" onClick={() => switchMode(true)}>Create an account</button></>,
+          };
 
   // Staff sign-in gets none of the customer-facing conversion signals.
   const footer = isAdminLogin ? (
@@ -322,25 +334,24 @@ const Login: React.FC<Props> = ({
       <span className="ax__foot-item"><ShieldCheck /> Access is logged and monitored</span>
     </div>
   ) : (
-    <>
-      <div className="ax__foot">
-        <span className="ax__foot-item"><ShieldCheck /> Encrypted end-to-end</span>
-        <span className="ax__foot-item"><Check /> Manual business verification</span>
-        <span className="ax__foot-item"><Wallet /> No credit card to start</span>
-      </div>
-      <BuiltForTicker />
-    </>
+    <div className="ax__foot">
+      <span className="ax__foot-item"><KeyRound /> Passwords are hashed, never stored as text</span>
+      <span className="ax__foot-item"><Check /> Business permits checked by hand</span>
+      <span className="ax__foot-item"><Wallet /> No credit card to start</span>
+    </div>
   );
+
 
   return (
     <AuthShell
       onBack={() => onNavigate(ViewState.LANDING)}
-      eyebrow={heading.eyebrow}
       title={heading.title}
       subtitle={heading.sub}
       darkMode={darkMode}
       toggleTheme={toggleTheme}
       footer={footer}
+      aside={isSignUp && !isAdminLogin && !forgotMode ? <SignupStory key="story" /> : undefined}
+      headerExtra={isSignUp && !isAdminLogin && !forgotMode ? <StepProgress steps={SIGNUP_STEPS} current={step} /> : undefined}
     >
       {/* ── Forgot password ── */}
       {forgotMode ? (
@@ -348,6 +359,7 @@ const Login: React.FC<Props> = ({
           <AuthField
             id="af-forgot-email"
             label="Email address"
+            placeholder="you@yourshop.ph"
             type="email"
             inputMode="email"
             value={forgotEmail}
@@ -355,7 +367,6 @@ const Login: React.FC<Props> = ({
             required
             autoFocus
             autoComplete="email"
-            icon={<Mail />}
           />
 
           {forgotMsg && <div className="ax-error">{forgotMsg}</div>}
@@ -382,51 +393,61 @@ const Login: React.FC<Props> = ({
         </form>
       ) : (
         <>
-          {!isAdminLogin && <AuthTabs isSignUp={isSignUp} onChange={switchMode} />}
-          <form onSubmit={handleSubmit} className="ax-form">
+          <m.form onSubmit={handleSubmit} className="ax-form" animate={shake}>
             {isSignUp && !isAdminLogin ? (
-              /* Submit (Continue / Enter) still drives the wizard and its validation; the stepper animates it. */
-              <Stepper index={step} onStepChange={(i) => { clearMessages(); setStep(i); }} showNav={false}>
-                <Step label={SIGNUP_STEPS[0]}>
-                  <div className="ax-form">{accountFields}</div>
-                </Step>
+              /* Submit (Continue / Enter) drives the steps and their validation; the header shows progress. */
+              <AnimatePresence mode="wait" initial={false} custom={stepDir}>
+              <m.div
+                key={step}
+                custom={stepDir}
+                variants={{
+                  enter: (d: number) => ({ opacity: 0, x: 28 * d }),
+                  center: { opacity: 1, x: 0 },
+                  exit: (d: number) => ({ opacity: 0, x: -28 * d }),
+                }}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+              >
+                {step === 0 && <div className="ax-form">{accountFields}</div>}
 
-                <Step label={SIGNUP_STEPS[1]}>
+                {step === 1 && (
                   <div className="ax-form">
                     <AuthField
                       id="af-biz"
                       label="Business name"
+                      placeholder="e.g. Tindahan ni Aling Rosa"
                       value={businessName}
                       onChange={(e) => setBusinessName(e.target.value)}
                       required
                       autoFocus
                       autoComplete="organization"
-                      icon={<Building2 />}
                     />
                     <AuthField
                       id="af-addr"
                       label="Business address"
+                      placeholder="Street, barangay, city"
                       value={businessAddress}
                       onChange={(e) => setBusinessAddress(e.target.value)}
                       required
                       autoComplete="street-address"
-                      icon={<MapPin />}
                     />
                     <AuthField
                       id="af-phone"
                       label="Contact number"
+                      placeholder="0917 123 4567"
                       type="tel"
                       inputMode="tel"
                       value={businessPhone}
                       onChange={(e) => setBusinessPhone(e.target.value)}
                       required
                       autoComplete="tel"
-                      icon={<Phone />}
                     />
                   </div>
-                </Step>
+                )}
 
-                <Step label={SIGNUP_STEPS[2]}>
+                {step === 2 && (
                   <div className="ax-form">
                     <div className="ax-doc">
                       <span className="ax-doc__label"><ShieldCheck /> Business permit</span>
@@ -465,19 +486,16 @@ const Login: React.FC<Props> = ({
                       />
                       <span>
                         I agree to the{' '}
-                        <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('terms'); }}>
-                          Terms of Service
-                        </button>{' '}
+                        <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>{' '}
                         and{' '}
-                        <button type="button" onClick={(e) => { e.preventDefault(); setLegalDoc('privacy'); }}>
-                          Privacy Policy
-                        </button>
+                        <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>
                         . Verification is required before full platform access.
                       </span>
                     </label>
                   </div>
-                </Step>
-              </Stepper>
+                )}
+              </m.div>
+              </AnimatePresence>
             ) : (
               accountFields
             )}
@@ -486,24 +504,35 @@ const Login: React.FC<Props> = ({
 
             <div className="ax-actions">
               {isSignUp && !isAdminLogin && step > 0 && (
-                <button
+                <m.button
                   type="button"
                   className="ax-btn ax-btn--ghost"
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => { clearMessages(); setStep((s) => s - 1); }}
                 >
                   Back
-                </button>
+                </m.button>
               )}
-              <button type="submit" className="ax-btn ax-btn--primary" disabled={isLoading}>
-                <span>
-                  {isLoading
-                    ? 'Just a sec…'
-                    : isSignUp && !isAdminLogin
-                      ? (step < SIGNUP_STEPS.length - 1 ? 'Continue' : 'Create account')
-                      : 'Sign in'}
-                </span>
-                {!isLoading && <ArrowRight />}
-              </button>
+              <m.button type="submit" className="ax-btn ax-btn--primary" disabled={isLoading} whileTap={{ scale: 0.97 }}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <m.span
+                    key={isLoading ? 'busy' : `${isSignUp}-${step}`}
+                    className="inline-flex items-center gap-2"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {isLoading && <Loader2 className="animate-spin" aria-hidden />}
+                    {isLoading
+                      ? (isSignUp && !isAdminLogin ? 'Creating your account…' : 'Signing in…')
+                      : isSignUp && !isAdminLogin
+                        ? (step < SIGNUP_STEPS.length - 1 ? 'Continue' : 'Create account')
+                        : 'Sign in'}
+                    {!isLoading && <ArrowRight />}
+                  </m.span>
+                </AnimatePresence>
+              </m.button>
             </div>
 
             {!isSignUp && !isAdminLogin && (
@@ -522,26 +551,9 @@ const Login: React.FC<Props> = ({
               </button>
             )}
 
-            <p className="ax-note">
-              <Sparkles />
-              {isAdminLogin
-                ? 'Staff access is logged and monitored.'
-                : isSignUp
-                  ? 'Manual verification keeps Kawayan spam-free.'
-                  : 'Encrypted end-to-end. No credit card needed to start.'}
-            </p>
-          </form>
+          </m.form>
         </>
       )}
-
-      <TermsOfServiceModal
-        open={legalDoc !== null}
-        doc={legalDoc ?? 'terms'}
-        onClose={() => setLegalDoc(null)}
-        onSwitchDoc={(d) => setLegalDoc(d)}
-        requireScrollToAccept={legalDoc === 'terms' && !acceptedTerms}
-        onAccept={legalDoc === 'terms' && !acceptedTerms ? () => setAcceptedTerms(true) : undefined}
-      />
     </AuthShell>
   );
 };

@@ -32,7 +32,7 @@ const UpNext: React.FC<{ posts: GeneratedPost[]; failedIds: string[]; onOpen: (p
   const empty = !failed.length && !todays.length && !drafts.length && !next;
 
   return (
-    <section className="un" aria-label="Up next">
+    <section className="un" aria-label="Up next" data-tour="up-next">
       <span className="un__label">Up next</span>
       <div className="un__items">
         {failed.map((p) => (

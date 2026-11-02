@@ -7,6 +7,7 @@ import { VerificationStatus as VStatus } from '../types';
 import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
 import { supportRealtime } from '../services/supportRealtime';
 import './onboarding.css';
+import KawayanLogo from './KawayanLogo';
 
 interface Props {
   userId?: string;
@@ -206,8 +207,7 @@ const VerificationStatus: React.FC<Props> = ({
 
   const Brand = (
     <div className="ob-brand">
-      <img src="/logo.png" alt="Kawayan" />
-      <span>Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span></span>
+      <KawayanLogo size={26} />
     </div>
   );
 

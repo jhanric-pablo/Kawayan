@@ -17,6 +17,7 @@ import NotificationCenter from './NotificationCenter';
 import AccountMenu from '../AccountMenu';
 import HelpPanel from '../HelpPanel';
 import '../appShell.css';
+import KawayanLogo, { KAWAYAN_ICON } from '../KawayanLogo';
 
 export interface NavItem {
   id: ViewState;
@@ -34,7 +35,8 @@ interface Props {
   onNavigate: (view: ViewState) => void;
   onHome: () => void;
   onCreatePost: () => void;
-  onOpenPost: (postId: string) => void;
+  /** `date` lets the calendar jump to the post's month before opening it. */
+  onOpenPost: (postId: string, date?: string) => void;
   children: React.ReactNode;
 }
 
@@ -122,7 +124,7 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
           if (e.key === 'Escape') setOpen(false);
           if (e.key === 'Enter' && hits[0]) pick(hits[0]);
         }}
-        className="h-9 w-full rounded-full border border-(--border) bg-(--card) pl-9 pr-3 text-sm text-(--fg) outline-hidden transition-colors placeholder:text-(--fg-subtle) hover:border-(--border-strong) focus:border-(--primary) focus:ring-2 focus:ring-(--ring)"
+        className="h-9 w-full rounded-md border border-(--border) bg-(--bg) pl-9 pr-3 text-sm text-(--fg) outline-hidden transition-colors placeholder:text-(--fg-subtle) hover:border-(--border-strong) focus:border-(--primary) focus:ring-2 focus:ring-(--ring)"
       />
       {open && needle && (
         <div
@@ -139,8 +141,8 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
                   <span className="h-8 w-8 shrink-0 rounded-md bg-(--bg-alt)" aria-hidden />
                 )}
                 <span className="min-w-0">
-                  <span className="block truncate text-[13px] font-semibold text-(--fg)">{p.topic}</span>
-                  <span className="block text-[11px] text-(--fg-muted)">
+                  <span className="block truncate text-ui font-semibold text-(--fg)">{p.topic}</span>
+                  <span className="block text-xs text-(--fg-muted)">
                     {new Date(`${p.date}T12:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })} · {p.status}
                   </span>
                 </span>
@@ -175,6 +177,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   const toast = useToast();
   const isUser = user.role === 'user';
   const feed = useWorkspaceFeed(isUser ? user.id : undefined);
+  const openPost = (postId: string) => onOpenPost(postId, feed.posts.find((p) => p.id === postId)?.date);
   const [noticeHidden, setNoticeHidden] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [plan, setPlan] = useState<SubscriptionTier | null>(null);
@@ -230,15 +233,13 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   return (
     <div className="flex min-h-screen">
       {!phone && (
-        <aside className="sticky top-0 z-40 flex h-screen w-[68px] shrink-0 flex-col border-r border-(--border) bg-(--card) lg:w-60">
+        <aside className="sticky top-0 z-40 flex h-screen w-[68px] shrink-0 flex-col border-r border-(--border) bg-(--bg) lg:w-60">
           <button type="button" onClick={onHome} className="flex h-14 shrink-0 items-center gap-2.5 px-[18px] lg:px-5" aria-label="Kawayan home">
-            <img src="/logo.png" alt="" className="h-8 w-8 rounded-xl object-contain" />
-            <span className="hidden font-display text-lg font-bold text-(--fg) lg:inline">
-              Kawayan<span className="text-(--primary)">.</span>
-            </span>
+            <img src={KAWAYAN_ICON} alt="" className="h-8 w-8 lg:hidden" />
+            <KawayanLogo size={24} className="hidden lg:inline-block" />
           </button>
           <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-2.5 py-3 lg:px-3">
-            <p className="hidden px-2.5 pb-2 text-[10.5px] font-bold uppercase tracking-widest text-(--fg-subtle) lg:block">Workspace</p>
+            <p className="eyebrow hidden px-2.5 pb-2 text-(--fg-subtle) lg:block">Workspace</p>
             {navItems.map((item) => {
               const active = view === item.id;
               return (
@@ -247,7 +248,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
                     {...navButton(item)}
                     aria-label={item.label}
                     className={clsx(
-                      'relative flex h-10 items-center justify-center gap-3 rounded-lg px-2.5 text-[13.5px] font-semibold transition-colors lg:justify-start',
+                      'relative flex h-10 items-center justify-center gap-3 rounded-lg px-2.5 text-ui font-semibold transition-colors lg:justify-start',
                       active
                         ? 'bg-brand/10 text-(--primary)'
                         : 'text-(--fg-muted) hover:bg-(--bg-alt) hover:text-(--fg)',
@@ -266,19 +267,16 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           <div className="space-y-2 border-t border-(--border) p-2.5 lg:space-y-2.5 lg:p-3">
             {isUser && (
               <SideTip label={`${engine.label} · ${used} of ${limit} posts used`}>
-                <div className="rounded-lg border border-(--border) bg-(--bg) p-2.5">
-                  <p className="flex items-center justify-center gap-2 text-[12px] font-semibold text-(--fg) lg:justify-start">
+                <div className="rounded-lg border border-(--border) bg-(--card) p-2.5" data-tour="posts-used">
+                  <p className="flex items-center justify-center gap-2 text-xs font-semibold text-(--fg) lg:justify-start">
                     <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-                      {(engine.tone === 'ok' || engine.tone === 'warn') && (
-                        <span className={clsx('absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:hidden', ENGINE_DOT[engine.tone])} />
-                      )}
                       <span className={clsx('relative inline-flex h-2 w-2 rounded-full', ENGINE_DOT[engine.tone])} />
                     </span>
                     <span className="hidden truncate lg:inline">{engine.label}</span>
                     <span className="sr-only lg:hidden">{engine.label}</span>
                   </p>
                   <div className="mt-2 hidden lg:block">
-                    <p className="mb-1.5 flex justify-between text-[11px] text-(--fg-muted)">
+                    <p className="mb-1.5 flex justify-between text-xs text-(--fg-muted)">
                       <span><b className="font-semibold text-(--fg) tabular-nums">{used}</b> of {limit} posts used</span>
                       <span>{new Date().toLocaleDateString('en-PH', { month: 'short' })}</span>
                     </p>
@@ -298,11 +296,11 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
                   onClick={() => setHelpOpen((o) => !o)}
                   aria-expanded={helpOpen}
                   aria-label="Ask AI / Help"
-                  className="flex h-9 w-full items-center justify-center gap-2.5 rounded-lg px-2.5 text-[13px] font-semibold text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg) aria-expanded:bg-(--bg-alt) aria-expanded:text-(--fg) lg:justify-start"
+                  className="flex h-9 w-full items-center justify-center gap-2.5 rounded-lg px-2.5 text-ui font-semibold text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg) aria-expanded:bg-(--bg-alt) aria-expanded:text-(--fg) lg:justify-start"
                 >
                   <MessageSquare className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden />
                   <span className="hidden flex-1 text-left lg:inline">Ask AI / Help</span>
-                  <kbd className="hidden rounded border border-(--border) bg-(--bg) px-1.5 font-sans text-[10.5px] font-semibold text-(--fg-subtle) lg:inline">
+                  <kbd className="hidden rounded border border-(--border) bg-(--bg) px-1.5 font-sans text-xs font-semibold text-(--fg-subtle) lg:inline">
                     {MOD_KEY}K
                   </kbd>
                 </button>
@@ -312,29 +310,29 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
         </aside>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-(--border) bg-[color-mix(in_srgb,var(--card)_88%,transparent)] px-3 backdrop-blur-md sm:gap-3 sm:px-6">
+      <div className="flex min-w-0 flex-1 flex-col bg-(--card)">
+        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-(--border) bg-(--card) px-3 sm:gap-3 sm:px-6">
           {phone && (
             <button type="button" onClick={onHome} aria-label="Kawayan home">
-              <img src="/logo.png" alt="" className="h-8 w-8 rounded-xl object-contain" />
+              <img src={KAWAYAN_ICON} alt="" className="h-8 w-8" />
             </button>
           )}
           {isUser && !phone ? (
-            <PostSearch posts={feed.posts} onOpen={onOpenPost} onFocus={feed.reload} />
+            <PostSearch posts={feed.posts} onOpen={openPost} onFocus={feed.reload} />
           ) : (
             <h2 className="text-sm font-semibold text-(--fg)">{navItems.find((i) => i.id === view)?.label}</h2>
           )}
           <div className="ml-auto flex items-center gap-2">
             {isUser && (
               <>
-                <button type="button" onClick={() => onNavigate(ViewState.SOCIAL)} className="btn btn-glass btn-sm hidden lg:inline-flex">
+                {feed.accountsState === 'ok' && feed.accounts.length === 0 && <button type="button" onClick={() => onNavigate(ViewState.SOCIAL)} className="btn btn-glass btn-sm hidden lg:inline-flex">
                   <Plus className="h-4 w-4" strokeWidth={2} aria-hidden /> Connect platform
-                </button>
-                <button type="button" onClick={onCreatePost} className="btn btn-primary btn-sm" aria-label="Create post">
+                </button>}
+                <button type="button" onClick={onCreatePost} className="btn btn-primary btn-sm" aria-label="Create post" data-tour="create-post">
                   <Plus className="h-4 w-4" strokeWidth={2.25} aria-hidden />
                   <span className="hidden sm:inline">Create post</span>
                 </button>
-                <NotificationCenter userId={user.id} feed={feed} onOpenPost={onOpenPost} />
+                <NotificationCenter userId={user.id} feed={feed} onOpenPost={openPost} />
               </>
             )}
             <AccountMenu user={user} plan={plan} {...account} showHelp={phone && isUser} />
@@ -347,7 +345,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
             className="mx-2 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300 sm:mx-4 lg:mx-6"
           >
             <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            <p className="min-w-0 flex-1 text-[13px] leading-snug">
+            <p className="min-w-0 flex-1 text-ui leading-snug">
               <b className="font-semibold">Warning:</b> Kawayan lost access to{' '}
               {expired.map((a) => `${PLATFORM_LABEL[a.platform]} (@${a.username})`).join(' and ')}. Reauthorize to prevent publishing delays.
             </p>
@@ -364,7 +362,7 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           </div>
         )}
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1 text-sm">{children}</main>
       </div>
 
       {isUser && <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />}

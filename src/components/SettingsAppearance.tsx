@@ -1,13 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { RadioGroup } from '@base-ui/react/radio-group';
 import { Radio } from '@base-ui/react/radio';
 import { Check } from 'lucide-react';
 
-type ThemeId = 'rice-paper' | 'cool-slate' | 'terracotta' | 'dark-zinc';
-type Palette = Exclude<ThemeId, 'dark-zinc'>;
-
-/** Also read by the inline script in index.html, so the palette applies before first paint. */
-const KEY = 'kawayan_theme';
+type ThemeId = 'light' | 'dark';
 
 interface Swatch {
   canvas: string;
@@ -19,53 +15,23 @@ interface Swatch {
   today: string;
 }
 
-/** Each palette's own colours, for its preview card. The live tokens are in index.html. */
+/** Each theme's own colours, for its preview card. The live tokens are in styles/theme.css. */
 const THEMES: { id: ThemeId; name: string; note: string; c: Swatch }[] = [
   {
-    id: 'rice-paper',
-    name: 'Rice Paper & Forest',
-    note: 'Warm green · natural',
+    id: 'light',
+    name: 'Light',
+    note: 'Rice paper & forest green',
     c: { canvas: '#EAE8E1', surface: '#F6F5F0', border: '#D9D5CB', ink: '#151D19', button: '#224739', accent: '#2B5748', today: 'rgba(43,87,72,0.12)' },
   },
   {
-    id: 'cool-slate',
-    name: 'Cool Slate & Cobalt',
-    note: 'Executive blue · crisp',
-    c: { canvas: '#E8ECF1', surface: '#F5F7FA', border: '#D3DAE3', ink: '#0F172A', button: '#0F172A', accent: '#225BD8', today: 'rgba(37,99,235,0.12)' },
-  },
-  {
-    id: 'terracotta',
-    name: 'Oatmeal & Terracotta',
-    note: 'Warm bronze · earthy',
-    c: { canvas: '#EEE9E0', surface: '#F8F5F0', border: '#DDD6CA', ink: '#1C1917', button: '#C2410C', accent: '#AF3A0B', today: 'rgba(194,65,12,0.12)' },
-  },
-  {
-    id: 'dark-zinc',
-    name: 'Deep Bamboo Dark',
-    note: 'Dark mode',
+    id: 'dark',
+    name: 'Dark',
+    note: 'Deep bamboo',
     c: { canvas: '#0B0F0E', surface: '#121816', border: '#1F2925', ink: '#E8EDEA', button: '#10B981', accent: '#10B981', today: 'rgba(16,185,129,0.16)' },
   },
 ];
 
-const readPalette = (): Palette => {
-  try {
-    const saved = localStorage.getItem(KEY);
-    return saved === 'cool-slate' || saved === 'terracotta' ? saved : 'rice-paper';
-  } catch {
-    return 'rice-paper';
-  }
-};
-
-const applyPalette = (p: Palette) => {
-  document.documentElement.setAttribute('data-theme', p);
-  try {
-    localStorage.setItem(KEY, p);
-  } catch {
-    /* private mode: applies for this visit only */
-  }
-};
-
-/** A tiny app in the palette's colours: sidebar, header with its button, and a timeline. */
+/** A tiny app in the theme's colours: sidebar, header with its button, and a timeline. */
 const Preview: React.FC<{ c: Swatch }> = ({ c }) => (
   <div className="flex h-28 gap-1.5 rounded-xl p-1.5" style={{ background: c.canvas }} aria-hidden>
     <div className="flex w-[30%] flex-col gap-1 rounded-lg border p-1.5" style={{ background: c.surface, borderColor: c.border }}>
@@ -95,54 +61,40 @@ const Preview: React.FC<{ c: Swatch }> = ({ c }) => (
 
 interface Props {
   darkMode: boolean;
-  /** Dark mode lives on the account (and syncs across devices); light palettes live on this device. */
+  /** Id of the visible label for the picker (the settings row title). */
+  labelId: string;
+  /** Dark mode lives on the account, so it syncs across devices. */
   toggleDarkMode: () => void;
 }
 
-/** Settings → Appearance: pick one of four palettes from miniature previews. */
-const SettingsAppearance: React.FC<Props> = ({ darkMode, toggleDarkMode }) => {
-  const [palette, setPalette] = useState<Palette>(readPalette);
-
-  const pick = (id: ThemeId) => {
-    if (id === 'dark-zinc') {
-      if (!darkMode) toggleDarkMode();
-      return;
-    }
-    setPalette(id);
-    applyPalette(id);
-    if (darkMode) toggleDarkMode();
-  };
-
+/** Settings → Appearance: light or dark, from miniature previews. */
+const SettingsAppearance: React.FC<Props> = ({ darkMode, toggleDarkMode, labelId }) => {
   return (
-    <div>
-      <span className="st-label" id="st-theme-label">Theme</span>
-      <RadioGroup
-        value={darkMode ? 'dark-zinc' : palette}
-        onValueChange={(v) => pick(v as ThemeId)}
-        aria-labelledby="st-theme-label"
-        className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2"
-      >
-        {THEMES.map((t) => (
-          <Radio.Root
-            key={t.id}
-            value={t.id}
-            className="group rounded-2xl border border-(--border-strong) bg-(--card) p-2 text-left outline-hidden transition-[border-color,box-shadow] hover:border-(--fg-subtle) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-2 data-checked:border-brand data-checked:p-[7px] data-checked:ring-2 data-checked:ring-brand/20"
-          >
-            <Preview c={t.c} />
-            <div className="flex items-center gap-2 px-1 pb-0.5 pt-2.5">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold text-(--fg)">{t.name}</p>
-                <p className="truncate text-[11.5px] text-(--fg-muted)">{t.note}</p>
-              </div>
-              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-(--border-strong) text-on-brand transition-colors group-data-checked:border-brand group-data-checked:bg-brand">
-                <Check className="h-3 w-3 opacity-0 group-data-checked:opacity-100" strokeWidth={3} aria-hidden />
-              </span>
+    <RadioGroup
+      value={darkMode ? 'dark' : 'light'}
+      onValueChange={(v) => (v === 'dark') !== darkMode && toggleDarkMode()}
+      aria-labelledby={labelId}
+      className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2"
+    >
+      {THEMES.map((t) => (
+        <Radio.Root
+          key={t.id}
+          value={t.id}
+          className="group rounded-2xl border border-(--border-strong) bg-(--card) p-2 text-left outline-hidden transition-[border-color,box-shadow] hover:border-(--fg-subtle) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-2 data-checked:border-brand data-checked:p-[7px] data-checked:ring-2 data-checked:ring-brand/20"
+        >
+          <Preview c={t.c} />
+          <div className="flex items-center gap-2 px-1 pb-0.5 pt-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-ui font-semibold text-(--fg)">{t.name}</p>
+              <p className="truncate text-xs text-(--fg-muted)">{t.note}</p>
             </div>
-          </Radio.Root>
-        ))}
-      </RadioGroup>
-      <p className="mt-2 text-xs text-(--fg-muted)">Light palettes are saved on this device. Dark mode follows your account.</p>
-    </div>
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-(--border-strong) text-on-brand transition-colors group-data-checked:border-brand group-data-checked:bg-brand">
+              <Check className="h-3 w-3 opacity-0 group-data-checked:opacity-100" strokeWidth={3} aria-hidden />
+            </span>
+          </div>
+        </Radio.Root>
+      ))}
+    </RadioGroup>
   );
 };
 

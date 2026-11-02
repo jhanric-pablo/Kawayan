@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowUpRight, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import clsx from 'clsx';
 
 export type IslandTone = 'success' | 'error' | 'info';
@@ -8,50 +8,78 @@ export interface IslandAction {
   onClick: () => void;
 }
 
+// Theme colours, so the toast is light in light mode and dark in dark mode.
 const DOT: Record<IslandTone, string> = {
-  success: 'bg-mint-400',
-  info: 'bg-mint-400',
-  error: 'bg-red-500',
+  success: 'bg-(--primary)',
+  info: 'bg-(--primary)',
+  error: 'bg-(--danger)',
 };
 
-/** Top-centre pill for session and system events. Every toast in the app renders as one. */
+/**
+ * The pill for every toast in the app, in the current theme's colours. A thin bar runs down while it's on screen, so you can
+ * see how long "Undo" is still there; pointing at it or tabbing into it pauses the countdown.
+ */
 const DynamicIslandAlert: React.FC<{
   message: string;
   tone: IslandTone;
+  duration: number;
   action?: IslandAction;
   onDismiss: () => void;
-}> = ({ message, tone, action, onDismiss }) => (
-  <div
-    role={tone === 'error' ? 'alert' : 'status'}
-    className="pointer-events-auto flex max-w-full items-center gap-3 rounded-[1.4rem] border border-zinc-700/50 bg-zinc-900/90 py-1.5 pl-4 pr-1.5 text-[13px] font-medium text-zinc-100 shadow-xl backdrop-blur-md animate-island-in motion-reduce:animate-none"
-  >
-    <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-      <span className={clsx('absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:hidden', DOT[tone])} />
-      <span className={clsx('relative inline-flex h-2 w-2 rounded-full', DOT[tone])} />
-    </span>
-    <span className="min-w-0 flex-1 py-1 leading-snug">{message}</span>
-    {action && (
+}> = ({ message, tone, duration, action, onDismiss }) => {
+  const [paused, setPaused] = useState(false);
+  const left = useRef(duration);
+
+  useEffect(() => {
+    if (paused) return;
+    const started = Date.now();
+    const t = setTimeout(onDismiss, left.current);
+    return () => {
+      clearTimeout(t);
+      left.current -= Date.now() - started;
+    };
+    // onDismiss is a fresh closure every render but always dismisses this toast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
+
+  return (
+    <div
+      role={tone === 'error' ? 'alert' : 'status'}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden rounded-[1.4rem] border border-(--border-strong) bg-(--card) py-2 pl-4 pr-1.5 text-ui font-medium text-(--fg) shadow-xl animate-island-in motion-reduce:animate-none"
+    >
+      <span className={clsx('h-2 w-2 shrink-0 rounded-full', DOT[tone])} aria-hidden />
+      <span className="min-w-0 flex-1 py-0.5 leading-snug">{message}</span>
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            action.onClick();
+            onDismiss();
+          }}
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-(--primary) transition-colors hover:bg-(--bg-alt)"
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
-        onClick={() => {
-          action.onClick();
-          onDismiss();
-        }}
-        className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-mint-400 transition-colors hover:bg-white/10"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-(--fg-muted) transition-colors hover:bg-(--bg-alt) hover:text-(--fg)"
       >
-        {action.label}
-        <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+        <X className="h-3.5 w-3.5" strokeWidth={2} />
       </button>
-    )}
-    <button
-      type="button"
-      onClick={onDismiss}
-      aria-label="Dismiss"
-      className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100"
-    >
-      <X className="h-3.5 w-3.5" strokeWidth={2} />
-    </button>
-  </div>
-);
+      <span className="absolute inset-x-4 bottom-1 h-0.5 overflow-hidden rounded-full bg-(--border) motion-reduce:hidden" aria-hidden>
+        <span
+          className={clsx('block h-full origin-left animate-toast-drain rounded-full', DOT[tone])}
+          style={{ animationDuration: `${duration}ms`, animationPlayState: paused ? 'paused' : 'running' }}
+        />
+      </span>
+    </div>
+  );
+};
 
 export default DynamicIslandAlert;

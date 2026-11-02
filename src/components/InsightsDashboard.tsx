@@ -8,7 +8,8 @@ import {
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { GeneratedPost } from '../types';
 import { useToast } from './ui/Toast';
-import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from './SocialAccounts';
+import { useFocusTrap } from '../utils/useFocusTrap';
+import { FacebookGlyph, InstagramGlyph } from './SocialAccounts';
 import {
   COMPARE_METRICS, Day, Platform, PlatformFilter, PLATFORM_NAMES, PostStats,
   combineHistories, comparePosts, dailyHistory, growthCsv, isoDay, periods, postsCsv, postsInPeriod, summarize,
@@ -162,6 +163,8 @@ const DownloadMenu: React.FC<{ caption: string; items: DownloadItem[]; onDone: (
 
 const CompareDialog: React.FC<{ posts: PostStats[]; caption: string; onClose: () => void }> = ({ posts, caption, onClose }) => {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(sheetRef, true);
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -185,7 +188,7 @@ const CompareDialog: React.FC<{ posts: PostStats[]; caption: string; onClose: ()
   // the dialog under the sticky header.
   return createPortal(
     <div className="kw-overlay in-overlay" onClick={onClose}>
-      <div className="kw-sheet in-cmp" role="dialog" aria-modal="true" aria-labelledby="in-cmp-title" onClick={(e) => e.stopPropagation()}>
+      <div ref={sheetRef} className="kw-sheet in-cmp" role="dialog" aria-modal="true" aria-labelledby="in-cmp-title" onClick={(e) => e.stopPropagation()}>
         <div className="in-cmp__head">
           <div>
             <h2 id="in-cmp-title">Compare posts</h2>
@@ -457,12 +460,6 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={chartData} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="in-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--fg-subtle)', fontSize: 11 }} tickMargin={8} minTickGap={28} interval="preserveStartEnd" />
               <YAxis
@@ -483,7 +480,8 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                 dataKey="cur"
                 stroke="var(--primary)"
                 strokeWidth={2}
-                fill="url(#in-fill)"
+                fill="var(--primary)"
+                fillOpacity={0.06}
                 dot={false}
                 activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--primary)' }}
               />
@@ -516,9 +514,6 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                 </div>
               );
             })}
-            <div className="in-plat__row is-soon">
-              <div className="in-plat__name"><TikTokGlyph /> TikTok <span className="in-plat__soon">Coming soon</span></div>
-            </div>
           </div>
         </section>
       </div>

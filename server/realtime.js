@@ -9,46 +9,8 @@ export const io = new Server({
   }
 });
 
-// Signaling Logic
+// Support hub: tickets and call notices (calls themselves run on Stream).
 io.on('connection', (socket) => {
-  socket.on('join-room', (roomId) => {
-    socket.join(roomId);
-    socket.data.roomId = roomId; // Track room for disconnect
-    socket.to(roomId).emit('user-connected', socket.id);
-  });
-
-  socket.on('signal', (data) => {
-    // data contains: { to: socketId, from: socketId, signal: sdp/ice }
-    io.to(data.to).emit('signal', {
-      from: socket.id,
-      signal: data.signal
-    });
-  });
-
-  socket.on('message', (data) => {
-    // data: { roomId, text, sender }
-    io.to(data.roomId).emit('message', {
-      text: data.text,
-      sender: data.sender,
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  socket.on('cam-state', (data) => {
-    socket.to(data.roomId).emit('cam-state', data.active);
-  });
-
-  socket.on('screen-state', (data) => {
-    socket.to(data.roomId).emit('screen-state', data.active);
-  });
-
-  socket.on('disconnect', () => {
-    if (socket.data.roomId) {
-      socket.to(socket.data.roomId).emit('peer-left');
-    }
-  });
-
-  // Support hub — tickets & calls (real-time, no refresh)
   socket.on('support:join', ({ token }) => {
     if (!token) return;
     const payload = JWTService.verifyToken(token);

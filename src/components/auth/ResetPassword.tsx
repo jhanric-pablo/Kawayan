@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ViewState } from '../../types';
 import { ValidationService } from '../../services/validationService';
-import { ArrowRight, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import AuthShell from './AuthShell';
 import AuthField from './AuthField';
 import PasswordMeter from './PasswordMeter';
@@ -51,8 +51,7 @@ const ResetPassword: React.FC<Props> = ({ token, onNavigate }) => {
   return (
     <AuthShell
       onBack={() => onNavigate(ViewState.LANDING)}
-      eyebrow="Account recovery"
-      title={done ? <>You’re all <em>set.</em></> : <>Set a new <em>password.</em></>}
+      title={done ? 'You’re all set' : 'Set a new password'}
       subtitle={done
         ? 'Your password has been updated — sign in to pick up where you left off.'
         : 'Choose something strong you haven’t used elsewhere.'}
@@ -80,7 +79,6 @@ const ResetPassword: React.FC<Props> = ({ token, onNavigate }) => {
             required
             autoFocus
             autoComplete="new-password"
-            icon={<Lock />}
             trailing={
               <button
                 type="button"
@@ -103,7 +101,6 @@ const ResetPassword: React.FC<Props> = ({ token, onNavigate }) => {
             onChange={(e) => setConfirm(e.target.value)}
             required
             autoComplete="new-password"
-            icon={<Lock />}
           />
 
           {errors.length > 0 && (

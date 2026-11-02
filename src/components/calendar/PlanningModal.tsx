@@ -10,12 +10,14 @@ import {
   Image as ImageIcon, Video, Type,
 } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
+import PostCountPicker from './PostCountPicker';
 import clsx from 'clsx';
 import FormatPicker from './FormatPicker';
 import ChannelTimelineTrack from './ChannelTimelineTrack';
 import type { TimelineCardItem } from './mapCalendarEvents';
 import type { PostChannels } from '../../utils/workspaceFeed';
 import { PRIMARY_BTN } from './PostComposer';
+import { useFocusTrap } from '../../utils/useFocusTrap';
 
 /**
  * PlanningModal: the month planner.
@@ -56,6 +58,14 @@ interface Props {
   onDeleteIdea: (index: number) => void;
   onOpenDay: (day: number) => void;
   onOpenBilling: () => void;
+  /** How many ideas "Plan" makes, picked by the owner, at most `maxPlanCount`. */
+  planCount: number;
+  /** Posts left this month, capped by open days left (no post yet, today onward). */
+  maxPlanCount: number;
+  openDayCount: number;
+  onPlanCountChange: (n: number) => void;
+  /** Switch the planner to next month (offered near the end of the month). */
+  onPlanNextMonth: () => void;
 }
 
 const FORMATS: { key: ContentIdea['format']; color: string; Icon: React.ElementType }[] = [
@@ -73,9 +83,9 @@ const STRATEGY_PRESETS = [
   'Educational tips & how-tos',
 ];
 
-const LABEL = 'text-[11px] font-bold uppercase tracking-[0.08em] text-(--fg-subtle)';
+const LABEL = 'eyebrow text-(--fg-subtle)';
 const INPUT =
-  'w-full rounded-lg border border-(--border) bg-(--bg-alt) px-3 py-2 text-[13px] text-(--fg) outline-hidden transition-colors focus:border-brand focus:ring-2 focus:ring-(--ring) read-only:opacity-70';
+  'w-full rounded-lg border border-(--border) bg-(--bg-alt) px-3 py-2 text-ui text-(--fg) outline-hidden transition-colors focus:border-brand focus:ring-2 focus:ring-(--ring) read-only:opacity-70';
 
 interface CapsuleProps {
   idea: ContentIdea;
@@ -104,15 +114,15 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
           disabled={locked}
           aria-label={`Idea for ${mon} ${idea.day}: ${idea.title || 'untitled'}. Edit`}
           className={clsx(
-            'block w-full rounded-xl border border-dashed p-2 pr-6 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-(--ring)',
+            'block w-full rounded-xl border border-dashed p-2 pr-7 text-left outline-hidden transition-colors focus-visible:ring-2 focus-visible:ring-(--ring)',
             chip?.busy
               ? 'border-brand bg-brand/15 ring-2 ring-brand/40'
               : 'border-brand/60 bg-brand/[0.07] hover:border-brand hover:bg-brand/12 data-popup-open:border-brand data-popup-open:bg-brand/12',
             locked && !chip?.busy && 'opacity-70',
           )}
         >
-          <span className="line-clamp-2 text-[12px] font-semibold leading-tight text-(--fg)">{idea.title || 'Untitled idea'}</span>
-          <span className="mt-1.5 flex items-center gap-1 text-[10.5px] font-semibold text-(--primary)">
+          <span className="line-clamp-2 text-xs font-semibold leading-tight text-(--fg)">{idea.title || 'Untitled idea'}</span>
+          <span className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-(--primary)">
             {chip?.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FormatIcon className="h-3 w-3" aria-hidden />}
             {chip ? chip.label : 'Idea'}
           </span>
@@ -147,10 +157,10 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
             </select>
           </label>
           <div className="flex items-center justify-between pt-1">
-            <button type="button" onClick={() => { setMode(null); onWrite(); }} className="inline-flex items-center gap-1 text-[13px] font-semibold text-(--primary) hover:underline">
+            <button type="button" onClick={() => { setMode(null); onWrite(); }} className="inline-flex items-center gap-1 text-ui font-semibold text-(--primary) hover:underline">
               Write now <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
-            <PopoverClose className={clsx(PRIMARY_BTN, 'px-4 py-1.5 text-[13px]')}>Done</PopoverClose>
+            <PopoverClose className={clsx(PRIMARY_BTN, 'px-4 py-1.5 text-ui')}>Done</PopoverClose>
           </div>
         </PopoverContent>
       </Popover>
@@ -159,7 +169,7 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label={`Actions for ${idea.title || 'idea'}`}
-            className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded text-(--fg-muted) opacity-0 transition-opacity hover:bg-(--bg-alt) hover:text-(--fg) focus-visible:opacity-100 group-hover:opacity-100 data-popup-open:opacity-100"
+            className="absolute right-0.5 top-0.5 grid h-6 w-6 place-items-center rounded-md text-(--fg-muted) transition-opacity hover:bg-(--bg-alt) hover:text-(--fg) pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100 pointer-fine:data-popup-open:opacity-100"
           >
             <Ellipsis className="h-3.5 w-3.5" strokeWidth={2} />
           </DropdownMenuTrigger>
@@ -212,12 +222,19 @@ const PlanningModal: React.FC<Props> = ({
   onDeleteIdea,
   onOpenDay,
   onOpenBilling,
+  planCount,
+  maxPlanCount,
+  openDayCount,
+  onPlanCountChange,
+  onPlanNextMonth,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const latest = useRef({ paused, onClose });
   useEffect(() => {
     latest.current = { paused, onClose };
   });
+
+  useFocusTrap(dialogRef, open && !paused);
 
   // Escape closes the planner, unless it's meant for something on top (the studio, a popover, a confirm).
   useEffect(() => {
@@ -260,7 +277,6 @@ const PlanningModal: React.FC<Props> = ({
   // Open days: in range, no post yet. They frame the plan and pulse while the AI fills them.
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const openDays = days.filter((d) => d >= scheduleRange.minDay && d <= scheduleRange.maxDay && !postStatusByDay[d]);
-  const perWeek = Math.max(1, Math.round(batchPostCount / Math.max(1, openDays.length / 7)));
   const ideaDays = new Set(ideas.map((i) => i.day));
 
   const dayOptionsFor = (current: number) =>
@@ -280,8 +296,8 @@ const PlanningModal: React.FC<Props> = ({
       state: focus || ideas.length ? 'done' : 'active',
     },
     {
-      title: `Plan ${batchPostCount} ideas`,
-      sub: ideas.length ? `${ideas.length} ideas, ${rangeText}` : `Dated ${rangeText}`,
+      title: planCount ? `Plan ${planCount} idea${planCount === 1 ? '' : 's'}` : 'Plan ideas',
+      sub: ideas.length ? `${ideas.length} idea${ideas.length === 1 ? '' : 's'}, ${rangeText}` : `Dated ${rangeText}`,
       state: planning ? 'busy' : ideas.length ? 'done' : focus ? 'active' : 'todo',
     },
     {
@@ -289,7 +305,7 @@ const PlanningModal: React.FC<Props> = ({
       sub: creating
         ? `${batchProgress!.current} of ${batchProgress!.total} done`
         : ideas.length
-          ? `${withPosts} of ${ideas.length} ideas have a post`
+          ? `${withPosts} of ${ideas.length} idea${ideas.length === 1 ? ' has' : 's have'} a post`
           : 'Captions, scores and visuals for every idea',
       state: creating ? 'busy' : ideas.length && withPosts >= ideas.length ? 'done' : ideas.length ? 'active' : 'todo',
     },
@@ -354,11 +370,21 @@ const PlanningModal: React.FC<Props> = ({
           {/* ── Campaign strategy ── */}
           <aside className="space-y-6 border-b border-(--border) px-5 py-5 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
             {trialLimitReached && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300" role="status">
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3.5 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300" role="status">
                 <CircleAlert className="h-4 w-4 shrink-0" /> You’ve used all {batchPostCount} posts for {monthName}.
                 {planLabel !== 'Pro' && (
                   <button type="button" className="ml-auto font-semibold underline" onClick={onOpenBilling}>Upgrade to Pro</button>
                 )}
+              </div>
+            )}
+
+            {scheduleRange.minDay > 1 && scheduleRange.maxDay - scheduleRange.minDay + 1 <= 5 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 px-3.5 py-2.5 text-ui text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300" role="status">
+                <CircleAlert className="h-4 w-4 shrink-0" />
+                Only {scheduleRange.maxDay - scheduleRange.minDay + 1} day{scheduleRange.maxDay - scheduleRange.minDay === 0 ? '' : 's'} left in {monthName}.
+                <button type="button" className="ml-auto font-semibold underline" onClick={onPlanNextMonth} disabled={busy}>
+                  Plan {new Date(year, month + 1, 1).toLocaleDateString('en-PH', { month: 'long' })} instead
+                </button>
               </div>
             )}
 
@@ -373,7 +399,7 @@ const PlanningModal: React.FC<Props> = ({
                   onChange={(e) => onStrategyChange(e.target.value)}
                   disabled={busy}
                   placeholder="e.g. “Undas promo for our ube pandesal” or “New branch in Cubao”"
-                  className="block w-full resize-none bg-transparent text-[14.5px] leading-relaxed outline-hidden placeholder:text-(--fg-subtle) disabled:opacity-60"
+                  className="block w-full resize-none bg-transparent text-sm leading-relaxed outline-hidden placeholder:text-(--fg-subtle) disabled:opacity-60"
                 />
               </div>
               <p className="text-xs text-(--fg-muted)">Kawayan plans the month around this. Change it any time, then re-plan.</p>
@@ -390,7 +416,7 @@ const PlanningModal: React.FC<Props> = ({
                     disabled={busy}
                     onClick={() => onStrategyChange(focus === s ? '' : s)}
                     className={clsx(
-                      'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50',
+                      'rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
                       focus === s
                         ? 'border-brand/60 bg-brand/10 text-(--primary)'
                         : 'border-(--border) bg-(--bg-alt) text-(--fg-muted) hover:border-(--border-strong) hover:text-(--fg)',
@@ -402,6 +428,26 @@ const PlanningModal: React.FC<Props> = ({
               </div>
             </section>
 
+            <section className="space-y-2">
+              <span className={LABEL} id="pl-count-label">How many posts?</span>
+              {maxPlanCount === 0 ? (
+                <p className="text-ui text-(--fg-muted)">
+                  {openDayCount === 0 ? `No open days left in ${monthName}.` : `No posts left in your plan for ${monthName}.`}
+                </p>
+              ) : (
+                <PostCountPicker
+                  value={planCount}
+                  max={maxPlanCount}
+                  onChange={onPlanCountChange}
+                  disabled={busy}
+                  openDays={openDays}
+                  takenDays={new Set(days.filter((d) => postStatusByDay[d]))}
+                  minDay={scheduleRange.minDay}
+                  daysInMonth={daysInMonth}
+                />
+              )}
+            </section>
+
             <section className="space-y-3">
               <span className={LABEL}>Your progress</span>
               <ol className="space-y-3">
@@ -409,7 +455,7 @@ const PlanningModal: React.FC<Props> = ({
                   <li key={step.title} className="flex gap-3">
                     <span
                       className={clsx(
-                        'grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-bold',
+                        'grid h-6 w-6 shrink-0 place-items-center rounded-full border text-xs font-bold',
                         step.state === 'done' && 'border-transparent bg-brand text-on-brand',
                         step.state === 'busy' && 'border-brand text-(--primary)',
                         step.state === 'active' && 'border-brand text-(--primary)',
@@ -418,18 +464,18 @@ const PlanningModal: React.FC<Props> = ({
                     >
                       {step.state === 'done' ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : step.state === 'busy' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : i + 1}
                     </span>
-                    <span className="min-w-0 text-[13px]">
+                    <span className="min-w-0 text-ui">
                       <b className={clsx('block font-semibold', step.state === 'todo' && 'text-(--fg-muted)')}>{step.title}</b>
                       <small className="block text-xs text-(--fg-muted)">{step.sub}</small>
                     </span>
                   </li>
                 ))}
               </ol>
-              <div className="rounded-xl border border-(--border) bg-(--card) p-3.5 text-[13px] leading-relaxed text-(--fg-muted)">
+              <div className="rounded-xl border border-(--border) bg-(--card) p-3.5 text-ui leading-relaxed text-(--fg-muted)">
                 <p className="mb-1 flex items-center justify-between font-semibold text-(--fg)">
                   Target dates <span className="font-display text-(--primary)">{rangeText}</span>
                 </p>
-                {batchPostCount} ideas across {openDays.length} open day{openDays.length === 1 ? '' : 's'}, about {perWeek} a week
+                {planCount} idea{planCount === 1 ? '' : 's'} across {openDays.length} open day{openDays.length === 1 ? '' : 's'}, one per day
                 {days.some((d) => postStatusByDay[d]) && ', around the days that already have posts'}. You can edit every idea before any post is made.
               </div>
             </section>
@@ -438,14 +484,14 @@ const PlanningModal: React.FC<Props> = ({
           {/* ── Multi-channel batch timeline ── */}
           <main className="flex min-w-0 flex-col lg:min-h-0">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 pt-5 sm:px-6" aria-live="polite">
-              <h3 className="text-[15px] font-bold">
+              <h3 className="text-sm font-bold">
                 {planning ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-(--primary)" />
-                    Planning {batchPostCount} ideas{focus ? ` around “${focus.length > 40 ? `${focus.slice(0, 40)}…` : focus}”` : ''}
+                    Planning {planCount} idea{planCount === 1 ? '' : 's'}{focus ? ` around “${focus.length > 40 ? `${focus.slice(0, 40)}…` : focus}”` : ''}
                   </span>
                 ) : ideas.length ? (
-                  <>{ideas.length} ideas <span className="font-normal text-(--fg-muted)">· {rangeText}</span></>
+                  <>{ideas.length} idea{ideas.length === 1 ? '' : 's'} <span className="font-normal text-(--fg-muted)">· {rangeText}</span></>
                 ) : (
                   <>{monthName} on your channels</>
                 )}
@@ -482,7 +528,7 @@ const PlanningModal: React.FC<Props> = ({
 
         {/* ── Action bar ── */}
         <footer className="flex flex-wrap items-center gap-3 border-t border-(--border) bg-(--card) px-5 py-3 sm:px-6">
-          <div className="min-w-0 flex-1 text-[13px] text-(--fg-muted) [&_b]:font-semibold [&_b]:text-(--fg)">
+          <div className="min-w-0 flex-1 text-ui text-(--fg-muted) [&_b]:font-semibold [&_b]:text-(--fg)">
             {creating ? (
               <div className="flex flex-wrap items-center gap-3">
                 <span>
@@ -509,16 +555,16 @@ const PlanningModal: React.FC<Props> = ({
 
           <div className="flex items-center gap-2">
             {ideas.length === 0 ? (
-              <button type="button" className={PRIMARY_BTN} onClick={onGeneratePlan} disabled={busy}>
+              <button type="button" className={PRIMARY_BTN} onClick={onGeneratePlan} disabled={busy || planCount === 0}>
                 {planning ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                {planning ? 'Planning…' : `Plan ${batchPostCount} ideas`}
+                {planning ? 'Planning…' : planCount ? `Plan ${planCount} idea${planCount === 1 ? '' : 's'}` : 'Nothing to plan'}
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={onGeneratePlan}
-                  disabled={busy}
+                  disabled={busy || planCount === 0}
                   className="inline-flex items-center gap-2 rounded-full border border-(--border-strong) px-4 py-2.5 text-sm font-semibold text-(--fg) transition-colors hover:bg-(--bg-alt) disabled:opacity-50"
                 >
                   {planning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Re-plan

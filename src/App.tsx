@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { ViewState, BrandProfile, User, VerificationStatus } from './types';
 import BrandSurvey from './components/BrandSurvey';
 import ContentCalendar, { CalendarIntent } from './components/ContentCalendar';
@@ -19,12 +19,13 @@ import SocialAccounts from './components/SocialAccounts';
 import Billing from './components/Billing';
 import SupportDashboard from './components/SupportDashboard';
 import VerificationStatusScreen from './components/VerificationStatus';
-import TermsOfServiceModal from './components/TermsOfServiceModal';
+import LegalPage from './components/LegalPage';
 import AppHydrationLoader from './components/AppHydrationLoader';
 import SpotlightTour from './components/tour/SpotlightTour';
 import { useOrganicDialog } from './components/OrganicDialog';
 import UniversalDatabaseService from './services/universalDatabaseService';
 import { supportRealtime } from './services/supportRealtime';
+import { endStreamSession } from './services/supportChat';
 import {
   hasPersistedSession,
   readRestorableView,
@@ -33,10 +34,16 @@ import {
   readThemeFromSession,
   resolveViewForRole,
   getHomeViewForRole,
+  VIEW_PATHS,
+  VIEWS_KEEPING_QUERY,
+  PUBLIC_VIEWS,
+  LEGAL_PATHS,
+  viewFromPath,
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
 import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3 } from 'lucide-react';
+import KawayanLogo, { KAWAYAN_ICON } from './components/KawayanLogo';
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -46,8 +53,10 @@ const App: React.FC = () => {
     if (hasPersistedSession()) {
       return readRestorableView() ?? ViewState.CALENDAR;
     }
-    // Logged-out visitors always begin at the public home page.
-    return ViewState.LANDING;
+    // Logged out: public pages open as addressed (/login, /signup); app pages ask to sign in first.
+    const fromUrl = viewFromPath(window.location.pathname);
+    if (fromUrl && PUBLIC_VIEWS.has(fromUrl)) return fromUrl;
+    return fromUrl && fromUrl !== ViewState.RESET_PASSWORD ? ViewState.LOGIN : ViewState.LANDING;
   });
   const [user, setUser] = useState<User | null>(() => {
     if (!hasPersistedSession() || isStoredTokenExpired()) return null;
@@ -59,8 +68,9 @@ const App: React.FC = () => {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [verifStatus, setVerifStatus] = useState<VerificationStatus>('none');
   const [verifRejectionReason, setVerifRejectionReason] = useState<string | undefined>();
-  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  // True for the tour that follows brand setup: it greets by name and ends on "Plan my first month".
+  const [tourFirstRun, setTourFirstRun] = useState(false);
   // Shell → calendar requests (Create post, search hits, notifications).
   const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
   const loginInProgressRef = useRef(false);
@@ -75,6 +85,36 @@ const App: React.FC = () => {
 
   useEffect(() => { viewRef.current = view; }, [view]);
 
+  // Keep the address bar in step with the screen. Start-up redirects and moves out of a
+  // sign-in screen replace the history entry, so Back doesn't land on a page that bounces you.
+  const location = useLocation();
+  const navigate = useNavigate();
+  // /terms and /privacy sit outside the screen state: anyone can open them, signed in or not.
+  const legalDoc = LEGAL_PATHS[location.pathname];
+  const navigationType = useNavigationType();
+  const bootedRef = useRef(false); // false until the first click or key press: earlier moves are redirects
+  const replaceNextRef = useRef(false);
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    const done = () => { bootedRef.current = true; };
+    window.addEventListener('pointerdown', done, { once: true, capture: true });
+    window.addEventListener('keydown', done, { once: true, capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', done, { capture: true });
+      window.removeEventListener('keydown', done, { capture: true });
+    };
+  }, []);
+  useEffect(() => {
+    const path = VIEW_PATHS[view];
+    const fromAuth = !PUBLIC_VIEWS.has(view) && (PUBLIC_VIEWS.has(prevViewRef.current) || prevViewRef.current === ViewState.RESET_PASSWORD);
+    const replace = !bootedRef.current || fromAuth || replaceNextRef.current;
+    prevViewRef.current = view;
+    replaceNextRef.current = false;
+    if (location.pathname === path || LEGAL_PATHS[location.pathname]) return;
+    navigate({ pathname: path, search: VIEWS_KEEPING_QUERY.has(view) ? window.location.search : '' }, { replace });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
   const continueAsUser = useCallback(async (loggedInUser: User, initialView?: ViewState) => {
     try {
       const profile = await dbService.getProfile(loggedInUser.id);
@@ -85,7 +125,9 @@ const App: React.FC = () => {
         navigateView(ViewState.SURVEY);
       }
     } catch {
-      navigateView(ViewState.SURVEY);
+      // Couldn't reach the server: not a new account. Stay on their screen; it retries when it opens.
+      toast.error('Couldn’t reach Kawayan just now. Your brand profile is safe. Refresh in a moment.');
+      navigateView(initialView || readRestorableView('user') || ViewState.CALENDAR);
     }
   }, [dbService]);
 
@@ -129,7 +171,8 @@ const App: React.FC = () => {
           vStatus = cached.status as VerificationStatus;
           rejectionReason = cached.rejectionReason;
         } else {
-          const existingProfile = await dbService.getProfile(loggedInUser.id);
+          const existingProfile = await dbService.getProfile(loggedInUser.id).catch(() => 'unknown' as const);
+          // A profile only exists after approval; if it can't be checked, don't demote the account.
           vStatus = existingProfile ? 'verified' : 'pending';
         }
       } else {
@@ -265,6 +308,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await dbService.logoutUser();
     supportRealtime.disconnect();
+    endStreamSession();
     setUser(null);
     setBrandProfile(null);
     setVerifStatus('none');
@@ -312,7 +356,8 @@ const App: React.FC = () => {
         navigateView(ViewState.SURVEY);
       }
     } catch {
-      navigateView(ViewState.SURVEY);
+      toast.error('Couldn’t reach Kawayan just now. Your brand profile is safe. Refresh in a moment.');
+      navigateView(ViewState.CALENDAR);
     }
   }, [user, dbService]);
 
@@ -376,8 +421,12 @@ const App: React.FC = () => {
 
     let cancelled = false;
     (async () => {
-      const profile = await dbService.getProfile(user.id);
-      if (!cancelled && profile) setBrandProfile(profile);
+      try {
+        const profile = await dbService.getProfile(user.id);
+        if (!cancelled && profile) setBrandProfile(profile);
+      } catch {
+        /* the screen keeps its loader; continueAsUser already said what happened */
+      }
     })();
     return () => {
       cancelled = true;
@@ -394,7 +443,10 @@ const App: React.FC = () => {
       // First time through onboarding: walk them around the calendar they just
       // landed on. Existing accounts are never ambushed — only this path and
       // the explicit replay in Settings open the tour.
-      if (!isTourDone(user.id)) setTourOpen(true);
+      if (!isTourDone(user.id)) {
+        setTourFirstRun(true);
+        setTourOpen(true);
+      }
     } catch (error) {
       console.error('Error saving profile:', error);
       await dialog.alert('Failed to save profile. Please try again.');
@@ -460,11 +512,34 @@ const App: React.FC = () => {
     navigateView(next);
   };
 
+  // Back/Forward: show the screen for the new address, or the nearest one this person may see.
+  const firstLocationRef = useRef(true);
+  useEffect(() => {
+    if (firstLocationRef.current) { firstLocationRef.current = false; return; }
+    if (navigationType !== 'POP' || LEGAL_PATHS[location.pathname]) return;
+    const wanted = viewFromPath(location.pathname) ?? ViewState.LANDING;
+    if (wanted === viewRef.current) return;
+    const target =
+      !user ? (PUBLIC_VIEWS.has(wanted) ? wanted : ViewState.LOGIN)
+      : wanted === ViewState.LANDING ? wanted
+      : PUBLIC_VIEWS.has(wanted) ? getHomeViewForRole(user.role)
+      : user.role === 'user' && verifStatus !== 'verified' ? ViewState.VERIFICATION
+      : resolveViewForRole(user.role, wanted);
+    if (target === viewRef.current) {
+      navigate(VIEW_PATHS[target], { replace: true }); // not allowed there: stay put, fix the address
+      return;
+    }
+    replaceNextRef.current = target !== wanted;
+    navigateView(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
   // Replay from Settings: the tour's anchors live on the calendar, so go there
   // first. The view switch is synchronous, so the elements exist by the time
   // SpotlightTour measures them.
   const handleReplayTour = () => {
     goTo(ViewState.CALENDAR);
+    setTourFirstRun(false);
     setTourOpen(true);
   };
 
@@ -496,8 +571,8 @@ const App: React.FC = () => {
   const pageClass = `w-full ${
     isAuthView ? 'min-h-[calc(100vh-0px)]' :
     view === ViewState.LANDING ? '' :
-    view === ViewState.CALENDAR ? 'max-w-full mx-auto py-4 px-2 sm:px-4 lg:px-6' :
-    adminConsole ? '' :
+    view === ViewState.CALENDAR ? 'py-6 px-2 sm:px-6 lg:px-8' :
+    adminConsole || view === ViewState.SUPPORT_DASHBOARD ? '' :
     (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
     'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
   }`;
@@ -563,7 +638,7 @@ const App: React.FC = () => {
                 <AppHydrationLoader />
               );
             case ViewState.SETTINGS:
-              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} onClose={() => navigateView(user?.role === 'support' ? ViewState.SUPPORT_DASHBOARD : ViewState.CALENDAR)} /> : <AppHydrationLoader />;
+              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => updateTheme(!darkMode)} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:
               return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
             case ViewState.SOCIAL:
@@ -590,6 +665,15 @@ const App: React.FC = () => {
 
   const accountMenu = user && <AccountMenu user={user} {...accountActions} />;
 
+  if (legalDoc) {
+    return (
+      <>
+        <LegalPage doc={legalDoc} onSwitch={(d) => navigate(`/${d}`)} onBack={() => navigate(VIEW_PATHS[view])} />
+        {!isLoggedIn && <AccessibilityWidget />}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col transition-colors font-sans" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
       {showNav && user ? (
@@ -602,7 +686,7 @@ const App: React.FC = () => {
           onNavigate={goTo}
           onHome={() => goTo(getHomeViewForRole(user.role))}
           onCreatePost={() => requestCalendar({ type: 'compose' })}
-          onOpenPost={(postId) => requestCalendar({ type: 'open', postId })}
+          onOpenPost={(postId, date) => requestCalendar({ type: 'open', postId, date })}
         >
           <div className={pageClass}>{page}</div>
         </DashboardLayout>
@@ -626,11 +710,9 @@ const App: React.FC = () => {
               className="flex items-center gap-2.5 cursor-pointer select-none"
               onClick={() => goTo(isLoggedIn && user ? getHomeViewForRole(user.role) : ViewState.LANDING)}
             >
-              <img src="/logo.png" alt="Kawayan" className="w-8 h-8 rounded-xl object-contain" />
-              {/* Logged in, the nav pills need the room on a phone; the logo stays. */}
-              <span className={`font-display text-xl font-bold ${isLoggedIn ? 'hidden sm:inline' : ''}`} style={{ color: 'var(--fg)' }}>
-                Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span>
-              </span>
+              {/* Logged in, the nav pills need the room on a phone: the icon stands in for the wordmark. */}
+              {isLoggedIn && <img src={KAWAYAN_ICON} alt="" className="w-8 h-8 sm:hidden" />}
+              <KawayanLogo size={24} className={isLoggedIn ? 'hidden sm:inline-block' : ''} />
               {user?.role === 'admin' && (
                 <span className="badge badge-green ml-1">Admin</span>
               )}
@@ -651,7 +733,7 @@ const App: React.FC = () => {
                     <div className="hidden md:flex items-center gap-1 mr-2">
                       <a
                         href="#features"
-                        className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        className="px-3 py-2 rounded-xl text-sm font-semibold transition"
                         style={{ color: 'var(--fg-muted)' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
@@ -660,7 +742,7 @@ const App: React.FC = () => {
                       </a>
                       <a
                         href="#pricing"
-                        className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        className="px-3 py-2 rounded-xl text-sm font-semibold transition"
                         style={{ color: 'var(--fg-muted)' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
@@ -670,7 +752,7 @@ const App: React.FC = () => {
                     </div>
                     <button
                       onClick={() => navigateView(ViewState.LOGIN)}
-                      className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                      className="px-4 py-2 rounded-xl text-sm font-semibold transition"
                       style={{ color: 'var(--fg-muted)' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,87,72,0.07)'; e.currentTarget.style.color = 'var(--fg)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--fg-muted)'; }}
@@ -704,7 +786,7 @@ const App: React.FC = () => {
 
       {/* Onboarding walkthrough — only on the calendar, where its anchors are. */}
       {isLoggedIn && user?.role === 'user' && verifStatus === 'verified' && view === ViewState.CALENDAR && (
-        <SpotlightTour open={tourOpen} onClose={closeTour} />
+        <SpotlightTour open={tourOpen} onClose={closeTour} firstRun={tourFirstRun} businessName={brandProfile?.businessName} />
       )}
 
       {/* Footer */}
@@ -712,15 +794,12 @@ const App: React.FC = () => {
         <footer className="mt-auto py-7 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
           <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Kawayan" className="w-6 h-6 rounded-lg opacity-80" />
-              <span className="font-display text-sm font-bold" style={{ color: 'var(--fg)' }}>
-                Kawayan<span style={{ color: 'var(--kw-green)' }}>.</span>
-              </span>
+              <KawayanLogo size={24} />
               <span className="text-xs" style={{ color: 'var(--fg-subtle)' }}>© 2025 Built for Philippine MSMEs</span>
             </div>
             <div className="flex items-center gap-5 text-xs" style={{ color: 'var(--fg-muted)' }}>
-              <button type="button" onClick={() => setLegalDoc('privacy')} className="hover:text-emerald-500 transition-colors">Privacy</button>
-              <button type="button" onClick={() => setLegalDoc('terms')} className="hover:text-emerald-500 transition-colors">Terms</button>
+              <button type="button" onClick={() => navigate('/privacy')} className="hover:text-emerald-500 transition-colors">Privacy</button>
+              <button type="button" onClick={() => navigate('/terms')} className="hover:text-emerald-500 transition-colors">Terms</button>
               {!user && (
                 <button
                   onClick={() => navigateView(ViewState.ADMIN_LOGIN)}
@@ -734,12 +813,6 @@ const App: React.FC = () => {
         </footer>
       )}
 
-      <TermsOfServiceModal
-        open={legalDoc !== null}
-        doc={legalDoc ?? 'terms'}
-        onClose={() => setLegalDoc(null)}
-        onSwitchDoc={(d) => setLegalDoc(d)}
-      />
     </div>
   );
 };

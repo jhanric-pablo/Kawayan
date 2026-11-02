@@ -2,7 +2,7 @@ import React from 'react';
 
 /** Minimal placeholder shown while session/view state hydrates on reload. */
 const AppHydrationLoader: React.FC = () => (
-  <div className="min-h-[60vh] flex flex-col items-center justify-center gap-6 px-6 transition-all duration-300">
+  <div className="min-h-[60vh] flex flex-col items-center justify-center gap-6 px-6 transition duration-300">
     <div
       className="w-12 h-12 rounded-full animate-spin"
       style={{
@@ -21,7 +21,7 @@ const AppHydrationLoader: React.FC = () => (
       {Array.from({ length: 14 }).map((_, i) => (
         <div
           key={i}
-          className="h-14 rounded-(--r-md) animate-pulse transition-all duration-300"
+          className="h-14 rounded-(--radius-md) animate-pulse transition duration-300"
           style={{
             background: 'var(--kw-green-pale)',
             animationDelay: `${(i % 7) * 60}ms`,
