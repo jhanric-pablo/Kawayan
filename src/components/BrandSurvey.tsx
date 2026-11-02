@@ -11,10 +11,16 @@ interface Props {
   onComplete: (profile: BrandProfile) => void;
   /** The verified business name from the user record; not editable here. */
   businessName?: string;
+  /** Saved Brand DNA to start from (e.g. reviewing it again while verification is pending). */
+  initialProfile?: BrandProfile | null;
+  /** The permit is still under review (the stepper shows Verification as in progress). */
+  verificationPending?: boolean;
+  /** Back to the verification screen without saving. */
+  onBack?: () => void;
 }
 
-const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
-  const [profile, setProfile] = useState<BrandProfile>({
+const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '', initialProfile, verificationPending, onBack }) => {
+  const [profile, setProfile] = useState<BrandProfile>(initialProfile ? { ...initialProfile, businessName: businessName || initialProfile.businessName } : {
     userId: '', // filled in by the caller on save
     businessName,
     industry: '',
@@ -77,7 +83,10 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '' }) => {
       <div className="ob-inner bs-wrap">
         {/* ─────────── main column ─────────── */}
         <div>
-          <div className="mb-6 flex"><OnboardingBar current={2} help={false} /></div>
+          <div className="mb-6 grid justify-items-start gap-2 [&_.ob-top]:mx-0 [&_.ob-top]:w-full">
+            {onBack && <button type="button" className="btn btn-ghost btn-sm -ml-2" onClick={onBack}>← Back to verification</button>}
+            <OnboardingBar current={2} help={!!verificationPending} verificationPending={verificationPending} />
+          </div>
           <div className="bs-head">
             <span className="bs-eyebrow"><Sparkles /> Brand DNA Setup</span>
             <h1>Let&apos;s set up your brand</h1>

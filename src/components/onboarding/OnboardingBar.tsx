@@ -1,6 +1,7 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Check, LifeBuoy } from 'lucide-react';
 import '../onboarding.css';
+import { HELP_EVENT } from '../../utils/usePhone';
 
 const HelpPanel = lazy(() => import('../HelpPanel'));
 
@@ -12,14 +13,21 @@ const STEPS = ['Account', 'Verification', 'Brand DNA'];
  * 3 · Brand DNA" and Help desk (the same help panel as inside the app). Sits between the logo and
  * the account menu of the app's own top bar.
  */
-const OnboardingBar: React.FC<{ current: number; done?: boolean; help?: boolean }> = ({ current, done, help = true }) => {
+const OnboardingBar: React.FC<{ current: number; done?: boolean; help?: boolean; verificationPending?: boolean }> = ({ current, done, help = true, verificationPending }) => {
   const [helpOpen, setHelpOpen] = useState(false);
+  // "Help desk" cards elsewhere on the screen open this same panel.
+  useEffect(() => {
+    if (!help) return;
+    const onHelp = () => setHelpOpen(true);
+    window.addEventListener(HELP_EVENT, onHelp);
+    return () => window.removeEventListener(HELP_EVENT, onHelp);
+  }, [help]);
   return (
     <>
       <div className="ob-top">
           <ol className="ob-steps" aria-label="Getting started">
             {STEPS.map((s, i) => {
-              const state = i < current || (done && i === current) ? 'done' : i === current ? 'now' : 'next';
+              const state = verificationPending && i === 1 ? 'now' : i < current || (done && i === current) ? 'done' : i === current ? 'now' : 'next';
               return (
                 <li key={s} className={`ob-steps__s is-${state}`} aria-current={state === 'now' ? 'step' : undefined}>
                   <span className="ob-steps__n">{state === 'done' ? <Check aria-hidden /> : i + 1}</span>

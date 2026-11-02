@@ -469,6 +469,11 @@ const App: React.FC = () => {
     try {
       await dbService.saveProfile(newProfile);
       setBrandProfile(newProfile);
+      // Filled in while the permit is still under review: back to the verification screen.
+      if (user.role === 'user' && verifStatus !== 'verified') {
+        navigateView(ViewState.VERIFICATION);
+        return;
+      }
       navigateView(ViewState.CALENDAR);
       // First time through onboarding: walk them around the calendar they just
       // landed on. Existing accounts are never ambushed — only this path and
@@ -481,6 +486,16 @@ const App: React.FC = () => {
       console.error('Error saving profile:', error);
       await dialog.alert('Failed to save profile. Please try again.');
     }
+  };
+
+  // From the verification screen: load any saved Brand DNA, then open the form.
+  const openBrandDnaEarly = async () => {
+    if (!user) return;
+    if (!brandProfile) {
+      const saved = await dbService.getProfile(user.id).catch(() => undefined);
+      if (saved) setBrandProfile(saved);
+    }
+    navigateView(ViewState.SURVEY);
   };
 
   const handleProfileUpdate = async (profileData: BrandProfile) => {
@@ -546,7 +561,8 @@ const App: React.FC = () => {
   // Internal auth/logout/session-transition code calls navigateView directly,
   // since at those call sites `user`/`verifStatus` are stale closures mid-transition.
   const goTo = (next: ViewState) => {
-    if (isLoggedIn && user?.role === 'user' && verifStatus !== 'verified' && next !== ViewState.VERIFICATION) {
+    // Brand DNA is the one screen open while waiting (it only saves the brand profile).
+    if (isLoggedIn && user?.role === 'user' && verifStatus !== 'verified' && next !== ViewState.VERIFICATION && next !== ViewState.SURVEY) {
       navigateView(ViewState.VERIFICATION);
       return;
     }
@@ -564,7 +580,7 @@ const App: React.FC = () => {
       !user ? (PUBLIC_VIEWS.has(wanted) ? wanted : ViewState.LOGIN)
       : wanted === ViewState.LANDING ? wanted
       : PUBLIC_VIEWS.has(wanted) ? getHomeViewForRole(user.role)
-      : user.role === 'user' && verifStatus !== 'verified' ? ViewState.VERIFICATION
+      : user.role === 'user' && verifStatus !== 'verified' ? (wanted === ViewState.SURVEY ? wanted : ViewState.VERIFICATION)
       : resolveViewForRole(user.role, wanted);
     if (target === viewRef.current) {
       navigate(VIEW_PATHS[target], { replace: true }); // not allowed there: stay put, fix the address
@@ -611,7 +627,7 @@ const App: React.FC = () => {
   const adminConsole = user?.role === 'admin' && view === ViewState.ADMIN_DASHBOARD && !blockForHydration;
   const pageClass = `w-full ${
     isAuthView ? 'min-h-[calc(100vh-0px)]' :
-    view === ViewState.LANDING ? '' :
+    view === ViewState.LANDING || view === ViewState.VERIFICATION ? '' :
     view === ViewState.CALENDAR || view === ViewState.PLANNER || view === ViewState.STUDIO ? 'py-6 px-2 sm:px-6 lg:px-8' :
     adminConsole || view === ViewState.SUPPORT_DASHBOARD ? '' :
     (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
@@ -673,10 +689,19 @@ const App: React.FC = () => {
                   onResubmit={handleVerifResubmit}
                   onSessionExpired={handleSessionExpired}
                   onVerified={handleVerified}
+                  onOpenBrandDna={user?.role === 'user' ? openBrandDnaEarly : undefined}
                 />
               );
             case ViewState.SURVEY:
-              return <BrandSurvey onComplete={handleSurveyComplete} businessName={user?.businessName} />;
+              return (
+                <BrandSurvey
+                  onComplete={handleSurveyComplete}
+                  businessName={user?.businessName}
+                  initialProfile={brandProfile}
+                  verificationPending={user?.role === 'user' && verifStatus !== 'verified'}
+                  onBack={user?.role === 'user' && verifStatus !== 'verified' ? () => navigateView(ViewState.VERIFICATION) : undefined}
+                />
+              );
             case ViewState.CALENDAR:
               if (user?.role === 'support') {
                 return (

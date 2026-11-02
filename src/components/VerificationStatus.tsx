@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut,
-  Shield, ArrowRight, Check, Sparkles, Send, Link2, LifeBuoy,
+  Shield, ArrowRight, Check, Sparkles, Send, LifeBuoy, Lock,
 } from 'lucide-react';
 import { VerificationStatus as VStatus } from '../types';
 import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
 import { supportRealtime } from '../services/supportRealtime';
 import './onboarding.css';
 import KawayanLogo from './KawayanLogo';
+import { HELP_EVENT } from '../utils/usePhone';
 
 interface Props {
   userId?: string;
@@ -19,6 +20,8 @@ interface Props {
   onSessionExpired?: () => void;
   /** Fired after the on-screen approval animation so the parent can route on. */
   onVerified?: () => void;
+  /** "Review your Brand DNA" while waiting (allowed before approval). */
+  onOpenBrandDna?: () => void;
 }
 
 type MetaKey = 'pending' | 'verified' | 'rejected' | 'none';
@@ -69,6 +72,7 @@ const VerificationStatus: React.FC<Props> = ({
   onResubmit,
   onSessionExpired,
   onVerified,
+  onOpenBrandDna,
 }) => {
   const [document, setDocument] = useState<File | null>(null);
   const [businessAddress, setBusinessAddress] = useState('');
@@ -80,6 +84,8 @@ const VerificationStatus: React.FC<Props> = ({
   const [approved, setApproved] = useState(status === 'verified');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isFirstSubmit = status === 'none';
+  // The file on record (from the status check), for the "uploaded file" row.
+  const [onFile, setOnFile] = useState<{ name?: string; at?: string } | null>(null);
 
   // ── real-time approval: react to the parent prop flipping to "verified" ──
   useEffect(() => {
@@ -103,6 +109,7 @@ const VerificationStatus: React.FC<Props> = ({
         if (isAuthResponse(res.status)) { onSessionExpired?.(); return; }
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
+        if (!cancelled && data?.documentName) setOnFile({ name: data.documentName, at: data.createdAt });
         if (!cancelled && data?.status === 'verified') setApproved(true);
       } catch {
         /* network hiccup — the next tick will retry */
@@ -257,181 +264,156 @@ const VerificationStatus: React.FC<Props> = ({
           { label: 'Approved', state: 'todo', icon: <Sparkles /> },
         ];
 
+  const replacing = status === 'pending' && !!document; // a new file picked to replace the one under review
+  const TITLE: Record<MetaKey, string> = {
+    pending: 'We’re checking your business permit.',
+    rejected: 'We couldn’t verify this yet.',
+    none: 'Verify your business.',
+    verified: 'Business verified',
+  };
+  const LINE: Record<MetaKey, string> = {
+    pending: 'Usually 1–2 business days. This page updates by itself.',
+    rejected: 'Upload a clear Mayor’s Permit, DTI or SEC registration to try again. This page updates by itself.',
+    none: 'Upload your Mayor’s Permit, DTI or SEC registration to unlock your workspace.',
+    verified: '',
+  };
+  const key = ((status as MetaKey) in META ? status : 'none') as MetaKey;
+  const badgeClass = key === 'pending' ? 'badge-amber' : key === 'rejected' ? 'badge-red' : 'badge-sage';
+  const uploadedOn = onFile?.at ? new Date(onFile.at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : null;
+
+  const fileInput = (
+    <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf" className="hidden" onChange={handleFileChange} />
+  );
+
   return (
-    <div className="ob-screen" style={{ ['--vs-accent' as any]: meta.accent }}>
-      <div className="ob-orb ob-orb--1" />
-      <div className="ob-orb ob-orb--2" />
-
-      <div className="ob-inner vs-inner">
-
-        <div className="vs-card">
-          <div className="vs-card__accent" />
-
-          <div className="vs-card__body">
-            <div className={`vs-icon${status === 'pending' ? ' vs-icon--pulse' : ''}`}>{meta.icon}</div>
-
-            <div className="vs-badge"><b />{meta.badge}</div>
-
-            <h1 className="vs-title">{meta.title}</h1>
-            {businessName && <p className="vs-biz">{businessName}</p>}
-            <p className="vs-body">{meta.body}</p>
-
-            {(status === 'pending' || status === 'rejected') && (
-              <div className="vs-timeline">
-                {tl.map((s) => (
-                  <div
-                    key={s.label}
-                    className={`vs-tl__step ${
-                      s.state === 'done' ? 'is-done' : s.state === 'current' ? 'is-current' : s.state === 'fail' ? 'is-fail' : ''
-                    }`}
-                  >
-                    <span className="vs-tl__dot">{s.icon}</span>
-                    <span className="vs-tl__label">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {status === 'pending' && (
-              <div className="vs-live"><b />Live &mdash; this page updates the moment you&apos;re approved</div>
-            )}
-
-            {/* Rejection note */}
-            {status === 'rejected' && rejectionReason && (
-              <div className="vs-note">
-                <XCircle />
-                <span><strong>Admin note:</strong> {rejectionReason}</span>
-              </div>
-            )}
-
-            {/* Submit / resubmit form */}
-            {showForm && (
-              <div className="vs-form">
-                <div className="vs-form__divider" />
-                <p className="vs-form__head">{isFirstSubmit ? 'Submit verification' : 'Upload a new document'}</p>
-
-                {isFirstSubmit && (
-                  <>
-                    <div>
-                      <label className="vs-label">Business Address</label>
-                      <input
-                        type="text"
-                        className="input"
-                        value={businessAddress}
-                        onChange={(e) => setBusinessAddress(e.target.value)}
-                        placeholder="e.g. 123 Rizal St, Quezon City"
-                      />
-                    </div>
-                    <div>
-                      <label className="vs-label">Contact Number</label>
-                      <input
-                        type="tel"
-                        className="input"
-                        value={businessPhone}
-                        onChange={(e) => setBusinessPhone(e.target.value)}
-                        placeholder="e.g. 09171234567"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label className="vs-label">Registration Document</label>
-                  <p className="vs-hint">Mayor&apos;s Permit, DTI, or SEC Registration — JPG, PNG or PDF, max 5MB</p>
-                </div>
-
-                {document ? (
-                  <div className="vs-file">
-                    <FileText className="vs-file__ico" />
-                    <div className="vs-file__meta">
-                      <div className="vs-file__name">{document.name}</div>
-                      <div className="vs-file__size">{fmtSize(document.size)}</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="vs-file__x"
-                      aria-label="Remove file"
-                      onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className={`vs-drop${dragging ? ' is-drag' : ''}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                  >
-                    <span className="vs-drop__ico"><Upload /></span>
-                    <span className="vs-drop__t">Click to upload{dragging ? '' : ' or drag & drop'}</span>
-                    <span className="vs-drop__s">Your document is only shared with our verification team</span>
-                  </button>
-                )}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.pdf"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-
-                {uploadError && <p className="vs-err">{uploadError}</p>}
-
-                {document && (
-                  <button onClick={handleSubmitDocument} disabled={uploading} className="btn btn-primary w-full">
-                    {uploading ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting&hellip;</>
-                    ) : isFirstSubmit ? (
-                      <><Send className="w-4 h-4" /> Submit for Review</>
-                    ) : (
-                      <><ArrowRight className="w-4 h-4" /> Resubmit for Review</>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {resubmitted && (
-              <div className="vs-note">
-                <Clock />
-                <span>Document submitted &mdash; your account is now pending review.</span>
-              </div>
-            )}
-
-            {status === 'pending' && !resubmitted && (
-              <div className="vs-note">
-                <Shield />
-                <span>You&apos;ll get full access the instant an admin approves your document. No need to refresh.</span>
-              </div>
-            )}
-
-            {(status === 'pending' || resubmitted) && (
-              <div className="vs-wait">
-                <p className="vs-wait__h">While you wait</p>
-                <div className="vs-wait__c">
-                  <Sparkles aria-hidden />
-                  <span><b>Brand DNA comes next</b><span>Once you’re approved, you’ll tell Kawayan how your shop sounds. Every caption follows it.</span></span>
-                </div>
-                <div className="vs-wait__c">
-                  <Link2 aria-hidden />
-                  <span><b>Then connect your pages</b><span>Link your Facebook Page and Instagram in Settings › Channels so posts go out on time.</span></span>
-                </div>
-                <div className="vs-wait__c">
-                  <LifeBuoy aria-hidden />
-                  <span><b>Questions?</b><span>Open the Help desk at the top. A person replies there and by email.</span></span>
-                </div>
-              </div>
-            )}
-
-            <button onClick={onLogout} className="vs-signout">
-              <LogOut className="w-3.5 h-3.5" /> Sign out
-            </button>
+    <div className="ob-screen vs-screen">
+      <div className="ob-inner vs-split">
+        {/* ── Status ── */}
+        <section className="vs-status card" aria-labelledby="vs-title">
+          <span className={`badge ${badgeClass} self-start`}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />{key === 'pending' ? 'Under review' : meta.badge}</span>
+          <div>
+            <h1 id="vs-title" className="vs-status__title">{TITLE[key]}</h1>
+            {businessName && <p className="vs-status__biz">{businessName}</p>}
+            <p className="vs-status__line">{resubmitted ? 'Document submitted. Your account is now pending review. This page updates by itself.' : LINE[key]}</p>
           </div>
-        </div>
+
+          {(status === 'pending' || status === 'rejected') && (
+            <ol className="vs-steps" aria-label="Verification progress">
+              {tl.map((st) => (
+                <li key={st.label} className={`vs-steps__s is-${st.state}`} aria-current={st.state === 'current' ? 'step' : undefined}>
+                  <span className="vs-steps__dot">{st.state === 'done' ? <Check /> : st.state === 'fail' ? <X /> : null}</span>
+                  <span>{st.label}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {status === 'rejected' && rejectionReason && (
+            <p className="kw-alert">
+              <XCircle className="h-4 w-4 shrink-0" aria-hidden /> <span><b className="font-semibold">Reviewer’s note:</b> {rejectionReason}</span>
+            </p>
+          )}
+
+          {/* The file under review, with Replace file */}
+          {status === 'pending' && (
+            <div className="vs-file">
+              <FileText className="vs-file__ico" aria-hidden />
+              <div className="vs-file__meta">
+                <div className="vs-file__name">{replacing ? document!.name : onFile?.name || 'Your business permit'}</div>
+                <div className="vs-file__size">{replacing ? `${fmtSize(document!.size)} · not sent yet` : uploadedOn ? `Uploaded ${uploadedOn}` : 'Under review'}</div>
+              </div>
+              {replacing ? (
+                <>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}>Cancel</button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleSubmitDocument} disabled={uploading}>
+                    {uploading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} {uploading ? 'Sending…' : 'Send instead'}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5" aria-hidden /> Replace file
+                </button>
+              )}
+              {fileInput}
+            </div>
+          )}
+
+          {/* First submission or after a send-back */}
+          {showForm && (
+            <div className="vs-form">
+              {isFirstSubmit && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="vs-label" htmlFor="vs-addr">Business address</label>
+                    <input id="vs-addr" type="text" className="input" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="e.g. 123 Rizal St, Quezon City" />
+                  </div>
+                  <div>
+                    <label className="vs-label" htmlFor="vs-phone">Contact number</label>
+                    <input id="vs-phone" type="tel" className="input" value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} placeholder="e.g. 09171234567" />
+                  </div>
+                </div>
+              )}
+              {document ? (
+                <div className="vs-file">
+                  <FileText className="vs-file__ico" />
+                  <div className="vs-file__meta">
+                    <div className="vs-file__name">{document.name}</div>
+                    <div className="vs-file__size">{fmtSize(document.size)}</div>
+                  </div>
+                  <button type="button" className="vs-file__x" aria-label="Remove file" onClick={() => { setDocument(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`vs-drop${dragging ? ' is-drag' : ''}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                >
+                  <span className="vs-drop__ico"><Upload /></span>
+                  <span className="vs-drop__t">Click to upload{dragging ? '' : ' or drag & drop'}</span>
+                  <span className="vs-drop__s">Mayor’s Permit, DTI or SEC · JPG, PNG or PDF · max 5 MB</span>
+                </button>
+              )}
+              {fileInput}
+              {document && (
+                <button onClick={handleSubmitDocument} disabled={uploading} className="btn btn-primary w-full">
+                  {uploading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting&hellip;</> : isFirstSubmit ? <><Send className="w-4 h-4" /> Submit for review</> : <><ArrowRight className="w-4 h-4" /> Resubmit for review</>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {uploadError && <p className="vs-err" role="alert">{uploadError}</p>}
+
+          <button onClick={onLogout} className="vs-signout self-start">
+            <LogOut className="w-3.5 h-3.5" /> Sign out
+          </button>
+        </section>
+
+        {/* ── While you wait ── */}
+        <aside className="vs-wait" aria-labelledby="vs-wait-h">
+          <h2 id="vs-wait-h" className="vs-wait__h">While you wait</h2>
+          {onOpenBrandDna && (
+            <button type="button" className="vs-wait__c is-primary" onClick={onOpenBrandDna}>
+              <Sparkles aria-hidden />
+              <span><b>Review your Brand DNA</b><span>Tell Kawayan how your shop sounds. Every caption follows it once you’re approved.</span></span>
+              <ArrowRight className="vs-wait__go" aria-hidden />
+            </button>
+          )}
+          <button type="button" className="vs-wait__c" onClick={() => window.dispatchEvent(new Event(HELP_EVENT))}>
+            <LifeBuoy aria-hidden />
+            <span><b>Help desk</b><span>Questions about your permit? A person replies there and by email.</span></span>
+            <ArrowRight className="vs-wait__go" aria-hidden />
+          </button>
+          <div className="vs-wait__c is-locked" aria-disabled="true">
+            <Lock aria-hidden />
+            <span><b>Opens after approval</b><span>Calendar, month planner, Post studio and insights. Then connect your Facebook Page and Instagram.</span></span>
+          </div>
+        </aside>
       </div>
     </div>
   );

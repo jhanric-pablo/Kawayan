@@ -692,10 +692,39 @@
 .ob-steps__l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 640px) { .ob-steps__l { display: none; } .ob-top { margin: 0 0.5rem; gap: 0.5rem; } .ob-top__tools .btn span { display: none; } }
 
-/* "While you wait" cards on the verification screen */
-.vs-wait { display: grid; gap: 0.6rem; margin-top: 1.25rem; }
+/* ═══════════════ Verification: one screen, status (≈60%) | while you wait (≈40%) ═══════════ */
+.vs-screen { min-height: calc(100svh - 3.75rem); padding-top: clamp(1.5rem, 5vh, 3rem); padding-bottom: clamp(1.5rem, 5vh, 3rem); }
+.vs-split { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; align-items: start; animation: vs-rise 0.28s var(--ease) both; }
+@media (min-width: 900px) { .vs-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; } }
+@media (prefers-reduced-motion: reduce) { .vs-split { animation: none; } }
+.vs-status { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.vs-status__title { font-size: clamp(22px, 2.4vw, 28px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; color: var(--fg); }
+.vs-status__biz { margin-top: 6px; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
+.vs-status__line { margin-top: 6px; font-size: var(--text-sm); color: var(--fg-muted); }
+.vs-status .vs-file { margin: 0; }
+.vs-status .vs-form { margin: 0; padding: 0; border: 0; display: grid; gap: 12px; }
+.vs-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vs-steps__s { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 2px solid var(--border); font-size: var(--text-ui); color: var(--fg-muted); }
+.vs-steps__s.is-done { border-top-color: var(--green); color: var(--fg); }
+.vs-steps__s.is-current { border-top-color: var(--amber); color: var(--fg); font-weight: 500; }
+.vs-steps__s.is-fail { border-top-color: var(--danger); color: var(--danger); font-weight: 500; }
+.vs-steps__dot { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 999px; border: 1px solid var(--border-strong); }
+.vs-steps__dot svg { width: 11px; height: 11px; }
+.vs-steps__s.is-done .vs-steps__dot { background: var(--green); border-color: var(--green); color: #fff; }
+.vs-steps__s.is-current .vs-steps__dot { border-color: var(--amber); background: var(--amber-soft); }
+.vs-steps__s.is-fail .vs-steps__dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* "While you wait": three compact action cards */
+.vs-wait { display: grid; gap: 10px; }
 .vs-wait__h { font-size: 15px; font-weight: 600; color: var(--fg); }
-.vs-wait__c { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); text-align: left; }
-.vs-wait__c svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--green-ink); }
+.vs-wait__c { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: left; transition: border-color 0.15s, transform 0.15s var(--ease); }
+button.vs-wait__c:hover { border-color: var(--border-strong); }
+button.vs-wait__c:active { transform: scale(0.99); }
+.vs-wait__c > svg:first-child { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--fg-muted); }
 .vs-wait__c b { display: block; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
-.vs-wait__c span { display: block; font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.45; }
+.vs-wait__c span span { display: block; margin-top: 2px; font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.45; }
+.vs-wait__go { width: 16px; height: 16px; flex: none; margin: 2px 0 0 auto; color: var(--fg-muted); }
+.vs-wait__c.is-primary { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.vs-wait__c.is-primary > svg:first-child { color: var(--green-ink); }
+.vs-wait__c.is-locked { background: var(--muted); border-style: dashed; }
+.vs-wait__c.is-locked b, .vs-wait__c.is-locked > svg { color: var(--fg-muted); }

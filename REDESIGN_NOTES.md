@@ -600,3 +600,16 @@ or gradient) with a soft skeleton when empty. Footer: per-page switches, a date 
 draft like the calendar does) and the Schedule button; "Connect a page" when none. Versions,
 quick tweaks, ask box, upload, Describe it, reach score, undo and autosave are unchanged. The
 Post studio page uses the same ToggleGroup and progress list.
+
+**4 — Verification page fits one screen.** Left (≈60%): one status card with "Under review",
+"We're checking your business permit.", one line ("Usually 1–2 business days. This page updates by
+itself." — replaces the separate Live line and shield notice), a horizontal Submitted → Under review
+→ Approved progress, and the file on record with "Replace file" (uses the existing resubmit
+endpoint, which already accepts a new file while pending). Right (≈40%): "While you wait" — Review
+your Brand DNA (primary, green border), Help desk (opens the help panel from item 3), Opens after
+approval (locked, grey). 1440×900: no scroll (the view no longer gets the page's extra padding);
+phones stack. Brand DNA is now reachable while pending (it only saves the brand profile; the server
+already allowed it): it opens prefilled with any saved profile, shows the stepper with Verification
+still in progress, and saving returns to the verification screen. Calendar, generation and billing
+stay closed. Live updates, the approval celebration and the redirect are unchanged; rejected and
+first-submission flows keep their upload form.
