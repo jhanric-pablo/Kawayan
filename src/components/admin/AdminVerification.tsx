@@ -232,7 +232,7 @@ const AdminVerification: React.FC<Props> = ({ verifications, loading, filter, on
               ) : doc.url && isPdf ? (
                 <iframe src={doc.url} title="Submitted document" className="h-full min-h-[420px] w-full rounded-lg border-0" />
               ) : doc.url ? (
-                <img src={doc.url} alt="Submitted document" className={zoom ? 'max-w-none' : 'max-h-[70vh] max-w-full object-contain'} />
+                <img decoding="async" src={doc.url} alt="Submitted document" className={zoom ? 'max-w-none' : 'max-h-[70vh] max-w-full object-contain'} />
               ) : null}
             </div>
           </>

@@ -49,7 +49,7 @@ const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boole
     )}
   >
     {item.imageUrl ? (
-      <img src={item.imageUrl} alt="" loading="lazy" className="h-[22px] w-[22px] shrink-0 rounded object-cover" />
+      <img decoding="async" src={item.imageUrl} alt="" loading="lazy" className="h-[22px] w-[22px] shrink-0 rounded object-cover" />
     ) : (
       <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded bg-(--muted) text-(--fg-muted)">
         <Sparkles className="h-3 w-3" strokeWidth={2} aria-hidden />
@@ -104,7 +104,7 @@ const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selec
   );
 };
 
-const DayCell: React.FC<{
+const DayCellBase: React.FC<{
   day: number | null;
   past: boolean;
   today: boolean;
@@ -176,6 +176,10 @@ const DayCell: React.FC<{
   );
 };
 
+/** Re-renders only when its own day, items or selection change. */
+const DayCell = React.memo(DayCellBase);
+const NO_ITEMS: TimelineCardItem[] = [];
+
 /**
  * The month at a glance: each post as a picture tile in its day. Unsent drafts and ideas show in
  * their day, in List view, in the Post studio and in the stat cards.
@@ -196,6 +200,7 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, onOpenPost, onOpenDay,
   const now = new Date();
   const todayKey = now.getFullYear() * 400 + now.getMonth() * 32 + now.getDate();
   const keyOf = (d: number) => year * 400 + month * 32 + d;
+  const labelFor = (d: number) => new Date(year, month, d).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
   const cells: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
 
@@ -225,8 +230,8 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, onOpenPost, onOpenDay,
                 day={day}
                 past={day !== null && keyOf(day) < todayKey}
                 today={day !== null && keyOf(day) === todayKey}
-                items={day ? byDay.get(day) ?? [] : []}
-                label={day ? new Date(year, month, day).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
+                items={day ? byDay.get(day) ?? NO_ITEMS : NO_ITEMS}
+                label={day ? labelFor(day) : ''}
                 tag={day ? tags?.get(day) : undefined}
                 selectedPostId={selectedPostId}
                 onOpenPost={onOpenPost}

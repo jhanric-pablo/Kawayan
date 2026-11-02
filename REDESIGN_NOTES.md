@@ -641,3 +641,28 @@ Interactions / Score (green badge at 75+), checkboxes, Compare (tray and compare
 Kept, placed below: "More columns" (link clicks, engagement rate), and a "More" panel with the chart
 metric switch, all downloads (posts CSV, growth CSV, full JSON report) and per-platform
 followers/reach detail; the "Demo data, generated for each account" note sits at the bottom.
+
+**9 — Smoother and faster.**
+Measured (`npm run build`, before → after):
+| chunk | before | after |
+|---|---|---|
+| main `index-*.js` (loaded on every page) | 2,092.7 kB (gzip 646.6) | 1,217.6 kB (gzip 389.5), −42% / −40% gz |
+| recharts (Insights, admin charts) | in main | own chunk, 338 kB, only on those screens |
+| react-day-picker + date-fns (composer date picker) | in main | own chunk, 77 kB, when the date popover opens |
+| Admin console / Support console / Insights / Settings / Billing / Help desk / Help panel | in main | 97 / 31 / 34 / 28 / 14 / 12 / 19 kB on demand |
+| Stream video SDK (`CallWindow`) | already lazy, 604 kB | unchanged |
+| landing "Why / How / Features" sections | in main | 3–5 kB each, after the hero |
+Changed: `React.lazy` + Suspense for those screens with `PageSkeleton` (title, stat cards, wide + side
+card) as the fallback; the help panel mounts on first open; landing sections below the fold load
+after the hero (with fixed-height skeletons so nothing jumps). Re-renders: month-grid day cells are
+`React.memo` with stable handlers (`useStableCallback`) and a shared empty array, so opening a post
+or typing elsewhere no longer re-renders all 35 cells; month data, tags and list items were already
+memoised; there is no notification polling (the feed refreshes on events), so nothing to cut there.
+Images: every `<img>` decodes async, list / grid / table / chat images lazy-load (they already had
+fixed sizes); real thumbnails would need a resize service, so lists still use the stored image.
+Motion: page changes fade + rise 8 px in 200 ms (exit 120 ms) inside the shell while the sidebar and
+top bar stay still; popovers, selects, menus, dialogs and tooltips scale 0.96 → 1 + fade in 180 ms,
+out in 120 ms; skeletons replace the page-level spinners (billing, admin, help desk, support inbox,
+help panel); the composer's accordion and Insights bars no longer animate height/width. Everything
+honours prefers-reduced-motion. Toasts already animate transform/opacity only and didn't stutter, so
+they stay (no sonner).

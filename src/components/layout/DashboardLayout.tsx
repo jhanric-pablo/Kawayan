@@ -18,7 +18,7 @@ import {
 import { useToast } from '../ui/Toast';
 import NotificationCenter from './NotificationCenter';
 import AccountMenu from '../AccountMenu';
-import HelpPanel from '../HelpPanel';
+const HelpPanel = React.lazy(() => import('../HelpPanel'));
 import '../appShell.css';
 import { KawayanMark } from '../KawayanLogo';
 import type { ThemePref } from '../../utils/sessionView';
@@ -160,7 +160,7 @@ const PostSearch: React.FC<{ posts: GeneratedPost[]; onOpen: (postId: string) =>
             hits.map((p) => (
               <button key={p.id} type="button" onClick={() => pick(p)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-(--bg-alt) focus-visible:bg-(--bg-alt)">
                 {p.imageUrl ? (
-                  <img src={p.imageUrl} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" />
+                  <img decoding="async" loading="lazy" src={p.imageUrl} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" />
                 ) : (
                   <span className="h-8 w-8 shrink-0 rounded-md bg-(--bg-alt)" aria-hidden />
                 )}
@@ -195,6 +195,10 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
   const openPost = (postId: string) => onOpenPost(postId, feed.posts.find((p) => p.id === postId)?.date);
   const [noticeHidden, setNoticeHidden] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [helpEverOpened, setHelpEverOpened] = useState(false);
+  useEffect(() => {
+    if (helpOpen) setHelpEverOpened(true);
+  }, [helpOpen]);
   const [plan, setPlan] = useState<SubscriptionTier | null>(null);
   const [payments, setPayments] = useState<Transaction[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -451,7 +455,12 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
         <main className="min-w-0 flex-1 text-sm">{children}</main>
       </div>
 
-      {isUser && <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />}
+      {/* Loaded on first open (it pulls in the chat client), then kept mounted so it can slide closed. */}
+      {isUser && helpEverOpened && (
+        <React.Suspense fallback={null}>
+          <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
+        </React.Suspense>
+      )}
     </SidebarProvider>
   );
 };

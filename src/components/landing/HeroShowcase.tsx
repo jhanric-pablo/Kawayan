@@ -60,7 +60,7 @@ const WeekLane: React.FC<{ shop: Shop }> = ({ shop }) => {
       <div className="lp-lane">
         {items.map((item, i) => (
           <article key={`${shop.key}-${i}`} className="lp-post" style={{ '--n': i } as React.CSSProperties}>
-            <img src={item.img} alt="" />
+            <img decoding="async" src={item.img} alt="" />
             <div>
               <StatusBadge status={item.status} time={item.time} />
               <b>{item.title}</b>

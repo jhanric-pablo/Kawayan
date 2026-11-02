@@ -67,7 +67,7 @@ const PhonePreview: React.FC<Props> = ({ businessName, caption, imageUrl, loadin
       className={clsx('overflow-hidden bg-(--muted)', tiktok ? 'absolute inset-0 bg-zinc-900' : 'relative aspect-square')}
     >
       {imageUrl ? (
-        <img key={imageUrl} src={imageUrl} alt="Post visual" className="h-full w-full object-cover" />
+        <img decoding="async" key={imageUrl} src={imageUrl} alt="Post visual" className="h-full w-full object-cover" />
       ) : (
         <div
           className={clsx(

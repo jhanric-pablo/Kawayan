@@ -250,7 +250,7 @@ const PostDetailSheet: React.FC<Props> = ({
           <PhonePreview key={p.id} businessName={profile.businessName} caption={p.caption} imageUrl={p.imageUrl} defaultPlatform={platforms[0] === 'instagram' ? 'instagram' : 'facebook'} tabs={['facebook', 'instagram']} />
         </div>
       ) : p.imageUrl ? (
-        <img src={p.imageUrl} alt={`Post image for ${p.topic}`} className="aspect-4/3 w-full border-b border-(--border) object-cover" />
+        <img decoding="async" src={p.imageUrl} alt={`Post image for ${p.topic}`} className="aspect-4/3 w-full border-b border-(--border) object-cover" />
       ) : (
         <div className="grid aspect-4/3 w-full place-items-center border-b border-(--border) bg-(--muted) text-(--fg-muted)">
           <ImageIcon className="h-7 w-7" aria-hidden />

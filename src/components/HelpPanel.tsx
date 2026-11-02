@@ -15,6 +15,7 @@ import { readCachedUser } from '../utils/authSession';
 import ChatThread, { type CallInfo } from './support/ChatThread';
 import { useToast } from './ui/Toast';
 import './support/support.css';
+import { ListSkeleton, ThreadSkeleton } from './ui/skeletons';
 
 const CallWindow = lazy(() => import('./support/CallWindow'));
 
@@ -350,7 +351,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                   <div className="flex flex-1 flex-col">
                     <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4 *:shrink-0">
                       {tickets === null ? (
-                        <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-(--fg-subtle)" aria-label="Loading" />
+                        <ListSkeleton className="grid gap-3 py-2" />
                       ) : tickets.length === 0 ? (
                         <div className="m-auto grid justify-items-center gap-1.5 text-center">
                           <MessagesSquare className="h-6 w-6 text-(--fg-subtle)" aria-hidden />
@@ -513,10 +514,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                       </div>
                     </>
                   ) : (
-                    <div className="grid flex-1 place-content-center justify-items-center gap-2 text-sm text-(--fg-muted)">
-                      <Loader2 className="h-5 w-5 animate-spin text-(--fg-subtle)" aria-hidden />
-                      Opening your conversation…
-                    </div>
+                    <div className="flex-1"><ThreadSkeleton /></div>
                   )
                 )}
               </m.div>

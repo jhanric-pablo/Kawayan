@@ -7,6 +7,7 @@ import { paymentService, Wallet, Transaction } from '../services/paymentService'
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
 import { ADDON_POST_PRICE_PHP, PRO_POST_LIMIT, PRO_PRICE_PHP, TRIAL_POST_LIMIT } from '../utils/tierLimits';
+import PageSkeleton from './PageSkeleton';
 
 const QUICK_AMOUNTS = [100, 500, 1000];
 const TOPUP_MIN = 100;
@@ -150,8 +151,10 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
 
   if (!wallet) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--fg-subtle)' }} />
+      <div className="grid gap-5" role="status" aria-label="Loading">
+        <div className="kw-skel h-7 w-48 rounded-md" />
+        <div className="grid gap-5 md:grid-cols-2"><div className="kw-skel h-64 rounded-xl" /><div className="kw-skel h-64 rounded-xl" /></div>
+        <div className="kw-skel h-56 rounded-xl" />
       </div>
     );
   }

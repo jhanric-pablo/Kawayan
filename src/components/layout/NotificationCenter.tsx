@@ -66,7 +66,7 @@ const Row: React.FC<{ entry: Entry; fresh?: boolean }> = ({ entry: e, fresh }) =
         )}
       </div>
     </div>
-    {e.thumb && <img src={e.thumb} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-(--border) object-cover" />}
+    {e.thumb && <img decoding="async" src={e.thumb} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-(--border) object-cover" />}
   </li>
 );
 

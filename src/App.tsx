@@ -1,27 +1,29 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
+import { AnimatePresence, m, LazyMotion, domAnimation, MotionConfig } from 'motion/react';
+import PageSkeleton from './components/PageSkeleton';
 import { Routes, Route, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { ViewState, BrandProfile, User, VerificationStatus } from './types';
-import BrandSurvey from './components/BrandSurvey';
+
 import ContentCalendar, { CalendarIntent } from './components/ContentCalendar';
 import DashboardLayout from './components/layout/DashboardLayout';
 import { useToast } from './components/ui/Toast';
-import AdminDashboard from './components/AdminDashboard';
+
 import Login from './components/Login';
-import ResetPassword from './components/auth/ResetPassword';
+
 import LandingPage from './components/LandingPage';
 import LandingNav from './components/landing/LandingNav';
-import Settings from './components/Settings';
+
 import AccessibilityWidget from './components/AccessibilityWidget';
 import AccountMenu from './components/AccountMenu';
 import { usePhone } from './utils/usePhone';
-import InsightsDashboard from './components/InsightsDashboard';
-import SocialAccounts from './components/SocialAccounts';
-import HelpDesk from './components/HelpDesk';
+
+
+
 import OnboardingBar from './components/onboarding/OnboardingBar';
-import Billing from './components/Billing';
-import SupportDashboard from './components/SupportDashboard';
+
+
 import VerificationStatusScreen from './components/VerificationStatus';
-import LegalPage from './components/LegalPage';
+
 import AppHydrationLoader from './components/AppHydrationLoader';
 import SpotlightTour from './components/tour/SpotlightTour';
 import { useOrganicDialog } from './components/OrganicDialog';
@@ -49,6 +51,18 @@ import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificati
 import { isTourDone, markTourDone } from './utils/tourState';
 import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3, Sparkles, PencilLine, LifeBuoy } from 'lucide-react';
 import KawayanLogo, { KawayanMark } from './components/KawayanLogo';
+
+// Heavy screens load on demand (recharts, the consoles, chat); Suspense shows a skeleton.
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const Settings = lazy(() => import('./components/Settings'));
+const InsightsDashboard = lazy(() => import('./components/InsightsDashboard'));
+const SocialAccounts = lazy(() => import('./components/SocialAccounts'));
+const HelpDesk = lazy(() => import('./components/HelpDesk'));
+const Billing = lazy(() => import('./components/Billing'));
+const SupportDashboard = lazy(() => import('./components/SupportDashboard'));
+const LegalPage = lazy(() => import('./components/LegalPage'));
+const BrandSurvey = lazy(() => import('./components/BrandSurvey'));
+const ResetPassword = lazy(() => import('./components/auth/ResetPassword'));
 
 const App: React.FC = () => {
   const dialog = useOrganicDialog();
@@ -799,7 +813,11 @@ const App: React.FC = () => {
           }}
           businessName={brandProfile?.businessName || user.businessName}
         >
-          <div className={pageClass}>{page}</div>
+          <Suspense fallback={<PageSkeleton />}>
+            <PageFade id={view}>
+              <div className={pageClass}>{page}</div>
+            </PageFade>
+          </Suspense>
         </DashboardLayout>
       ) : (
       <>
@@ -890,7 +908,9 @@ const App: React.FC = () => {
 
       {/* ── Main Content ──────────────────────────────────────────── */}
       <main className="grow">
-        <div className={pageClass}>{page}</div>
+        <Suspense fallback={<PageSkeleton />}>
+          <div className={pageClass}>{page}</div>
+        </Suspense>
       </main>
       </>
       )}
@@ -935,5 +955,26 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+/**
+ * Page changes inside the app shell: the content fades and rises 8px (200 ms); the sidebar and top
+ * bar stay still. Exits are quicker than entrances. Reduced motion: no movement.
+ */
+const PageFade: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => (
+  <LazyMotion features={domAnimation}>
+    <MotionConfig reducedMotion="user">
+      <AnimatePresence mode="wait" initial={false}>
+        <m.div
+          key={id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] } }}
+          exit={{ opacity: 0, transition: { duration: 0.12 } }}
+        >
+          {children}
+        </m.div>
+      </AnimatePresence>
+    </MotionConfig>
+  </LazyMotion>
+);
 
 export default App;

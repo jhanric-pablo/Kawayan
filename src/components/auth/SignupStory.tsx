@@ -49,7 +49,7 @@ const PlanPreview: React.FC = () => (
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: EASE, delay: 0.18 + i * 0.07 }}
       >
-        <img src={p.img} alt="" />
+        <img decoding="async" loading="lazy" src={p.img} alt="" />
         <span className="ax-story__day">{p.day}</span>
         <b>{p.title}</b>
       </m.div>
@@ -65,7 +65,7 @@ const PublishPreview: React.FC = () => {
   }, []);
   return (
     <div className="ax-story__demo ax-story__publish">
-      <img src="/hero/ai/panaderia-1.jpg" alt="" />
+      <img decoding="async" loading="lazy" src="/hero/ai/panaderia-1.jpg" alt="" />
       <div className="ax-story__publish-text">
         <b>Pandesal alert</b>
         <span><FacebookGlyph className="h-3.5 w-3.5" /> Aling Nena’s Bakery</span>

@@ -1,13 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { ViewState } from '../types';
 import {
   ArrowRight, CheckCircle2,
   ShieldCheck, Lock, UserCheck,
 } from 'lucide-react';
 import HeroShowcase, { BUSINESS_TYPES } from './landing/HeroShowcase';
-import WhyKawayan from './landing/WhyKawayan';
-import HowItWorks from './landing/HowItWorks';
-import Features from './landing/Features';
+// Below the fold: loaded after the hero so the first paint is lighter.
+const WhyKawayan = lazy(() => import('./landing/WhyKawayan'));
+const HowItWorks = lazy(() => import('./landing/HowItWorks'));
+const Features = lazy(() => import('./landing/Features'));
+/** Holds the section's space while it loads, so the page doesn't jump. */
+const SectionSkeleton: React.FC<{ h: number }> = ({ h }) => <div className="kw-skel rounded-xl" style={{ height: h }} aria-hidden />;
 import './landing/landing.css';
 
 interface Props {
@@ -188,7 +191,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       {/* ══ Why Kawayan — the meaning behind the name (animation unchanged) ══ */}
       <div className="lp-band lp-band--why">
         <div className="lp-rail">
-          <WhyKawayan />
+          <Suspense fallback={<SectionSkeleton h={420} />}><WhyKawayan /></Suspense>
           <i className="lp-px lp-px--l" aria-hidden="true" /><i className="lp-px lp-px--r" aria-hidden="true" />
         </div>
       </div>
@@ -196,13 +199,13 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       {/* ══ How it works ══ */}
       <Band id="how" railClassName="lp-pad">
         <SectionTitle eyebrow="How it works" title="From blank calendar to a month of posts." sub="Three steps. No design skills, no marketing degree." />
-        <HowItWorks />
+        <Suspense fallback={<SectionSkeleton h={420} />}><HowItWorks /></Suspense>
       </Band>
 
       {/* ══ Features ══ */}
       <Band id="features" railClassName="lp-pad">
         <SectionTitle eyebrow="Features" title="Post with confidence." sub={<>The tools inside Kawayan, shown the way you&rsquo;ll use them.</>} />
-        <Features />
+        <Suspense fallback={<SectionSkeleton h={640} />}><Features /></Suspense>
       </Band>
 
       <Spacer />

@@ -256,7 +256,7 @@ const PlannerPage: React.FC<Props> = ({
                 <div className="kw-gen-grid">
                   {runPosts.map((p, i) => (
                     <button key={p.id} type="button" className="kw-gen" style={{ animationDelay: `${Math.min(i, 6) * 80}ms` }} onClick={() => onOpenPost(p)}>
-                      {p.imageUrl ? <img src={p.imageUrl} alt="" /> : <span className="kw-gen__noimg"><ImageIcon className="h-5 w-5" aria-hidden /></span>}
+                      {p.imageUrl ? <img decoding="async" loading="lazy" src={p.imageUrl} alt="" /> : <span className="kw-gen__noimg"><ImageIcon className="h-5 w-5" aria-hidden /></span>}
                       <span className="flex flex-col gap-1.5 p-3 text-left text-xs">
                         <span className="flex items-center justify-between gap-2">
                           <span className="mono text-(--fg-muted)">{dayLabel(month, Number(p.date.slice(8, 10)))}</span>

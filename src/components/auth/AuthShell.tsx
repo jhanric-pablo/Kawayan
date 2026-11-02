@@ -90,7 +90,7 @@ const AuthShell: React.FC<Props> = ({
             <AnimatePresence>{aside}</AnimatePresence>
             {!aside && (
               <div className="ax-collage">
-                {COLLAGE.map((src) => <img key={src} src={src} alt="" loading="lazy" />)}
+                {COLLAGE.map((src) => <img decoding="async" key={src} src={src} alt="" loading="lazy" />)}
               </div>
             )}
           </aside>

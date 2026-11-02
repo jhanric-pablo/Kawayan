@@ -92,7 +92,7 @@ const DAY_PARTS = [
 ];
 
 const Thumb: React.FC<{ post: PostStats; className?: string }> = ({ post, className = 'in-thumb' }) => (
-  <span className={className}>{post.imageUrl ? <img src={post.imageUrl} alt="" loading="lazy" /> : <ImageIcon aria-hidden />}</span>
+  <span className={className}>{post.imageUrl ? <img decoding="async" src={post.imageUrl} alt="" loading="lazy" /> : <ImageIcon aria-hidden />}</span>
 );
 
 interface ChartRow { label: string; prevLabel: string; cur: number; prev: number }

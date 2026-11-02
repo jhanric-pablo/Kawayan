@@ -223,7 +223,7 @@ const ChatThread: React.FC<Props> = ({ channel, meId, variant, notes = [], canne
                   {m.text && <div className="sp-bub">{m.text}</div>}
                   {m.attachments?.map((a, i) =>
                     a.type === 'image' ? (
-                      <a key={i} href={a.image_url} target="_blank" rel="noreferrer" className="sp-img"><img src={a.image_url} alt={a.title || 'Attachment'} loading="lazy" /></a>
+                      <a key={i} href={a.image_url} target="_blank" rel="noreferrer" className="sp-img"><img decoding="async" src={a.image_url} alt={a.title || 'Attachment'} loading="lazy" /></a>
                     ) : (
                       <a key={i} href={a.asset_url} target="_blank" rel="noreferrer" className="sp-file"><FileText aria-hidden /><span>{a.title}<small>{kb(a.file_size as number)}</small></span></a>
                     ),

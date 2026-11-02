@@ -25,6 +25,8 @@ import { Sidebar, SidebarProvider, useSidebar } from './ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SideTip, SideToggle, SidebarBridge, useSideOpen } from './layout/shellSidebar';
 import KwSelect from './ui/kw-select';
+import PageSkeleton from './PageSkeleton';
+import { ListSkeleton } from './ui/skeletons';
 
 interface Props {
   darkMode: boolean;
@@ -687,9 +689,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="adm-spinner" />
-      </div>
+      <PageSkeleton variant="console" />
     );
   }
 
@@ -1240,7 +1240,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
               </div>
               <Panel flush title="Pending payments" desc="Top-ups and plan payments that haven't been confirmed yet.">
                 {billingLoading ? (
-                  <div className="adm-spinner" />
+                  <ListSkeleton />
                 ) : pendingTxns.length === 0 ? (
                   <Empty>No pending transactions — all payments verified.</Empty>
                 ) : (

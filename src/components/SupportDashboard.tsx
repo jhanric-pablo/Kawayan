@@ -11,6 +11,7 @@ import ChatThread, { type CallInfo } from './support/ChatThread';
 import { useToast } from './ui/Toast';
 import './support/support.css';
 import KwSelect from './ui/kw-select';
+import { ListSkeleton, ThreadSkeleton } from './ui/skeletons';
 
 const CallWindow = lazy(() => import('./support/CallWindow'));
 
@@ -259,7 +260,7 @@ const SupportDashboard: React.FC = () => {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {tickets === null ? (
-                <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-(--fg-subtle)" aria-label="Loading" />
+                <ListSkeleton rows={4} />
               ) : visible.length === 0 ? (
                 <p className="px-4 py-8 text-center text-(--fg-subtle)">Nothing here.</p>
               ) : (
@@ -355,7 +356,7 @@ const SupportDashboard: React.FC = () => {
                       activeCallId={call?.id ?? null}
                     />
                   ) : (
-                    <div className="grid h-full place-items-center"><Loader2 className="h-5 w-5 animate-spin text-(--fg-subtle)" aria-label="Opening" /></div>
+                    <ThreadSkeleton />
                   )}
                 </div>
               </>

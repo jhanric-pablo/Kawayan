@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useStableCallback } from '../utils/useStableCallback';
 import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
 import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, rewriteCaption } from '../services/aiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
@@ -1158,6 +1159,11 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       setPlanningOpen(true);
     }
   };
+  // Stable handlers so the month grid's memoised day cells only re-render when their own data changes.
+  const gridOpenPost = useStableCallback((post: GeneratedPost) => setSheetPostId(post.id));
+  const gridOpenDay = useStableCallback((day: number) => handleDayClick(day));
+  const gridMovePost = useStableCallback((post: GeneratedPost, day: number) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))));
+  const gridMoveIdea = useStableCallback((index: number, day: number) => moveIdea(index, day));
   const tags = useMemo(() => dayTags(currentDate.getFullYear(), currentDate.getMonth()), [monthKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const listItems = useMemo(
     () => [...monthData.byDay.values()].flat().sort((a, b) => a.day - b.day || (a.post ? 0 : 1) - (b.post ? 0 : 1)),
@@ -1382,10 +1388,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             <MonthGrid
               currentDate={currentDate}
               byDay={monthData.byDay}
-              onOpenPost={(post) => setSheetPostId(post.id)}
-              onOpenDay={handleDayClick}
-              onMovePost={(post, day) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day)))}
-              onMoveIdea={moveIdea}
+              onOpenPost={gridOpenPost}
+              onOpenDay={gridOpenDay}
+              onMovePost={gridMovePost}
+              onMoveIdea={gridMoveIdea}
               tags={tags}
               selectedPostId={sheetPostId}
             />
@@ -1560,7 +1566,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
                         <tr key={p.id} onClick={() => openPost(p)}>
                           <td>
                             <button type="button" className="flex min-h-9 items-center gap-2.5 text-left" onClick={(e) => { e.stopPropagation(); openPost(p); }}>
-                              {p.imageUrl ? <img src={p.imageUrl} alt="" className="h-[30px] w-[30px] shrink-0 rounded-md object-cover" /> : <span className="h-[30px] w-[30px] shrink-0 rounded-md bg-(--muted)" />}
+                              {p.imageUrl ? <img decoding="async" loading="lazy" src={p.imageUrl} alt="" className="h-[30px] w-[30px] shrink-0 rounded-md object-cover" /> : <span className="h-[30px] w-[30px] shrink-0 rounded-md bg-(--muted)" />}
                               <span className="font-medium">{p.topic}</span>
                             </button>
                           </td>

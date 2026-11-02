@@ -51,7 +51,7 @@ const PostTable: React.FC<Props> = ({ month, items, selectedPostId, onOpenPost, 
                 <td>
                   <button type="button" className="flex min-h-9 items-center gap-2.5 text-left" onClick={(e) => { e.stopPropagation(); open(); }} aria-pressed={selected || undefined}>
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" loading="lazy" className="h-[30px] w-[30px] shrink-0 rounded-md object-cover" />
+                      <img decoding="async" src={item.imageUrl} alt="" loading="lazy" className="h-[30px] w-[30px] shrink-0 rounded-md object-cover" />
                     ) : (
                       <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md bg-(--muted) text-(--fg-muted)"><Sparkles className="h-3.5 w-3.5" aria-hidden /></span>
                     )}

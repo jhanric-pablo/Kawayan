@@ -13,6 +13,7 @@ import { readCachedUser } from '../utils/authSession';
 import ChatThread from './support/ChatThread';
 import { useToast } from './ui/Toast';
 import './support/support.css';
+import { ListSkeleton, ThreadSkeleton } from './ui/skeletons';
 
 const CATEGORIES: Ticket['category'][] = ['Technical', 'Billing', 'General'];
 const PRIORITIES: Ticket['priority'][] = ['Low', 'Medium', 'High'];
@@ -192,7 +193,7 @@ const HelpDesk: React.FC<{ initialTicketId?: string | null }> = ({ initialTicket
             </div>
             <div className="kw-tlist" role="list">
               {tickets === null ? (
-                <Loader2 className="mx-auto my-8 h-5 w-5 animate-spin text-(--fg-muted)" aria-label="Loading" />
+                <ListSkeleton rows={3} />
               ) : shown.length === 0 ? (
                 <p className="px-4 py-8 text-center text-ui text-(--fg-muted)">{tickets.length ? 'No tickets match.' : 'No tickets yet. Open one when you need us.'}</p>
               ) : (
@@ -304,9 +305,7 @@ const HelpDesk: React.FC<{ initialTicketId?: string | null }> = ({ initialTicket
                   ) : channel && session ? (
                     <ChatThread key={channel.cid} channel={channel} meId={session.userId} variant="owner" onSent={markReplied} placeholder="Write a reply…" />
                   ) : (
-                    <div className="grid h-full place-content-center justify-items-center gap-2 text-sm text-(--fg-muted)">
-                      <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Opening the conversation…
-                    </div>
+                    <ThreadSkeleton />
                   )}
                 </div>
               </>

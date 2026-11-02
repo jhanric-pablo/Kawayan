@@ -18,7 +18,8 @@ import { phDatesInMonth } from '../../utils/phCalendar';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar as DayCalendar } from '../ui/calendar';
+// react-day-picker + date-fns load only when the date popover opens.
+const DayCalendar = React.lazy(() => import('../ui/calendar').then((m) => ({ default: m.Calendar })));
 import { Switch } from '../ui/switch';
 
 /* ── Shared looks ── */
@@ -606,7 +607,7 @@ const PostComposer: React.FC<Props> = ({
 <div className="flex flex-wrap items-start gap-4">
                   <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-(--border) bg-(--bg-alt)">
                     {post.imageUrl ? (
-                      <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
+                      <img decoding="async" src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" />
                     ) : (
                       <ImageIcon className="absolute inset-0 m-auto h-7 w-7 text-(--fg-subtle)" aria-hidden />
                     )}
@@ -823,7 +824,7 @@ const PostComposer: React.FC<Props> = ({
             {/* Image */}
             <section className="card overflow-hidden" aria-label="Image">
               <div className="relative aspect-square bg-(--muted)">
-                {post.imageUrl ? <img src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" /> : <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-(--fg-muted)" aria-hidden />}
+                {post.imageUrl ? <img decoding="async" src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" /> : <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-(--fg-muted)" aria-hidden />}
                 {loadingImage && (
                   <span className="absolute inset-0 grid place-items-center bg-black/45 text-white"><Loader2 className="h-6 w-6 animate-spin" aria-label="Creating a new image" /></span>
                 )}
@@ -1273,6 +1274,7 @@ const PostComposer: React.FC<Props> = ({
                       <ChevronDown className="h-3.5 w-3.5 text-(--fg-muted)" aria-hidden />
                     </PopoverTrigger>
                     <PopoverContent side="top" align="end" className="w-auto gap-3 p-3">
+                      <React.Suspense fallback={<div className="kw-skel h-[260px] w-[252px] rounded-lg" />}>
                       <DayCalendar
                         mode="single"
                         selected={new Date(`${post.date}T00:00:00`)}
@@ -1280,6 +1282,7 @@ const PostComposer: React.FC<Props> = ({
                         disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                         defaultMonth={new Date(`${post.date}T00:00:00`)}
                       />
+                      </React.Suspense>
                       {!onMoveDate && <p className="text-xs text-(--fg-muted)">Move the post on the calendar to change its day.</p>}
                       <div className="grid grid-cols-3 gap-1.5">
                         {SUGGESTED_TIMES.map((t) => {

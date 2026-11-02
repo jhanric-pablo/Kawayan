@@ -54,7 +54,7 @@ const TimelinePostCard: React.FC<Props> = ({ item, onOpen, onEdit, onRetry }) =>
     >
       <button type="button" onClick={onOpen} className="flex w-full items-start gap-2 rounded-md text-left" title={item.title}>
         {item.imageUrl ? (
-          <img src={item.imageUrl} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded object-cover" />
+          <img decoding="async" src={item.imageUrl} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded object-cover" />
         ) : (
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-(--muted) text-(--fg-muted)">
             <FormatIcon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
