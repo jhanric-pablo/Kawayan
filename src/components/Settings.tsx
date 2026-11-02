@@ -183,9 +183,10 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
         </div>
       </div>
 
-      {/* Section switcher: sticks under the top bar and follows the scroll */}
-      <nav aria-label="Settings sections" className="sticky top-14 z-30 mb-6 overflow-x-auto border-b border-(--border) bg-(--card) scrollbar-hide">
-        <div className="flex gap-5">
+      <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-7">
+      {/* Section switcher: a tab row on small screens, a side menu on wide ones; follows the scroll */}
+      <nav aria-label="Settings sections" className="sticky top-14 z-30 mb-6 overflow-x-auto border-b border-(--border) bg-(--bg) scrollbar-hide lg:top-[72px] lg:mb-0 lg:overflow-visible lg:border-0 lg:bg-transparent">
+        <div className="flex gap-5 lg:flex-col lg:gap-px">
           {sections.map((s) => (
             <button
               key={s.id}
@@ -193,12 +194,15 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
               onClick={() => go(s.id)}
               aria-current={active === s.id ? 'true' : undefined}
               className={clsx(
-                '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 text-sm font-semibold transition-colors',
-                active === s.id ? 'border-(--fg) text-(--fg)' : 'border-transparent text-(--fg-muted) hover:text-(--fg)',
+                '-mb-px flex min-h-11 items-center gap-1.5 whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors',
+                'lg:mb-0 lg:min-h-9 lg:rounded-lg lg:border lg:px-2.5 lg:py-0 lg:text-left',
+                active === s.id
+                  ? 'border-(--fg) text-(--fg) lg:border-(--border) lg:bg-(--card) lg:shadow-xs'
+                  : 'border-transparent text-(--fg-muted) hover:text-(--fg) lg:text-(--fg) lg:hover:bg-[color-mix(in_srgb,var(--fg)_5%,transparent)]',
               )}
             >
               {s.label}
-              {s.brand && brandDirty && <span className="h-1.5 w-1.5 rounded-full bg-(--warning)" aria-label="Unsaved changes" />}
+              {s.brand && brandDirty && <span className="h-1.5 w-1.5 rounded-full bg-(--amber)" aria-label="Unsaved changes" />}
             </button>
           ))}
         </div>
@@ -212,7 +216,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                 <LockedValue
                   id="st-biz"
                   value={brand.businessName}
-                  badge={<span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-badge px-2 py-0.5 text-xs font-semibold text-badge-text"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Verified</span>}
+                  badge={<span className="badge badge-green shrink-0"><ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Verified</span>}
                 />
               </SettingRow>
 
@@ -242,13 +246,13 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                   {COLOR_NAMES.map((name, i) => {
                     const color = brand.brandColors?.[i] || DEFAULT_COLORS[i];
                     return (
-                      <label key={name} className="flex cursor-pointer items-center gap-2.5 rounded-full border border-(--border-strong) bg-(--card) py-1.5 pl-1.5 pr-3.5 hover:border-(--fg-subtle) focus-within:ring-2 focus-within:ring-(--ring)">
-                        <span className="relative h-7 w-7 overflow-hidden rounded-full ring-1 ring-black/10" style={{ background: color }}>
+                      <label key={name} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-(--border) bg-(--card) py-1.5 pl-1.5 pr-3.5 shadow-xs hover:bg-(--muted) focus-within:ring-2 focus-within:ring-(--ring)">
+                        <span className="relative h-8 w-8 overflow-hidden rounded-lg border border-(--border)" style={{ background: color }}>
                           <input type="color" value={color} onChange={(e) => setColor(i, e.target.value)} aria-label={`${name} brand colour`} className="absolute inset-0 cursor-pointer opacity-0" />
                         </span>
                         <span className="leading-tight">
-                          <span className="block text-ui font-semibold text-(--fg)">{name}</span>
-                          <span className="block font-mono text-xs uppercase text-(--fg-muted)">{color}</span>
+                          <span className="block text-ui font-medium text-(--fg)">{name}</span>
+                          <span className="mono block text-xs uppercase text-(--fg-muted)">{color}</span>
                         </span>
                       </label>
                     );
@@ -383,15 +387,16 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
           </SettingsSection>
         </div>
       </div>
+      </div>
 
       {/* Floating save bar, only while brand details have unsaved edits */}
       {brandDirty && (
         <div
           role="status"
-          className="kw-savebar fixed inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md items-center gap-2 rounded-full border border-(--border-strong) bg-(--card) py-2 pl-5 pr-2 shadow-xl animate-scale-in md:bottom-6"
+          className="kw-savebar fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-(--border) bg-(--card) py-2 pl-4 pr-2 shadow-lg animate-scale-in md:bottom-6"
         >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-(--warning)" aria-hidden />
-          <span className="flex-1 text-sm font-semibold text-(--fg)">Unsaved changes</span>
+          <span className="h-2 w-2 shrink-0 rounded-full bg-(--amber)" aria-hidden />
+          <span className="flex-1 text-sm font-medium text-(--fg)">Unsaved changes</span>
           <button type="button" className="btn btn-ghost btn-sm" onClick={discardBrand} disabled={brandSaving}>Discard</button>
           <button type="button" className="btn btn-primary btn-sm" onClick={saveBrand} disabled={brandSaving}>
             {brandSaving ? 'Saving…' : 'Save'}

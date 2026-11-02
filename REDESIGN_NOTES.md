@@ -83,16 +83,16 @@ Legend: `[ ]` todo, `[x]` restyled.
 - [x] Calendar: empty / loading / error states, delete & reschedule confirms
 - [x] Post studio (`PostComposer`, `FormatPicker`)
 - [x] Month planner (`PlanningModal`, `PostCountPicker`)
-- [ ] Insights (`InsightsDashboard`, `insights.css`, compare tray)
-- [ ] Billing (plans, wallet, top-up, history, payment dialogs)
-- [ ] Settings › Business
-- [ ] Settings › Voice & audience
-- [ ] Settings › Login & security
-- [ ] Settings › Appearance (`SettingsAppearance`)
-- [ ] Settings save bar
-- [ ] Social accounts (`SocialAccounts`)
-- [ ] Help panel incl. Ask the assistant box (`HelpPanel`)
-- [ ] Support chat thread (`support/ChatThread`)
+- [x] Insights (`InsightsDashboard`, `insights.css`, compare tray)
+- [x] Billing (plans, wallet, top-up, history, payment dialogs)
+- [x] Settings › Business
+- [x] Settings › Voice & audience
+- [x] Settings › Login & security
+- [x] Settings › Appearance (`SettingsAppearance`)
+- [x] Settings save bar
+- [x] Social accounts (`SocialAccounts`)
+- [x] Help panel incl. Ask the assistant box (`HelpPanel`)
+- [x] Support chat thread (`support/ChatThread`)
 
 ### Public / onboarding
 - [ ] Landing: header (`LandingNav`)
@@ -198,3 +198,13 @@ format and strategy pickers (selected = green-soft), green progress bars, links 
 The studio's step sections now fade/slide in instead of animating height.
 Check: Create post → Draft with AI → tweak chips → schedule; Plan month → plan ideas → create posts.
 Left: nothing; mockup-only extras (best-time slot buttons) noted as ideas.
+
+**Step 5 — insights, billing, settings, social, help.** Charts and sparklines use the green line +
+green-soft fill with a dashed grey comparison line; deltas in mono. Billing wallet is the mockup's
+inverted (black/white) card; amounts and dates in mono. Settings gets a left section menu on wide
+screens (tabs on small), tighter settings rows, new Light/Dark preview swatches, a squarer save bar.
+Social: green Connect/Reconnect buttons and a "Connected" badge. Help panel/chat: neutral icon tiles,
+my messages on green-soft, internal notes on dashed amber, mono timestamps.
+Check: Settings → each section, save bar, Appearance theme switch, Replay tour; Billing top-up and
+cancel pending; Social connect; Help → message, call, Assistant.
+Left: nothing for these screens.

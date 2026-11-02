@@ -20,14 +20,14 @@ const THEMES: { id: ThemeId; name: string; note: string; c: Swatch }[] = [
   {
     id: 'light',
     name: 'Light',
-    note: 'Rice paper & forest green',
-    c: { canvas: '#EAE8E1', surface: '#F6F5F0', border: '#D9D5CB', ink: '#151D19', button: '#224739', accent: '#2B5748', today: 'rgba(43,87,72,0.12)' },
+    note: 'White and grey, a touch of green',
+    c: { canvas: '#F4F4F5', surface: '#FFFFFF', border: '#E4E4E7', ink: '#0A0A0A', button: '#0B7A4E', accent: '#0B7A4E', today: 'rgba(11,122,78,0.08)' },
   },
   {
     id: 'dark',
     name: 'Dark',
-    note: 'Deep bamboo',
-    c: { canvas: '#0B0F0E', surface: '#121816', border: '#1F2925', ink: '#E8EDEA', button: '#10B981', accent: '#10B981', today: 'rgba(16,185,129,0.16)' },
+    note: 'Near-black, mint accents',
+    c: { canvas: '#09090B', surface: '#111113', border: '#27272A', ink: '#FAFAFA', button: '#34D399', accent: '#34D399', today: 'rgba(52,211,153,0.12)' },
   },
 ];
 
@@ -80,15 +80,15 @@ const SettingsAppearance: React.FC<Props> = ({ darkMode, toggleDarkMode, labelId
         <Radio.Root
           key={t.id}
           value={t.id}
-          className="group rounded-2xl border border-(--border-strong) bg-(--card) p-2 text-left outline-hidden transition-[border-color,box-shadow] hover:border-(--fg-subtle) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-2 data-checked:border-brand data-checked:p-[7px] data-checked:ring-2 data-checked:ring-brand/20"
+          className="group rounded-xl border border-(--border) bg-(--card) p-2 text-left outline-hidden transition-[border-color,box-shadow] hover:border-(--border-strong) focus-visible:ring-2 focus-visible:ring-(--ring) data-checked:border-(--green) data-checked:shadow-[0_0_0_1px_var(--green)]"
         >
           <Preview c={t.c} />
           <div className="flex items-center gap-2 px-1 pb-0.5 pt-2.5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-ui font-semibold text-(--fg)">{t.name}</p>
+              <p className="truncate text-ui font-medium text-(--fg)">{t.name}</p>
               <p className="truncate text-xs text-(--fg-muted)">{t.note}</p>
             </div>
-            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-(--border-strong) text-on-brand transition-colors group-data-checked:border-brand group-data-checked:bg-brand">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-(--border-strong) text-(--green-fg) transition-colors group-data-checked:border-(--green) group-data-checked:bg-(--green)">
               <Check className="h-3 w-3 opacity-0 group-data-checked:opacity-100" strokeWidth={3} aria-hidden />
             </span>
           </div>

@@ -585,3 +585,16 @@ input:focus, textarea:focus, select:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/* Inverted card (mockup .wallet): black on light pages, white on dark ones. Local tokens flip inside it. */
+.kw-wallet {
+  --card: #0a0a0a; --bg: #0a0a0a; --fg: #fafafa; --fg-muted: #a1a1aa; --fg-subtle: #a1a1aa;
+  --border: #27272a; --border-strong: #3f3f46; --muted: #1b1b1f; --bg-alt: #1b1b1f; --danger: #f87171;
+  --green: #34d399; --green-fg: #052e1c; --primary-accent: #34d399; --primary-accent-hover: #6ee7b7; --primary-accent-fg: #052e1c;
+  background: var(--card); color: var(--fg); border-color: var(--card);
+}
+.dark .kw-wallet {
+  --card: #fafafa; --bg: #fafafa; --fg: #0a0a0a; --fg-muted: #6b6b73; --fg-subtle: #6b6b73;
+  --border: #e4e4e7; --border-strong: #d4d4d8; --muted: #f4f4f5; --bg-alt: #f4f4f5; --danger: #c2261d;
+  --green: #0b7a4e; --green-fg: #ffffff; --primary-accent: #0b7a4e; --primary-accent-hover: #0a6a44; --primary-accent-fg: #ffffff;
+}

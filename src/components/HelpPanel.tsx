@@ -22,7 +22,7 @@ type Mode = 'chat' | CallInfo['kind'];
 const PUSHED: Screen[] = ['thread', 'new'];
 const TABS = [['home', 'Home', House], ['messages', 'Messages', MessagesSquare], ['assistant', 'Assistant', Sparkles]] as const;
 const CATEGORIES: Ticket['category'][] = ['Technical', 'Billing', 'General'];
-const STATUS_DOT: Record<Ticket['status'], string> = { Open: 'bg-(--primary)', Pending: 'bg-amber-500', Resolved: 'bg-(--border-strong)' };
+const STATUS_DOT: Record<Ticket['status'], string> = { Open: 'bg-(--primary)', Pending: 'bg-(--amber)', Resolved: 'bg-(--border-strong)' };
 const STATUS_TEXT: Record<Ticket['status'], string> = { Open: 'Waiting for support', Pending: 'Support replied', Resolved: 'Resolved' };
 const SUGGESTED = ['Why didn’t my scheduled post go out?', 'How do I connect my Facebook Page?', 'What does Pro include?', 'How do I top up my wallet?'];
 const NEW_TITLE: Record<Mode, string> = { chat: 'New message', voice: 'Voice call', video: 'Video call' };
@@ -247,7 +247,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
           inert={!open}
           className={clsx(
             'fixed inset-y-0 right-0 z-85 flex w-full max-w-[400px] flex-col border-l border-(--border-strong) bg-(--card) text-(--fg) outline-hidden transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-            open ? 'translate-x-0 shadow-2xl' : 'translate-x-full',
+            open ? 'translate-x-0 shadow-lg' : 'translate-x-full',
           )}
         >
           {call && open && <div className="cw-dock-space shrink-0" aria-hidden />}
@@ -285,7 +285,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                 {screen === 'home' && (
                   <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4 *:shrink-0">
                     <div className="px-1 pt-1">
-                      <p className="text-xl font-bold tracking-tight">Hi{me?.businessName ? `, ${me.businessName}` : ''}</p>
+                      <p className="text-xl font-semibold tracking-tight">Hi{me?.businessName ? `, ${me.businessName}` : ''}</p>
                       <p className="text-[15px] text-(--fg-muted)">How can we help today?</p>
                     </div>
 
@@ -412,7 +412,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                       {aiBusy && <div className="sp-typing" aria-label="The assistant is writing"><i /><i /><i /></div>}
                       {ai.length > 0 && !aiBusy && (
                         <button type="button" onClick={talkToPerson} className="sp-card flex items-center gap-2.5 self-start px-3 py-2 text-sm font-semibold">
-                          <MessageSquare className="h-4 w-4 text-(--primary)" aria-hidden /> Talk to a person instead
+                          <MessageSquare className="h-4 w-4 text-(--fg)" aria-hidden /> Talk to a person instead
                         </button>
                       )}
                     </div>
@@ -469,7 +469,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                       <span className="text-sm font-semibold">It’s about</span>
                       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Topic">
                         {CATEGORIES.map((c) => (
-                          <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={clsx('rounded-full border px-3 py-1 text-sm font-medium transition-colors', category === c ? 'border-(--primary) bg-(--kw-green-pale) text-(--primary)' : 'border-(--border-strong) text-(--fg-muted) hover:text-(--fg)')}>{c}</button>
+                          <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={clsx('rounded-full border px-3 py-1 text-sm font-medium transition-colors', category === c ? 'border-transparent bg-(--green-soft) text-(--green-ink)' : 'border-(--border-strong) text-(--fg-muted) hover:text-(--fg)')}>{c}</button>
                         ))}
                       </div>
                     </div>
@@ -527,7 +527,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                   type="button"
                   onClick={() => go(id)}
                   aria-current={screen === id ? 'page' : undefined}
-                  className={clsx('relative grid justify-items-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors', screen === id ? 'text-(--primary)' : 'text-(--fg-subtle) hover:text-(--fg)')}
+                  className={clsx('relative grid justify-items-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors', screen === id ? 'text-(--fg) [&_svg]:text-(--green-ink)' : 'text-(--fg-muted) hover:text-(--fg)')}
                 >
                   <Icon className="h-5 w-5" aria-hidden />
                   {label}

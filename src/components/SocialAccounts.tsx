@@ -124,7 +124,7 @@ const SocialAccounts: React.FC = () => {
         >
           <Info className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--fg-muted)' }} />
           <p className="flex-1 text-sm" style={{ color: 'var(--fg-muted)' }}>{loadError}</p>
-          <button onClick={loadAccounts} className="text-sm font-semibold shrink-0" style={{ color: 'var(--primary)' }}>
+          <button onClick={loadAccounts} className="btn btn-outline btn-sm shrink-0">
             Try again
           </button>
         </div>
@@ -139,20 +139,20 @@ const SocialAccounts: React.FC = () => {
               <div className="flex items-start gap-3 sm:gap-4">
                 <BrandTile><p.Glyph /></BrandTile>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>{p.name}</p>
+                  <p className="text-[15px] font-semibold tracking-tight" style={{ color: 'var(--fg)' }}>{p.name}</p>
                   <p className="text-ui" style={{ color: 'var(--fg-muted)' }}>{p.detail}</p>
                 </div>
                 {(linked.length === 0 || needsReconnect) ? (
                   <button
                     onClick={() => handleConnect(p.id)}
                     disabled={loading || unavailable || busy === p.id}
-                    className="btn btn-outline btn-sm shrink-0"
+                    className="btn btn-primary btn-sm shrink-0"
                   >
                     {busy === p.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {needsReconnect ? 'Reconnect' : 'Connect'}
                   </button>
                 ) : (
-                  <span className="text-xs font-medium shrink-0 py-1.5" style={{ color: 'var(--primary)' }}>Connected</span>
+                  <span className="badge badge-green shrink-0"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />Connected</span>
                 )}
               </div>
 

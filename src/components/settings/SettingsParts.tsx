@@ -10,8 +10,8 @@ export const SettingsSection: React.FC<{ id: string; title: string; description:
 }) => (
   <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-32">
     <div className="surface overflow-hidden">
-      <header className="border-b border-(--border) px-5 py-4 sm:px-6">
-        <h2 id={`${id}-title`} className="text-lg font-bold text-(--fg)">{title}</h2>
+      <header className="border-b border-(--border) px-4 py-3.5 sm:px-5">
+        <h2 id={`${id}-title`} className="text-base font-semibold tracking-tight text-(--fg)">{title}</h2>
         <p className="mt-0.5 text-sm text-(--fg-muted)">{description}</p>
       </header>
       <div className="divide-y divide-(--border)">{children}</div>
@@ -33,9 +33,9 @@ export const SettingRow: React.FC<{
 }> = ({ label, hint, htmlFor, labelId, wide, children }) => {
   const Label = htmlFor ? 'label' : 'p';
   return (
-    <div className={clsx('grid gap-3 px-5 py-5 sm:px-6', !wide && 'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-8')}>
+    <div className={clsx('grid gap-3.5 p-5 sm:p-6', !wide && 'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-8')}>
       <div className="min-w-0">
-        <Label {...(htmlFor ? { htmlFor } : {})} id={labelId} className="block text-sm font-semibold text-(--fg)">{label}</Label>
+        <Label {...(htmlFor ? { htmlFor } : {})} id={labelId} className="block text-[15px] font-semibold tracking-tight text-(--fg)">{label}</Label>
         {hint && <div className="mt-1 text-ui leading-relaxed text-(--fg-muted)">{hint}</div>}
       </div>
       <div className="min-w-0">{children}</div>
@@ -45,7 +45,7 @@ export const SettingRow: React.FC<{
 
 /** A read-only value with a short reason it can't be edited here. */
 export const LockedValue: React.FC<{ id: string; value: string; badge?: React.ReactNode }> = ({ id, value, badge }) => (
-  <div className="flex items-center gap-2 rounded-(--radius-md) border border-(--border) bg-(--bg-alt) px-3.5 py-2.5">
+  <div className="flex min-h-[38px] items-center gap-2 rounded-(--radius-md) border border-(--border) bg-(--muted) px-3 py-2">
     <span id={id} className="min-w-0 flex-1 truncate text-sm text-(--fg)">{value || '—'}</span>
     {badge}
   </div>

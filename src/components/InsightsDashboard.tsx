@@ -65,7 +65,7 @@ const Spark: React.FC<{ values: number[] }> = ({ values }) => {
   const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1)) * 100},${27 - ((v - min) / range) * 24}`).join(' ');
   return (
     <svg className="in-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden>
-      <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <polyline points={points} fill="none" stroke="var(--green)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 };
@@ -474,16 +474,16 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                 content={(p) => <ChartTip active={p.active} payload={p.payload as any} metric={CHART_METRICS.find((m) => m.key === metric)!.label} />}
                 cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
               />
-              <Area type="monotone" dataKey="prev" stroke="var(--fg-subtle)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={false} />
+              <Area type="monotone" dataKey="prev" stroke="var(--fg-muted)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={false} />
               <Area
                 type="monotone"
                 dataKey="cur"
-                stroke="var(--primary)"
+                stroke="var(--green)"
                 strokeWidth={2}
-                fill="var(--primary)"
-                fillOpacity={0.06}
+                fill="var(--green-soft)"
+                fillOpacity={1}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--primary)' }}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)', fill: 'var(--green)' }}
               />
             </AreaChart>
           </ResponsiveContainer>

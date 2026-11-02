@@ -170,7 +170,7 @@ const Billing: React.FC = () => {
               : `A ${peso(pending.amount)} top-up is waiting for payment.`}
           </p>
           {checkoutUrl && (
-            <a href={checkoutUrl} className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>
+            <a href={checkoutUrl} className="btn btn-primary btn-sm">
               Continue payment
             </a>
           )}
@@ -189,7 +189,7 @@ const Billing: React.FC = () => {
         {/* Plan */}
         <section className="surface p-6 flex flex-col">
           <p className="text-ui font-medium" style={labelStyle}>Current plan</p>
-          <h2 className="font-display text-2xl font-semibold mt-1" style={{ color: 'var(--fg)' }}>{isPro ? 'Pro' : 'Free'}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight mt-1" style={{ color: 'var(--fg)' }}>{isPro ? 'Pro' : 'Free'}</h2>
           <p className="text-sm mt-1" style={labelStyle}>
             {isPro ? `${PRO_POST_LIMIT} posts a month · ${peso(PRO_PRICE_PHP)}/month` : `${TRIAL_POST_LIMIT} posts a month · ₱0`}
           </p>
@@ -238,10 +238,10 @@ const Billing: React.FC = () => {
           </div>
         </section>
 
-        {/* Wallet */}
-        <section className="surface p-6">
+        {/* Wallet: the mockup's inverted card */}
+        <section className="surface kw-wallet p-6">
           <p className="text-ui font-medium" style={labelStyle}>Wallet balance</p>
-          <p className="font-display text-3xl font-semibold mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
+          <p className="text-[34px] leading-tight font-semibold tracking-tight mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
           <p className="text-sm mt-1" style={labelStyle}>For extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
 
           <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
@@ -255,7 +255,7 @@ const Billing: React.FC = () => {
                   className="flex-1 rounded-(--radius) py-1.5 text-sm font-medium tabular-nums transition-colors"
                   style={
                     amount === String(v)
-                      ? { border: '1px solid var(--primary)', color: 'var(--primary)', background: 'var(--card)' }
+                      ? { border: '1px solid var(--fg)', color: 'var(--fg)', background: 'var(--muted)' }
                       : { border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'var(--card)' }
                   }
                 >
@@ -325,13 +325,13 @@ const Billing: React.FC = () => {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: status ? 'var(--fg-muted)' : 'var(--fg)' }}>{title}</p>
                     <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--fg-subtle)' }}>
-                      {new Date(t.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      {ref && <> · <span className="font-mono">{ref.length > 18 ? `${ref.slice(0, 18)}…` : ref}</span></>}
+                      <span className="mono">{new Date(t.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      {ref && <> · <span className="mono">{ref.length > 18 ? `${ref.slice(0, 18)}…` : ref}</span></>}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p
-                      className={`text-sm font-semibold tabular-nums ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}
+                      className={`mono text-sm font-medium tabular-nums ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}
                       style={{ color: status ? 'var(--fg-subtle)' : credit ? 'var(--primary)' : 'var(--fg)' }}
                     >
                       {credit ? '+' : '−'}{peso(t.amount)}

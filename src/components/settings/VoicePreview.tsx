@@ -18,7 +18,7 @@ const VoicePreview: React.FC<{ voice: string; businessName: string; audience: st
       <p className="eyebrow text-(--fg-subtle)">Sample caption</p>
       <div className="mt-2.5 rounded-(--radius-md) border border-(--border) bg-(--card) p-3.5 shadow-xs">
         <div className="mb-2 flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-(--primary-accent) text-xs font-bold text-(--primary-accent-fg)" aria-hidden>
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-(--primary-accent) text-xs font-semibold text-(--primary-accent-fg)" aria-hidden>
             {name.charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 truncate text-ui font-semibold text-(--fg)">{name}</span>
