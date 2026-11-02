@@ -37,6 +37,28 @@ router.get('/api/admin/stats', async (req, res) => {
   }
 });
 
+// System status for the admin overview. Only yes/no flags and timings: never key values.
+router.get('/api/admin/system-status', async (req, res) => {
+  const started = Date.now();
+  let dbOk = false;
+  try {
+    const h = await dbService.healthCheck();
+    dbOk = h?.status === 'healthy';
+  } catch {
+    dbOk = false;
+  }
+  const has = (...names) => names.every((n) => !!process.env[n]);
+  res.json({
+    api: { ok: true },
+    database: { ok: dbOk, latencyMs: Date.now() - started },
+    ai: { configured: has('GROQ_API_KEY') || has('CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN') },
+    zernio: { configured: has('ZERNIO_API_KEY') },
+    paymongo: { configured: has('PAYMONGO_SECRET_KEY'), testMode: String(process.env.PAYMONGO_SECRET_KEY || '').startsWith('sk_test_') },
+    chat: { configured: has('STREAM_API_KEY', 'STREAM_API_SECRET') },
+    checkedAt: new Date().toISOString(),
+  });
+});
+
 router.get('/api/admin/logs', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;

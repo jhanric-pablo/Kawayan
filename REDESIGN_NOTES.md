@@ -379,9 +379,9 @@ the last day), used by the calendar tags and the Month planner's "Dates Kawayan 
 - [x] Help desk page (`/help`): ticket list with status badges + search, conversation thread (mine tinted green), reply box with attachment, "Ask the assistant" card, New ticket — **FE** (reuses the Help panel's ticket/chat logic; the slide-over panel stays)
 
 ## F4. Staff — Admin overview
-- [ ] 4 stat cards: Businesses, Permits to review, Payments to verify, Open tickets — **FE**
-- [ ] "Sign-ups, last 14 days" bar chart — **FE** (from the loaded users list)
-- [ ] System status list (API, Database, AI, Zernio, PayMongo) + "Allow registrations" switch — **API** (`GET /api/admin/system-status`: configured/ok flags only, never key values). The switch mirrors the existing Settings switch (local state today, see risks)
+- [x] 4 stat cards: Businesses, Permits to review, Payments to verify, Open tickets — **FE**
+- [x] "Sign-ups, last 14 days" bar chart — **FE** (from the loaded users list)
+- [x] System status list (API, Database, AI, Zernio, PayMongo) + "Allow registrations" switch — **API** (`GET /api/admin/system-status`: configured/ok flags only, never key values). The switch mirrors the existing Settings switch (local state today, see risks)
 - [x] Recent activity from the audit log — **have**
 
 ## F5. Staff — Verification
@@ -496,3 +496,13 @@ ticket). Right: the conversation (same Stream chat as the Help panel, your messa
 button, Mark resolved, rating once resolved) or the New ticket form (topic + urgency). On phones
 the list and conversation swap. Notifications' "Open ticket" and Billing's "Talk to us" open it.
 The slide-over Help panel (⌘/) stays, with voice and video calls.
+
+**F4 — Admin overview.** Greeting header ("Good afternoon, Mika · Monday, Nov 2 · 2 permits and 0
+tickets waiting") with Review permits. New top block: 4 stat cards (Businesses + new this month,
+Permits to review + oldest, Payments to verify + total, Open tickets + high/critical), "Sign-ups,
+last 14 days" bars from the users list, and System status (API with latency, Database, AI
+generation, Zernio publishing, PayMongo incl. Test mode) from the new
+`GET /api/admin/system-status` (admin only; yes/no flags, never key values) plus the Allow
+registrations switch (same local setting as the Settings tab). The existing date-range KPIs,
+growth / retention charts, latest activity and Needs attention stay below, under "For the dates
+above". AI / Zernio / PayMongo show "Set up" (configured), not a live ping.

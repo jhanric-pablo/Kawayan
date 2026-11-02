@@ -8,6 +8,7 @@ import {
   Users, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings,
   Download, Filter, Lock, CreditCard, Moon, Sun, XCircle, Wallet, ChevronDown, ChevronRight, RefreshCw, UserPlus,
   LogIn, Upload, Send, CalendarClock, AlertTriangle, TrendingUp, PhilippinePeso, Store, ArrowUpDown, Check,
+  Server, Sparkles, Link2,
 } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { supportService } from '../services/supportService';
@@ -50,6 +51,14 @@ const EMPTY_STATS: AdminStats = {
 
 type HealthStatus = 'checking' | 'ok' | 'db-down' | 'api-down';
 type Health = { status: HealthStatus; latencyMs?: number; checkedAt?: number };
+type SystemStatus = {
+  api: { ok: boolean };
+  database: { ok: boolean; latencyMs?: number };
+  ai: { configured: boolean };
+  zernio: { configured: boolean };
+  paymongo: { configured: boolean; testMode?: boolean };
+  chat?: { configured: boolean };
+};
 
 /* ── Shared building blocks ───────────────────────────────────────── */
 const cx = (...c: Array<string | false | undefined | null>) => c.filter(Boolean).join(' ');
@@ -313,6 +322,8 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
   // Settings
   const [health, setHealth] = useState<Health>({ status: 'checking' });
+  // Which services are set up (from GET /api/admin/system-status; flags only, never keys).
+  const [sys, setSys] = useState<SystemStatus | null>(null);
   const [systemSettings, setSystemSettings] = useState({ maintenanceMode: false, allowRegistrations: true });
   const [adminProfile, setAdminProfile] = useState({ email: 'admin@kawayan.ph', password: '', confirm: '' });
 
@@ -357,6 +368,13 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
       status = 'api-down';
     }
     setHealth({ status, latencyMs: Math.round(performance.now() - started), checkedAt: Date.now() });
+    try {
+      const token = localStorage.getItem('kawayan_jwt');
+      const r = await fetch('/api/admin/system-status', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      setSys(r.ok ? await r.json() : null);
+    } catch {
+      setSys(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -613,6 +631,9 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
   const pendingVerifs = verifications.filter((v) => v.status === 'pending').length;
   const openTickets = tickets.filter((t) => t.status !== 'Resolved').length;
+  // The part of the email before "." / "+" / "@" ("mika.santos@…" → "Mika"); generic inboxes get no name.
+  const emailName = (user?.email || '').split(/[.+@]/)[0];
+  const staffFirstName = emailName && !/^(admin|support|info|hello|team)$/i.test(emailName) ? emailName[0].toUpperCase() + emailName.slice(1) : '';
 
   const NAV: Array<{ id: Tab; label: string; icon: React.ElementType; count?: number; group: 'Workspace' | 'System' }> = [
     { id: 'overview', label: 'Overview', icon: Activity, group: 'Workspace' },
@@ -625,7 +646,10 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   ];
 
   const HEADINGS: Record<Tab, { title: string; sub: string }> = {
-    overview: { title: 'Overview', sub: 'Revenue, growth and platform activity at a glance.' },
+    overview: {
+      title: `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}${staffFirstName ? `, ${staffFirstName}` : ''}`,
+      sub: `${new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })} · ${pendingVerifs} permit${pendingVerifs === 1 ? '' : 's'} and ${openTickets} ticket${openTickets === 1 ? '' : 's'} waiting.`,
+    },
     users: { title: 'Users', sub: 'Search, edit roles, adjust wallets and manage subscriptions.' },
     verification: { title: 'Verification queue', sub: 'Review business documents and approve or reject MSME accounts.' },
     billing: { title: 'Billing', sub: 'Verify pending wallet top-ups and manage billing cycles.' },
@@ -659,6 +683,45 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const signUps = stats.revenueData.reduce((sum, d) => sum + d.value, 0);
   const visibleTickets = ticketFilter === 'all' ? tickets : tickets.filter((t) => t.status === ticketFilter);
   const pendingTotal = pendingTxns.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  // Overview (mockup): businesses, permits, payments, tickets; sign-ups over the last 14 days.
+  const owners = users.filter((u) => (u.role ?? 'user') === 'user');
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const ownersThisMonth = owners.filter((u) => u.createdAt && parseUtc(u.createdAt).getTime() >= monthStart).length;
+  const oldestPermit = verifications
+    .filter((v) => v.status === 'pending' && v.createdAt)
+    .map((v) => parseUtc(v.createdAt).getTime())
+    .sort((a, b) => a - b)[0];
+  const criticalTickets = tickets.filter((t) => t.status !== 'Resolved' && (t.priority === 'Critical' || t.priority === 'High')).length;
+  const signupDays = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (13 - i));
+    return d;
+  });
+  const signupBars = signupDays.map((d) => {
+    const next = d.getTime() + 86_400_000;
+    return { d, n: users.filter((u) => u.createdAt && parseUtc(u.createdAt).getTime() >= d.getTime() && parseUtc(u.createdAt).getTime() < next).length };
+  });
+  const signupMax = Math.max(1, ...signupBars.map((b) => b.n));
+  const signup14 = signupBars.reduce((a, b) => a + b.n, 0);
+  const shortDate = (d: Date) => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  type SysRow = { icon: typeof Activity; label: string; state: 'up' | 'down' | 'off' | 'checking' | 'test'; note?: string };
+  const sysRows: SysRow[] = [
+    { icon: Activity, label: 'API', state: health.status === 'checking' ? 'checking' : health.status === 'api-down' ? 'down' : 'up', note: health.latencyMs != null && health.status !== 'api-down' ? `${health.latencyMs}ms` : undefined },
+    { icon: Server, label: 'Database', state: sys ? (sys.database.ok ? 'up' : 'down') : health.status === 'checking' ? 'checking' : health.status === 'ok' ? 'up' : 'down' },
+    { icon: Sparkles, label: 'AI generation', state: !sys ? 'checking' : sys.ai.configured ? 'up' : 'off' },
+    { icon: Link2, label: 'Zernio publishing', state: !sys ? 'checking' : sys.zernio.configured ? 'up' : 'off' },
+    { icon: CreditCard, label: 'PayMongo', state: !sys ? 'checking' : !sys.paymongo.configured ? 'off' : sys.paymongo.testMode ? 'test' : 'up' },
+  ];
+  const SYS_BADGE: Record<SysRow['state'], [string, string]> = {
+    up: ['badge-green', 'Set up'],
+    down: ['badge-red', 'Down'],
+    off: ['badge-red', 'Not set up'],
+    checking: ['', 'Checking…'],
+    test: ['badge-amber', 'Test mode'],
+  };
+  const allUp = sysRows.every((r) => r.state === 'up' || r.state === 'test');
 
   return (
     <div className="adm kw-shell kw-shell--staff text-sm text-(--fg)">
@@ -755,6 +818,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'overview' && (
                 <>
+                  {pendingVerifs > 0 && (
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => reviewVerification()}>
+                      <Shield className="h-3.5 w-3.5" aria-hidden /> Review permits
+                    </button>
+                  )}
                   <div className="adm-segment" role="group" aria-label="Date range">
                     {RANGE_PRESETS.map((p) => (
                       <button key={p.key} type="button" aria-pressed={rangePreset === p.key} onClick={() => pickRange(p.key)}>{p.label}</button>
@@ -793,6 +861,84 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
           {/* ─────────────  OVERVIEW  ───────────── */}
           {activeTab === 'overview' && (
             <div className={cx('space-y-4 transition-opacity', statsLoading && 'opacity-60')} aria-busy={statsLoading}>
+              <div className="kw-stats">
+                <button type="button" className="card kw-stat text-left" onClick={() => setActiveTab('users')}>
+                  <span className="kw-stat__h">Businesses <Users className="h-4 w-4" aria-hidden /></span>
+                  <b>{owners.length.toLocaleString()}</b>
+                  <small>{ownersThisMonth ? <><span className="text-(--green-ink)">+{ownersThisMonth}</span> this month</> : 'None new this month'}</small>
+                </button>
+                <button type="button" className="card kw-stat text-left" onClick={() => reviewVerification()}>
+                  <span className="kw-stat__h">Permits to review <Shield className="h-4 w-4" aria-hidden /></span>
+                  <b>{pendingVerifs}</b>
+                  <small>{oldestPermit ? `Oldest ${timeAgo(new Date(oldestPermit).toISOString())}` : 'All caught up'}</small>
+                </button>
+                <button type="button" className="card kw-stat text-left" onClick={() => setActiveTab('billing')}>
+                  <span className="kw-stat__h">Payments to verify <Wallet className="h-4 w-4" aria-hidden /></span>
+                  <b>{pendingTxns.length}</b>
+                  <small>{pendingTxns.length ? `${peso(pendingTotal)} total` : 'Nothing waiting'}</small>
+                </button>
+                <button type="button" className="card kw-stat text-left" onClick={() => setActiveTab('helpdesk')}>
+                  <span className="kw-stat__h">Open tickets <MessageSquare className="h-4 w-4" aria-hidden /></span>
+                  <b>{openTickets}</b>
+                  <small>{criticalTickets ? `${criticalTickets} high or critical` : 'None urgent'}</small>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section className="card overflow-hidden">
+                  <div className="kw-card-h">
+                    <h3>Sign-ups, last 14 days</h3>
+                    <span className="kw-hint mono">{signup14} total</span>
+                  </div>
+                  <div className="p-5">
+                    <div className="flex h-[180px] items-end gap-1.5" role="img" aria-label={`Sign-ups per day, last 14 days: ${signupBars.map((b) => b.n).join(', ')}`}>
+                      {signupBars.map((b, i) => (
+                        <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5" title={`${shortDate(b.d)}: ${b.n}`}>
+                          <span className="mono text-[10px] text-(--fg-muted)">{b.n}</span>
+                          <i
+                            className="block w-full rounded-t"
+                            style={{ height: `${Math.max(2, (b.n / signupMax) * 140)}px`, background: i === signupBars.length - 1 ? 'var(--green)' : 'color-mix(in srgb, var(--fg) 12%, transparent)' }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mono mt-1.5 flex justify-between text-[11px] text-(--fg-muted)">
+                      <span>{shortDate(signupDays[0])}</span>
+                      <span>{shortDate(signupDays[13])}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="card overflow-hidden">
+                  <div className="kw-card-h">
+                    <h3>System status</h3>
+                    <span className={cx('badge', allUp ? 'badge-green' : 'badge-amber')}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />{allUp ? 'Operational' : 'Needs a look'}</span>
+                  </div>
+                  <ul className="divide-y divide-(--border)">
+                    {sysRows.map((r) => (
+                      <li key={r.label} className="flex items-center gap-3 px-5 py-3">
+                        <r.icon className="h-4 w-4 text-(--fg-muted)" aria-hidden />
+                        <span className="flex-1 text-ui">{r.label}</span>
+                        <span className={cx('badge', SYS_BADGE[r.state][0])}>
+                          {r.state !== 'checking' && <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />}
+                          {r.state === 'up' && r.note ? `Up · ${r.note}` : r.state === 'up' && r.label === 'Database' ? 'Up' : SYS_BADGE[r.state][1]}
+                        </span>
+                      </li>
+                    ))}
+                    <li className="flex items-center gap-3 px-5 py-3">
+                      <UserPlus className="h-4 w-4 text-(--fg-muted)" aria-hidden />
+                      <label htmlFor="adm-allow-reg" className="flex-1 text-ui">Allow registrations</label>
+                      <Switch
+                        id="adm-allow-reg"
+                        checked={systemSettings.allowRegistrations}
+                        onCheckedChange={(v) => setSystemSettings({ ...systemSettings, allowRegistrations: v })}
+                      />
+                    </li>
+                  </ul>
+                </section>
+              </div>
+
+              <h2 className="pt-2 text-sm font-semibold text-(--fg-muted)">For the dates above</h2>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <Kpi accent icon={PhilippinePeso} label="Total revenue" value={peso(stats.revenue)} hint="Completed PayMongo payments" />
                 <Kpi icon={Users} label="Total users" value={stats.totalUsers.toLocaleString()} hint="Signed up in this range" onClick={() => setActiveTab('users')} />
