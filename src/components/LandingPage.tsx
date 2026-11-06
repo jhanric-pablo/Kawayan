@@ -4,7 +4,7 @@ import {
   ArrowRight, CheckCircle2,
   ShieldCheck, Lock, UserCheck,
 } from 'lucide-react';
-import HeroShowcase, { BUSINESS_TYPES } from './landing/HeroShowcase';
+import HeroShowcase from './landing/HeroShowcase';
 // Below the fold: loaded after the hero so the first paint is lighter.
 const WhyKawayan = lazy(() => import('./landing/WhyKawayan'));
 const HowItWorks = lazy(() => import('./landing/HowItWorks'));
@@ -99,10 +99,9 @@ const Spacer: React.FC = () => (
   <div className="lp-band" aria-hidden="true"><div className="lp-rail"><div className="lp-spacer" /></div></div>
 );
 
-const SectionTitle: React.FC<{ eyebrow?: string; title: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode }> = ({ eyebrow, title, sub, action }) => (
+const SectionTitle: React.FC<{ title: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode }> = ({ title, sub, action }) => (
   <div className="lp-sec-title reveal">
     <div>
-      {eyebrow && <p className="lp-sec-title__eyebrow">{eyebrow}</p>}
       <h2>{title}</h2>
       {sub && <p>{sub}</p>}
     </div>
@@ -112,41 +111,33 @@ const SectionTitle: React.FC<{ eyebrow?: string; title: React.ReactNode; sub?: R
 
 const LandingPage: React.FC<Props> = ({ onNavigate }) => {
   // --- Scroll reveal (opacity + transform only) ---
+  const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll('.reveal'));
-    if (!els.length) return;
-    if (!('IntersectionObserver' in window)) {
-      els.forEach((el) => el.classList.add('is-in'));
-      return;
-    }
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
-      }
-    }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' });
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    const root = pageRef.current;
+    if (!root) return;
+    const io = 'IntersectionObserver' in window
+      ? new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) { e.target.classList.add('is-in'); io?.unobserve(e.target); }
+          }
+        }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' })
+      : null;
+    // Lazy sections mount after this effect runs, so keep picking up new .reveal elements.
+    const watch = () => root.querySelectorAll('.reveal:not(.is-in)').forEach((el) => (io ? io.observe(el) : el.classList.add('is-in')));
+    watch();
+    const mo = new MutationObserver(watch);
+    mo.observe(root, { childList: true, subtree: true });
+    return () => { mo.disconnect(); io?.disconnect(); };
   }, []);
 
   // FAQ answers expand/collapse independently (not an exclusive accordion).
   const [openFaqs, setOpenFaqs] = useState<Set<string>>(new Set());
 
   return (
-    <div className="lp-page">
+    <div className="lp-page" ref={pageRef}>
       {/* ══ Hero ══ */}
       <Band className="lp-band--hero" railClassName="lp-hero" label="Introduction">
         <HeroShowcase onNavigate={onNavigate} />
-      </Band>
-
-      {/* ══ Business types: one slow row, faded edges, pauses on hover ══ */}
-      <Band railClassName="lp-cloud" label="Business types">
-        <p>Made for every Filipino MSME</p>
-        <ul className="sr-only">{BUSINESS_TYPES.map((b) => <li key={b}>{b}</li>)}</ul>
-        <div className="lp-marquee" aria-hidden="true">
-          <div>
-            {[...BUSINESS_TYPES, ...BUSINESS_TYPES].map((b, i) => <span key={i}>{b}</span>)}
-          </div>
-        </div>
       </Band>
 
       <Spacer />
@@ -155,7 +146,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       <Band label="Kawayan in numbers">
         <div className="lp-stats reveal">
           <div className="lp-stat">
-            <p className="lp-stat__num"><CountUp to={20} suffix="+" /><span> hrs</span></p>
+            <p className="lp-stat__num"><CountUp to={20} suffix="+" /><span className="lp-stat__unit"> hrs</span></p>
             <p className="lp-stat__label">saved on content each week</p>
           </div>
           <div className="lp-stat">
@@ -189,7 +180,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       <Spacer />
 
       {/* ══ Why Kawayan — the meaning behind the name (animation unchanged) ══ */}
-      <div className="lp-band lp-band--why">
+      <div className="lp-band lp-band--why" data-nav-dark>
         <div className="lp-rail">
           <Suspense fallback={<SectionSkeleton h={420} />}><WhyKawayan /></Suspense>
           <i className="lp-px lp-px--l" aria-hidden="true" /><i className="lp-px lp-px--r" aria-hidden="true" />
@@ -198,13 +189,13 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
 
       {/* ══ How it works ══ */}
       <Band id="how" railClassName="lp-pad">
-        <SectionTitle eyebrow="How it works" title="From blank calendar to a month of posts." sub="Three steps. No design skills, no marketing degree." />
+        <SectionTitle title="From a blank calendar to a month of posts" sub="Three steps, and no design skills needed." />
         <Suspense fallback={<SectionSkeleton h={420} />}><HowItWorks /></Suspense>
       </Band>
 
       {/* ══ Features ══ */}
       <Band id="features" railClassName="lp-pad">
-        <SectionTitle eyebrow="Features" title="Post with confidence." sub={<>The tools inside Kawayan, shown the way you&rsquo;ll use them.</>} />
+        <SectionTitle title="Everything you need to post every week" sub={<>The tools inside Kawayan, shown the way you&rsquo;ll use them.</>} />
         <Suspense fallback={<SectionSkeleton h={640} />}><Features /></Suspense>
       </Band>
 
@@ -212,7 +203,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
 
       {/* ══ Testimonials ══ */}
       <Band railClassName="lp-pad" label="What shop owners say">
-        <SectionTitle eyebrow="Diskarte, delivered" title="Loved by shop owners nationwide." />
+        <SectionTitle title="What owners said after trying it" />
         <div className="lp-quotes">
           {QUOTES.map((q, i) => (
             <figure key={q.name} className={`lp-quote reveal reveal-d${i + 1}`}>
@@ -231,7 +222,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
 
       {/* ══ Pricing ══ */}
       <Band id="pricing" railClassName="lp-pad">
-        <SectionTitle eyebrow="Simple pricing" title={<>Priced for a sari-sari&nbsp;budget.</>} sub="Start free. Upgrade when your shop is ready. Cancel anytime." />
+        <SectionTitle title={<>Priced for a sari-sari&nbsp;budget</>} sub="Start free. Upgrade when your shop is ready. Cancel anytime." />
         <div className="lp-prices">
           {PLANS.map((plan, idx) => (
             <div key={plan.name} className={`lp-price reveal reveal-d${idx + 1}${plan.featured ? ' is-featured' : ''}`}>
@@ -280,8 +271,7 @@ const LandingPage: React.FC<Props> = ({ onNavigate }) => {
       <Band id="faq" railClassName="lp-pad">
         <div className="lp-faq-grid">
           <div className="reveal">
-            <p className="lp-sec-title__eyebrow">Questions</p>
-            <h2 className="lp-faq-grid__title">Everything else, answered.</h2>
+            <h2 className="lp-faq-grid__title">Questions owners ask</h2>
           </div>
           <div className="lp-faq reveal">
             {FAQS.map((f) => {

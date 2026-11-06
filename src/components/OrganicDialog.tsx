@@ -13,6 +13,8 @@ export type OrganicDialogType = 'alert' | 'confirm' | 'prompt';
 export interface OrganicDialogOptions {
   title?: string;
   message: string;
+  /** Optional structured content shown instead of the message text (the message stays as its plain-text form). */
+  body?: React.ReactNode;
   placeholder?: string;
   defaultValue?: string;
   confirmLabel?: string;
@@ -105,11 +107,11 @@ const OrganicDialogModal: React.FC<{
           {isPrompt ? options.message : title}
         </h2>
 
-        {!isPrompt && (
+        {!isPrompt && (options.body ?? (
           <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--fg-muted)' }}>
             {options.message}
           </p>
-        )}
+        ))}
 
         {isPrompt && options.title && (
           <p className="text-xs mb-4" style={{ color: 'var(--fg-muted)' }}>{options.title}</p>
@@ -133,16 +135,17 @@ const OrganicDialogModal: React.FC<{
           />
         )}
 
-        </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t px-6 py-3.5" style={{ borderColor: 'var(--border)', background: 'var(--muted)' }}>
+        {/* One white card: no grey footer; Cancel stays quiet so the main action leads. */}
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           {showCancel && (
-            <button ref={cancelRef} type="button" onClick={onCancel} className="btn btn-outline">
+            <button ref={cancelRef} type="button" onClick={onCancel} className="btn btn-ghost">
               {options.cancelLabel ?? 'Cancel'}
             </button>
           )}
           <button ref={confirmRef} type="button" onClick={onConfirm} className="btn btn-primary">
             {confirmLabel}
           </button>
+        </div>
         </div>
       </div>
     </div>

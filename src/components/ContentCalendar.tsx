@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useStableCallback } from '../utils/useStableCallback';
 import { BrandProfile, ContentIdea, GeneratedPost } from '../types';
-import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, rewriteCaption } from '../services/aiService';
+import { generateContentPlan, generatePostCaptionAndImagePrompt, generateImageFromPrompt, preloadImage, rewriteCaption } from '../services/aiService';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { paymentService } from '../services/paymentService';
 import { socialService, SocialAccount, SocialPlatform } from '../services/socialService';
 import {
-  ChevronLeft, ChevronRight, Layers, ArrowRight, Plus, Sparkles, CalendarDays, PencilLine, TriangleAlert, BarChart3,
+  ChevronLeft, ChevronRight, Layers, ArrowRight, TriangleAlert, CalendarPlus, CircleCheck, Link2, X,
 } from 'lucide-react';
 import ChannelTimelineTrack from './calendar/ChannelTimelineTrack';
 import MonthGrid from './calendar/MonthGrid';
@@ -16,15 +16,16 @@ import PostDetailSheet from './calendar/PostDetailSheet';
 import { StatusBadge } from './calendar/TimelinePostCard';
 import { buildCalendarItems, heldPlatforms, monthItems } from './calendar/mapCalendarEvents';
 import PostTable from './calendar/PostTable';
+import './calendar/kawayanCalendar.css';
 import PlannerPage from './calendar/PlannerPage';
 import { dayTags } from '../utils/phCalendar';
 import PostComposer from './calendar/PostComposer';
 import PlanningModal from './calendar/PlanningModal';
-import UpNext from './calendar/UpNext';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
+import KwSelect from './ui/kw-select';
 import { normalizeFormat } from '../services/validationService';
-import { FEED_EVENT, PostChannels, failedPostsKey, platformsFor, postChannelsKey, readStored } from '../utils/workspaceFeed';
+import { FEED_EVENT, PostChannels, clockTime, failedPostsKey, platformsFor, postChannelsKey, readStored } from '../utils/workspaceFeed';
 import { storePostImage } from '../utils/postImage';
 import {
   countPostsInMonth,
@@ -67,16 +68,20 @@ const announceFeedChange = () => window.dispatchEvent(new Event(FEED_EVENT));
 type CalendarView = 'month' | 'timeline' | 'list';
 const VIEW_KEY = 'kawayan_calendar_view';
 
+type StatusFilter = 'pending' | 'scheduled' | 'failed';
+const STATUS_FILTER_LABEL: Record<StatusFilter, string> = { pending: 'Pending approval', scheduled: 'Upcoming', failed: 'Failed' };
+
 const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpenBilling, intent, onIntentDone, onOpenInsights, onOpenChannels, onOpenPlanner, page = 'calendar', plannerMonth, onShowCalendar }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
-  // Month grid first; the choice is remembered on this device.
+  // Month grid first (List on phones, where grid days only fit icons); the choice is remembered on this device.
   const [viewMode, setViewModeState] = useState<CalendarView>(() => {
+    const fallback: CalendarView = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches ? 'list' : 'month';
     try {
       const v = localStorage.getItem(VIEW_KEY);
-      return v === 'timeline' || v === 'list' ? v : 'month';
+      return v === 'timeline' || v === 'list' || v === 'month' ? v : fallback;
     } catch {
-      return 'month';
+      return fallback;
     }
   });
   const setViewMode = (v: CalendarView) => {
@@ -84,14 +89,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
   };
   const [channelFilter, setChannelFilter] = useState<'facebook' | 'instagram' | null>(null);
-  // Layout only: at 1280px and up the post details sit beside the calendar instead of in a sheet.
-  const [wideScreen, setWideScreen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1280px)');
-    const onChange = () => setWideScreen(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
   const [batchStrategy, setBatchStrategy] = useState('');
   const [planningOpen, setPlanningOpen] = useState(false); // collapsible AI planning panel (UI only)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -237,7 +234,9 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     return false;
   };
 
-  const IMAGE_PROMPT_SUFFIX = ', high quality, professional photography style, 4k';
+  // The image model only sees the image prompt, so the no-text rule is repeated here. No style words:
+  // the post prompt picks photo or illustration per post.
+  const IMAGE_PROMPT_SUFFIX = ' Square 1:1 composition. No text, letters, numbers, signage, logos or watermarks anywhere in the image.';
 
   const postExistsForDay = (day: number, source: GeneratedPost[] = posts) =>
     source.some((p) => {
@@ -484,15 +483,25 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
     const pool = sameMonth ? posts : await dbService.getUserPosts(userId, date.slice(0, 7));
     const clash = pool.find((p) => p.id !== post.id && p.date === date);
     if (clash) { toast.error(`${dayLabel(date)} already has a post (“${clash.topic}”). Pick another day.`); return false; }
-    if (
-      !isUndo &&
-      !(await dialog.confirm({
+    if (!isUndo) {
+      const snippet = (post.caption || post.topic).replace(/\s+/g, ' ').trim();
+      const ok = await dialog.confirm({
         title: 'Move this post?',
-        message: `“${post.topic}” will move from ${dayLabel(post.date)} to ${dayLabel(date)}.`,
+        message: `“${post.topic}” moves from ${dayLabel(post.date)} to ${dayLabel(date)}.`,
+        // Scannable: the post in quotes, then the date change in bold.
+        body: (
+          <div className="grid gap-3">
+            <p className="line-clamp-2 text-sm leading-relaxed text-(--fg-muted)">“{snippet}”</p>
+            <p className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-(--fg)">
+              <span>{dayLabel(post.date)}</span>
+              <ArrowRight className="h-4 w-4 text-(--fg-muted)" aria-hidden />
+              <span className="text-(--green-ink)">{dayLabel(date)}</span>
+            </p>
+          </div>
+        ),
         confirmLabel: 'Move post',
-      }))
-    ) {
-      return false;
+      });
+      if (!ok) return false;
     }
 
     const moved = { ...post, date };
@@ -508,7 +517,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       setCalendarDataVersion((v) => v + 1);
     }
     announceFeedChange();
-    if (!isUndo) toast.toast(`Moved to ${dayLabel(date)}`, { variant: 'success', action: { label: 'Undo', onClick: () => movePost(moved, post.date, true) } });
+    if (!isUndo) toast.toast(`Post moved to ${dayLabel(date)}`, { variant: 'success', action: { label: 'Undo', onClick: () => movePost(moved, post.date, true) } });
     return true;
   };
 
@@ -722,6 +731,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
       // Cache-busting query param only makes sense for real URLs (Pollinations fallback);
       // a data: URL is already unique per generation and a query string corrupts it.
       const imageUrl = base.startsWith('data:') ? base : `${base}${base.includes('?') ? '&' : '?'}seed=${Date.now()}`;
+      // Keep the spinner until the new picture has loaded, then swap it in.
+      if (!imageUrl.startsWith('data:')) await preloadImage(imageUrl);
       const latest = contentRef.current;
       if (!latest || latest.id !== generatedContent.id) return; // the composer moved on to another post
       const updated: GeneratedPost = { ...latest, imageUrl };
@@ -1135,6 +1146,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const heldPosts = monthPosts.filter((p) => heldPlatforms(p, postChannels, socialAccounts || []).length > 0);
   const failedPosts = monthPosts.filter((p) => p.status === 'Draft' && failedIds.includes(p.id));
   const attention = [...heldPosts, ...failedPosts].sort((a, b) => a.date.localeCompare(b.date));
+  const upcoming = monthPosts.filter((p) => p.status === 'Scheduled' && p.date >= todayKey && !heldPosts.includes(p)).sort((a, b) => a.date.localeCompare(b.date));
+  const publishedCount = monthPosts.filter((p) => p.status === 'Published').length;
+  // Loaded and empty: nothing can be scheduled or published until a page is connected.
+  const noPages = socialAccounts !== null && socialAccounts.length === 0;
   const expiredAccounts = (socialAccounts || []).filter((a) => !a.isActive);
   const platformName = (pl: string) => (pl === 'instagram' ? 'Instagram' : pl === 'facebook' ? 'Facebook' : pl);
   const attentionReason = heldPosts.length
@@ -1165,12 +1180,25 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
   const gridMovePost = useStableCallback((post: GeneratedPost, day: number) => movePost(post, ymd(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))));
   const gridMoveIdea = useStableCallback((index: number, day: number) => moveIdea(index, day));
   const tags = useMemo(() => dayTags(currentDate.getFullYear(), currentDate.getMonth()), [monthKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [statusFilter, setStatusFilter] = useState<StatusFilter | null>(null);
+  useEffect(() => setStatusFilter(null), [monthKey]);
   const listItems = useMemo(
     () => [...monthData.byDay.values()].flat().sort((a, b) => a.day - b.day || (a.post ? 0 : 1) - (b.post ? 0 : 1)),
     [monthData],
   );
-  // Wide screens show the selected post in a panel beside the calendar; smaller ones use the sheet.
-  const sideDetail = wideScreen && !!sheetPost;
+  const filteredItems = statusFilter
+    ? listItems.filter((i) => (statusFilter === 'failed' ? i.status === 'failed' || i.held : !i.held && i.status === (statusFilter === 'pending' ? 'draft' : 'scheduled')))
+    : listItems;
+  // Previous / Next in the post modal: every post by date, so it also works from search or a notification.
+  const postOrder = useMemo(() => [...posts].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)), [posts]);
+  const sheetIndex = sheetPost ? postOrder.findIndex((x) => x.id === sheetPost.id) : -1;
+  const goToPost = (i: number) => {
+    const next = postOrder[i];
+    if (!next) return;
+    setSheetPostId(next.id);
+    const d = new Date(`${next.date}T12:00:00`);
+    if (d.getFullYear() !== currentDate.getFullYear() || d.getMonth() !== currentDate.getMonth()) setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+  };
   const onCurrentMonth = currentDate.getFullYear() === new Date().getFullYear() && currentDate.getMonth() === new Date().getMonth();
   const now = new Date();
   const isPastMonth = currentDate.getFullYear() * 12 + currentDate.getMonth() < now.getFullYear() * 12 + now.getMonth();
@@ -1184,55 +1212,122 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
       {page === 'calendar' && (<>
       {/* ── Header (mockup .page-h) ── */}
+      {/* The month lives here once; the calendar below no longer repeats it. */}
       <div className="kw-page-h">
         <div>
-          <h1>{monthLabel}</h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="relative grid overflow-hidden">
+          <AnimatePresence mode="popLayout" initial={false} custom={slide}>
+            <m.span
+              key={monthLabel}
+              custom={slide}
+              variants={{
+                enter: (d: number) => ({ y: d >= 0 ? 18 : -18, opacity: 0 }),
+                center: { y: 0, opacity: 1 },
+                exit: (d: number) => ({ y: d >= 0 ? -18 : 18, opacity: 0 }),
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+              className="col-start-1 row-start-1 whitespace-nowrap"
+            >
+              {monthLabel}
+            </m.span>
+          </AnimatePresence>
+        </h1>
+        <div className="flex items-center gap-1.5" data-tour="month-nav">
+          <button
+            type="button"
+            aria-label="Previous month"
+            className="btn btn-outline btn-sm w-8 px-0!"
+            onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {/* Jumps back to the current month: quiet when you're already there, highlighted when you've moved away. */}
+          <button
+            type="button"
+            disabled={onCurrentMonth}
+            title={onCurrentMonth ? 'You’re on this month' : `Back to ${new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })}`}
+            className={`btn btn-outline btn-sm ${onCurrentMonth ? 'cursor-default! text-(--fg-muted)' : ''}`}
+            onClick={() => setCurrentDate(new Date())}
+          >
+            {onCurrentMonth ? 'Today' : 'Back to today'}
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            className="btn btn-outline btn-sm w-8 px-0!"
+            onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="relative group hidden sm:block">
+          <input
+            type="text"
+            value={dateInputValue}
+            onChange={(e) => setDateInputValue(e.target.value)}
+            onBlur={handleDateInputBlur}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder="Jump to…"
+            aria-label="Jump to date"
+            className="h-8 w-28 rounded-lg border border-(--border) bg-(--card) px-2.5 text-ui text-(--fg) shadow-xs outline-hidden placeholder:text-(--fg-muted)"
+          />
+          <div className="absolute opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 bg-(--fg) text-(--bg) text-xs px-2 py-1 rounded-md -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
+            Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
+          </div>
+        </div>
+          </div>
           <p>
             {!dataLoaded
               ? 'Loading your month…'
+              : noPages && draftsToApprove.length
+                ? `${draftsToApprove.length} draft${draftsToApprove.length > 1 ? 's' : ''} saved. Connect a page to schedule ${draftsToApprove.length > 1 ? 'them' : 'it'}.`
               : draftsToApprove.length
                 ? `${draftsToApprove.length} draft${draftsToApprove.length > 1 ? 's need' : ' needs'} your approval before ${draftsToApprove.length > 1 ? 'they' : 'it'} can post.`
                 : monthPosts.length
-                  ? 'Nothing waiting on you. Every post this month is scheduled or posted.'
+                  ? 'Your month is on track.'
                   : isPastMonth ? 'No posts this month.' : 'Nothing planned yet. Plan the month or write a post.'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-outline" onClick={composeNext}>
-            <Plus className="h-4 w-4" aria-hidden /> New post
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => openPlannerFor(nextMonth)}>
-            <Sparkles className="h-4 w-4" aria-hidden /> Plan {nextMonthName}
-          </button>
-        </div>
+        {/* "Create post" lives in the top bar; green stays on that one action. */}
+        <button type="button" className="btn btn-outline" onClick={() => openPlannerFor(nextMonth)}>
+          <CalendarPlus className="h-4 w-4" aria-hidden /> Plan {nextMonthName}
+        </button>
       </div>
 
-      {/* ── Stats (mockup .stats) ── */}
-      <div className="kw-stats" aria-label="This month at a glance">
-        <div className="card kw-stat">
-          <div className="kw-stat__h">Posts this month <CalendarDays aria-hidden /></div>
-          <b>{monthlyPostCount} <span className="text-base font-medium text-(--fg-muted)">/ {batchPostCount}</span></b>
-          <small>{Math.max(0, batchPostCount - monthlyPostCount)} left on {planLabelText}</small>
+      {/* ── No page connected: publishing needs one, drafts don't ── */}
+      {noPages && (
+        <div className="kw-connect" role="status">
+          <Link2 className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          <p><b>Connect Facebook or Instagram to publish</b><span>Scheduling and publishing need a connected page. You can keep creating, editing and saving drafts in the meantime.</span></p>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onOpenSocial}>Connect a page</button>
         </div>
-        <div className="card kw-stat">
-          <div className="kw-stat__h">Drafts to approve <PencilLine aria-hidden /></div>
-          <b>{draftsToApprove.length}</b>
-          <small>{draftsToApprove.length ? `Next one due ${shortDay(draftsToApprove[0].date)}` : 'All caught up'}</small>
+      )}
+
+      {/* ── This month: plan use and real results (what needs action is in the bar below) ── */}
+      <div className="card kw-glance kw-glance--3" aria-label="This month">
+        <div>
+          <span>Posts this month</span>
+          <b>{monthlyPostCount}<em>/ {batchPostCount}</em></b>
+          <small>{batchPostCount} on your {planLabelText} plan</small>
         </div>
-        <div className="card kw-stat">
-          <div className="kw-stat__h">Needs attention <TriangleAlert aria-hidden /></div>
-          <b className={attention.length ? 'text-(--danger)!' : undefined}>{attention.length}</b>
-          <small className="truncate">{attentionReason}</small>
+        <div>
+          <span>Published</span>
+          <b>{publishedCount}</b>
+          <small>{publishedCount ? 'Confirmed by your pages' : noPages ? 'Needs a connected page' : 'Nothing published yet'}</small>
         </div>
-        <div className="card kw-stat">
-          <div className="kw-stat__h">Avg reach score <BarChart3 aria-hidden /></div>
+        <div>
+          <span>Average reach score</span>
           <b>{avgNow ?? '—'}</b>
           <small>
             {avgNow != null && avgPrev != null ? (
               <>
                 <span className={avgNow - avgPrev >= 0 ? 'kw-up' : 'kw-down'}>{avgNow - avgPrev >= 0 ? '+' : '−'}{Math.abs(avgNow - avgPrev)}</span> from {prevMonthName}
               </>
-            ) : avgNow != null ? 'From this month’s posts' : 'No scored posts yet'}
+            ) : avgNow != null ? 'AI estimate for this month' : 'No scored posts yet'}
           </small>
         </div>
       </div>
@@ -1266,91 +1361,77 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         </div>
       )}
 
-      {dataLoaded && <UpNext posts={posts} failedIds={failedIds} onOpen={openPost} onPlan={() => openPlannerFor(currentDate)} />}
+      {/* ── Needs your attention: only the statuses that have posts; each opens them in List view.
+             With nothing pending or failed it shrinks to one "all set" line. ── */}
+      {dataLoaded && monthPosts.length > 0 && (draftsToApprove.length === 0 && attention.length === 0 ? (
+        <div className="kw-allset" role="status" data-tour="up-next">
+          <CircleCheck className="h-4 w-4 shrink-0 text-(--success)" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">
+            <b>All set.</b>{' '}
+            {upcoming.length
+              ? `${upcoming.length} scheduled, next on ${shortDay(upcoming[0].date)}${postChannels[upcoming[0].id]?.at ? ` at ${clockTime(postChannels[upcoming[0].id]?.at)}` : ''}.`
+              : publishedCount === monthPosts.length ? 'Every post this month is published.' : 'Nothing needs your approval.'}
+          </span>
+          {upcoming.length > 0 && (
+            <button type="button" aria-pressed={statusFilter === 'scheduled'} onClick={() => setStatusFilter((f) => (f === 'scheduled' ? null : 'scheduled'))}>
+              View schedule ›
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="kw-attn" role="group" aria-label="Needs your attention" data-tour="up-next">
+          <div className="kw-attn__h">Needs your attention</div>
+          {([
+            ['pending', 'is-amber', draftsToApprove.length, 'Pending approval', draftsToApprove[0] ? `Next due ${shortDay(draftsToApprove[0].date)}` : '', 'Review posts'],
+            ['failed', 'is-red', attention.length, 'Failed', attentionReason, 'View issues'],
+            ['scheduled', 'is-brand', upcoming.length, 'Upcoming', upcoming[0] ? `Next ${shortDay(upcoming[0].date)}${postChannels[upcoming[0].id]?.at ? `, ${clockTime(postChannels[upcoming[0].id]?.at)}` : ''}` : '', 'View schedule'],
+          ] as const).filter(([, , n]) => n > 0).map(([key, tone, n, label, detail, go]) => (
+            <button
+              key={key}
+              type="button"
+              className={`kw-attn__item ${tone}`}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter((f) => (f === key ? null : key))}
+            >
+              <span className="kw-attn__n">{n}</span>
+              <span className="kw-attn__tx"><b>{label}</b><small>{detail}</small></span>
+              <span className="kw-attn__go">{go} ›</span>
+            </button>
+          ))}
+        </div>
+      ))}
 
-      <div className={sideDetail ? 'kw-work' : undefined}>
+      <div>
       {/* ─────────────  Channel timeline (primary)  ───────────── */}
       <section className="card w-full min-w-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-(--border) px-3 py-3 sm:px-3.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="relative mr-1 grid overflow-hidden text-base font-semibold tracking-tight text-(--fg) sm:text-lg">
-              <AnimatePresence mode="popLayout" initial={false} custom={slide}>
-                <m.span
-                  key={monthLabel}
-                  custom={slide}
-                  variants={{
-                    enter: (d: number) => ({ y: d >= 0 ? 18 : -18, opacity: 0 }),
-                    center: { y: 0, opacity: 1 },
-                    exit: (d: number) => ({ y: d >= 0 ? -18 : 18, opacity: 0 }),
-                  }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-                  className="col-start-1 row-start-1 whitespace-nowrap"
-                >
-                  {monthLabel}
-                </m.span>
-              </AnimatePresence>
-            </h1>
-            <div className="flex items-center gap-1.5" data-tour="month-nav">
-              <button
-                type="button"
-                aria-label="Previous month"
-                className="btn btn-outline btn-sm w-8 px-0!"
-                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {/* Jumps back to the current month: quiet when you're already there, highlighted when you've moved away. */}
-              <button
-                type="button"
-                disabled={onCurrentMonth}
-                title={onCurrentMonth ? 'You’re on this month' : `Back to ${new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })}`}
-                className={`btn btn-outline btn-sm ${onCurrentMonth ? 'cursor-default! text-(--fg-muted)' : ''}`}
-                onClick={() => setCurrentDate(new Date())}
-              >
-                {onCurrentMonth ? 'Today' : 'Back to today'}
-              </button>
-              <button
-                type="button"
-                aria-label="Next month"
-                className="btn btn-outline btn-sm w-8 px-0!"
-                onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="relative group hidden sm:block">
-              <input
-                type="text"
-                value={dateInputValue}
-                onChange={(e) => setDateInputValue(e.target.value)}
-                onBlur={handleDateInputBlur}
-                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                placeholder="Jump to…"
-                aria-label="Jump to date"
-                className="h-8 w-28 rounded-lg border border-(--border) bg-(--card) px-2.5 text-ui text-(--fg) shadow-xs outline-hidden placeholder:text-(--fg-muted)"
-              />
-              <div className="absolute opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 bg-(--fg) text-(--bg) text-xs px-2 py-1 rounded-md -bottom-9 left-0 whitespace-nowrap pointer-events-none z-50 shadow-lg">
-                Try &quot;Jan 2026&quot;, &quot;12/25/25&quot;, or &quot;2026&quot;
-              </div>
-            </div>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="kw-usage w-full sm:w-auto lg:hidden">
+            <span className={`kw-usage w-full sm:w-auto lg:hidden${monthlyPostCount >= batchPostCount ? ' is-full' : ''}`}>
               <span className="kw-usage__bar" aria-hidden>
                 <b style={{ width: `${Math.min(100, (monthlyPostCount / Math.max(batchPostCount, 1)) * 100)}%` }} />
               </span>
               {monthlyPostCount} of {batchPostCount} posts used
               {subscription === 'FREE' && (
-                <button type="button" onClick={onOpenBilling}>· Pro gives 16</button>
+                <button type="button" className="inline-flex min-h-6 items-center" onClick={onOpenBilling}>· Pro gives 16</button>
               )}
             </span>
             {viewMode === 'month' && (socialAccounts?.length ?? 0) > 0 && (
-              <Segmented id="channel" label="Show posts for" value={channelFilter} onChange={(v) => setChannelFilter(v as typeof channelFilter)} options={[[null, 'All'], ['facebook', 'Facebook'], ['instagram', 'Instagram']] as const} />
+              <KwSelect
+                aria-label="Show posts for"
+                size="sm"
+                className="w-auto! min-w-32"
+                value={channelFilter ?? 'all'}
+                onValueChange={(v) => setChannelFilter(v === 'all' ? null : (v as 'facebook' | 'instagram'))}
+                options={[{ value: 'all', label: 'All pages' }, { value: 'facebook', label: 'Facebook' }, { value: 'instagram', label: 'Instagram' }]}
+              />
             )}
-            <span data-tour="calendar-views" className="inline-flex"><Segmented id="view" label="Calendar view" value={viewMode} onChange={setViewMode} options={[['month', 'Month'], ['timeline', 'Timeline'], ['list', 'List']] as const} /></span>
+            <span data-tour="calendar-views" className="inline-flex"><Segmented id="view" label="Calendar view" value={statusFilter ? 'list' : viewMode} onChange={(v) => { setStatusFilter(null); setViewMode(v); }} options={[['month', 'Month'], ['timeline', 'Timeline'], ['list', 'List']] as const} /></span>
+            {statusFilter && (
+              <span className="kw-filterchip">
+                Showing: {STATUS_FILTER_LABEL[statusFilter]}
+                <button type="button" aria-label="Show all posts" onClick={() => setStatusFilter(null)}><X className="h-3.5 w-3.5" aria-hidden /></button>
+              </span>
+            )}
             <button
               type="button"
               data-tour="plan-month"
@@ -1372,7 +1453,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         <div data-tour="calendar-grid" className="relative overflow-hidden">
           <AnimatePresence mode="wait" initial={false} custom={slide}>
           <m.div
-            key={`${viewMode}:${monthKey}`}
+            key={`${statusFilter ? `list-${statusFilter}` : viewMode}:${monthKey}`}
             custom={slide}
             variants={{
               enter: (d: number) => ({ opacity: 0, x: d * 36, y: d ? 0 : 8 }),
@@ -1384,7 +1465,15 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
             exit="exit"
             transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
           >
-          {viewMode === 'month' && dataLoaded ? (
+          {statusFilter ? (
+            <PostTable
+              month={currentDate}
+              items={filteredItems}
+              selectedPostId={sheetPostId}
+              onOpenPost={(item) => item.post && setSheetPostId(item.post.id)}
+              onOpenIdea={(item) => handleDayClick(item.day)}
+            />
+          ) : viewMode === 'month' && dataLoaded ? (
             <MonthGrid
               currentDate={currentDate}
               byDay={monthData.byDay}
@@ -1449,33 +1538,6 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         </div>
       </section>
 
-      {sideDetail && sheetPost && (
-        <PostDetailSheet
-          inline
-          post={sheetPost}
-          heldPlatforms={heldPlatforms(sheetPost, postChannels, socialAccounts || [])}
-          regenerating={regeneratingId === sheetPost.id}
-          onApprove={approvePost}
-          onRegenerate={regeneratePost}
-          onReconnect={reconnectPlatform}
-          onDuplicate={duplicatePost}
-          onUnschedule={unschedulePost}
-          onOpenInsights={onOpenInsights}
-          profile={profile}
-          platforms={platformsFor(sheetPost, postChannels, socialAccounts || [])}
-          scheduledAt={postChannels[sheetPost.id]?.at}
-          queuedAt={postChannels[sheetPost.id]?.queuedAt}
-          failed={sheetPost.status === 'Draft' && failedIds.includes(sheetPost.id)}
-          publishing={publishing}
-          onClose={() => setSheetPostId(null)}
-          onEdit={editPost}
-          onRetry={retryPost}
-          onMove={(post, date) => {
-            setSheetPostId(null);
-            movePost(post, date);
-          }}
-        />
-      )}
       </div>
 
       </>)}
@@ -1548,11 +1610,8 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
           <div className="kw-page-h">
             <div>
               <h1>Post studio</h1>
-              <p>Pick a draft to finish and approve, or start a new post.</p>
+              <p>Pick a draft to finish and approve. New posts start from Create post at the top.</p>
             </div>
-            <button type="button" className="btn btn-primary" onClick={composeNext}>
-              <Plus className="h-4 w-4" aria-hidden /> New post
-            </button>
           </div>
           {studioGroups.map((g) => (
             <section key={g.title} className="card overflow-hidden" aria-label={g.title}>
@@ -1657,7 +1716,10 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
 
       {/* ── Post details (from a timeline card, search or a notification) ── */}
       <PostDetailSheet
-        post={wideScreen ? null : sheetPost}
+        post={sheetPost}
+        onPrev={sheetIndex > 0 ? () => goToPost(sheetIndex - 1) : undefined}
+        onNext={sheetIndex >= 0 && sheetIndex < postOrder.length - 1 ? () => goToPost(sheetIndex + 1) : undefined}
+        position={sheetIndex >= 0 ? { index: sheetIndex + 1, total: postOrder.length } : undefined}
         heldPlatforms={sheetPost ? heldPlatforms(sheetPost, postChannels, socialAccounts || []) : []}
         regenerating={!!sheetPost && regeneratingId === sheetPost.id}
         onApprove={approvePost}
@@ -1675,11 +1737,7 @@ const ContentCalendar: React.FC<Props> = ({ profile, userId, onOpenSocial, onOpe
         onClose={() => setSheetPostId(null)}
         onEdit={editPost}
         onRetry={retryPost}
-        onMove={(post, date) => {
-          // Close the sheet so the confirm dialog isn't stuck behind it.
-          setSheetPostId(null);
-          movePost(post, date);
-        }}
+        onMove={(post, date) => { movePost(post, date); }}
       />
     </div>
     </LazyMotion>

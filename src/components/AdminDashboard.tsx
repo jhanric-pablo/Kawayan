@@ -2,13 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from 'recharts';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { Switch } from './ui/switch';
 import {
-  Users, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Edit, Save, X, Search, Shield, Settings,
-  Download, Filter, Lock, CreditCard, Moon, Sun, XCircle, Wallet, ChevronDown, ChevronRight, RefreshCw, UserPlus,
-  LogIn, Upload, Send, CalendarClock, AlertTriangle, TrendingUp, PhilippinePeso, Store, ArrowUpDown, Check,
-  Server, Sparkles, Link2,
+  Users, Activity, MessageSquare, CheckSquare, Clock, CheckCircle, Trash2, Save, X, Search, Shield, Settings, Download, Filter, Lock, CreditCard, Moon, Sun, XCircle, Wallet, ChevronDown, ChevronRight, RefreshCw, UserPlus, LogIn, Upload, Send, CalendarClock, AlertTriangle, TrendingUp, PhilippinePeso, Store, ArrowUpDown, Check, Server, Link2, Cpu,
 } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { supportService } from '../services/supportService';
@@ -25,7 +22,8 @@ import { Sidebar, SidebarProvider, useSidebar } from './ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SideTip, SideToggle, SidebarBridge, useSideOpen } from './layout/shellSidebar';
 import KwSelect from './ui/kw-select';
-import PageSkeleton from './PageSkeleton';
+import AppHydrationLoader from './AppHydrationLoader';
+import AdminNotifications, { AdminNote } from './admin/AdminNotifications';
 import { ListSkeleton } from './ui/skeletons';
 
 interface Props {
@@ -33,7 +31,6 @@ interface Props {
   toggleTheme: () => void;
   user: User;
   onSignOut: () => void;
-  onSwitchAccount?: () => void;
 }
 
 type Tab = 'overview' | 'users' | 'verification' | 'billing' | 'helpdesk' | 'logs' | 'settings';
@@ -121,12 +118,12 @@ const FieldLabel: React.FC<{ htmlFor?: string; children: React.ReactNode }> = ({
 );
 
 const RoleBadge: React.FC<{ role: string }> = ({ role }) => (
-  <span className={cx('badge', role === 'admin' ? 'badge-green' : role === 'support' ? 'badge-blue' : 'badge-sage')}>{role}</span>
+  <span className={cx('badge', role === 'admin' ? 'badge-green' : role === 'support' ? 'badge-blue' : 'badge-sage')}>{role === 'admin' ? 'Admin' : role === 'support' ? 'Support' : 'Owner'}</span>
 );
 
 const PlanBadge: React.FC<{ plan?: string }> = ({ plan = 'FREE' }) =>
   plan === 'FREE' ? (
-    <span className="inline-flex rounded-full border border-(--border-strong) px-2.5 text-xs font-semibold leading-5 text-(--fg-muted)">Free</span>
+    <span className="badge badge-sage">Free</span>
   ) : (
     <span className="badge badge-green">{plan === 'PRO' ? 'Pro' : 'Enterprise'}</span>
   );
@@ -152,6 +149,9 @@ const ACTION_META: Record<string, { label: string; icon: React.ElementType; bg: 
   approve_verification: { label: 'Verification approved', icon: CheckCircle, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
   reject_verification: { label: 'Verification rejected', icon: XCircle, bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', fg: 'text-(--danger)', dot: 'bg-(--danger)' },
   delete_user: { label: 'Account deleted', icon: Trash2, bg: 'bg-rose-600/10', fg: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-600' },
+  update_user: { label: 'Account changed by admin', icon: Users, bg: 'bg-(--bg-alt)', fg: 'text-(--fg-muted)', dot: 'bg-(--fg-subtle)' },
+  adjust_balance: { label: 'Wallet adjusted by admin', icon: Wallet, bg: 'bg-(--amber)/10', fg: 'text-(--amber)', dot: 'bg-(--amber)' },
+  change_plan: { label: 'Plan changed by admin', icon: CreditCard, bg: 'bg-(--bg-alt)', fg: 'text-(--fg-muted)', dot: 'bg-(--fg-subtle)' },
   upgrade_plan: { label: 'Plan upgraded', icon: TrendingUp, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
   wallet_topup: { label: 'Wallet topped up', icon: Wallet, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
   publish_post: { label: 'Post published', icon: Send, bg: 'bg-(--green)/10', fg: 'text-(--green-ink)', dot: 'bg-(--green)' },
@@ -281,7 +281,7 @@ const SettingSwitch: React.FC<{ label: string; desc: string; checked: boolean; o
   </label>
 );
 
-const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOut, onSwitchAccount }) => {
+const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOut }) => {
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
@@ -307,12 +307,13 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const [loading, setLoading] = useState(true);
 
   // User management
-  const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [managingUser, setManagingUser] = useState<any | null>(null);
+  // The user open in the detail drawer (all account controls live there, not in the list).
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
-  const [manageAction, setManageAction] = useState<'balance' | 'subscription'>('balance');
+  // Newest accounts first.
+  const [sortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
   const [balanceForm, setBalanceForm] = useState({ amount: 0, reason: '' });
   const [subForm, setSubForm] = useState({ plan: 'FREE', expiresAt: '' });
 
@@ -363,6 +364,35 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   };
 
   const refreshAll = () => Promise.all([loadStats(), loadData()]);
+
+  // Keep the bell and the permit alert current: re-check the queues every 30s while the tab is visible.
+  useEffect(() => {
+    const id = setInterval(() => { if (document.visibilityState === 'visible') loadData(); }, 30_000);
+    return () => clearInterval(id);
+  }, [dbService]);
+
+  // A permit that arrives while the console is open gets a toast (not the ones already waiting at load).
+  const seenPermits = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const pending = verifications.filter((v) => v.status === 'pending');
+    if (loading) return;
+    if (seenPermits.current) {
+      const fresh = pending.filter((v) => !seenPermits.current!.has(v.id));
+      if (fresh.length === 1) toast.info(`${fresh[0].businessName || fresh[0].email} sent a business permit to review.`);
+      else if (fresh.length > 1) toast.info(`${fresh.length} new business permits to review.`);
+    }
+    seenPermits.current = new Set(pending.map((v) => v.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifications, loading]);
+
+  // The permit alert bar hides until a newer permit comes in.
+  const [dismissedPermit, setDismissedPermit] = useState<string | null>(() => {
+    try { return sessionStorage.getItem('kawayan_admin_permit_alert'); } catch { return null; }
+  });
+  const dismissPermitAlert = (id: string) => {
+    setDismissedPermit(id);
+    try { sessionStorage.setItem('kawayan_admin_permit_alert', id); } catch { /* private mode */ }
+  };
 
   useEffect(() => { loadData(); }, [dbService]);
   useEffect(() => { loadStats(); }, [dbService, dateRange]);
@@ -499,10 +529,6 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   };
 
   // --- Sorting & filtering ---
-  const handleSort = (key: string) => {
-    setSortConfig((current) => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' }));
-  };
-
   const getFilteredAndSortedUsers = () => {
     const q = searchTerm.toLowerCase();
     const filtered = users.filter((u) =>
@@ -557,11 +583,20 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
     URL.revokeObjectURL(url);
   };
 
-  // --- Actions ---
+  // --- Actions (all from the user drawer, which stays open and shows the fresh values) ---
+  const drawerUser = users.find((u) => u.id === drawerUserId) ?? null;
+  const openUser = (u: any) => {
+    setDrawerUserId(u.id);
+    setEditForm({});
+    setBalanceForm({ amount: 0, reason: '' });
+    setSubForm({ plan: u.subscription || 'FREE', expiresAt: '' });
+    setConfirmDelete(false);
+  };
+
   const handleUserUpdate = async (userId: string) => {
     try {
       await dbService.updateUser(userId, editForm);
-      setEditingUser(null);
+      toast.success('Changes saved');
       setEditForm({});
       loadData();
     } catch (error) {
@@ -569,11 +604,12 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
     }
   };
 
+  // Confirmed inside the drawer (a second "Delete permanently" step), since a dialog would open behind it.
   const handleDeleteUser = async (userId: string) => {
-    const confirmed = await dialog.confirm('Are you sure? This will delete ALL user data permanently.');
-    if (!confirmed) return;
     try {
       await dbService.deleteUser(userId);
+      toast.success('Account deleted');
+      setDrawerUserId(null);
       refreshAll();
     } catch (error) {
       toast.error('Could not delete the user.');
@@ -581,11 +617,11 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   };
 
   const handleAdjustBalance = async () => {
-    if (!managingUser) return;
+    if (!drawerUser || !balanceForm.amount) return;
     try {
-      await dbService.adminAdjustBalance(managingUser.id, balanceForm.amount, balanceForm.reason);
+      await dbService.adminAdjustBalance(drawerUser.id, balanceForm.amount, balanceForm.reason);
       toast.success('Balance adjusted');
-      setManagingUser(null);
+      setBalanceForm({ amount: 0, reason: '' });
       loadData();
     } catch (error) {
       toast.error('Could not adjust the balance.');
@@ -593,14 +629,14 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   };
 
   const handleUpdateSubscription = async () => {
-    if (!managingUser) return;
+    if (!drawerUser) return;
     try {
-      await dbService.adminUpdateSubscription(managingUser.id, subForm.plan, subForm.expiresAt);
-      toast.success('Subscription updated');
-      setManagingUser(null);
+      // The plan has no expiry date in the database yet, so none is sent.
+      await dbService.adminUpdateSubscription(drawerUser.id, subForm.plan, '');
+      toast.success('Plan updated');
       loadData();
     } catch (error) {
-      toast.error('Could not update the subscription.');
+      toast.error('Could not update the plan.');
     }
   };
 
@@ -689,7 +725,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
   if (loading) {
     return (
-      <PageSkeleton variant="console" />
+      <AppHydrationLoader sub="Opening the console" />
     );
   }
 
@@ -718,6 +754,44 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
     d.setDate(d.getDate() - (13 - i));
     return d;
   });
+  const pendingPermits = verifications
+    .filter((v) => v.status === 'pending')
+    .sort((a, b) => (b.createdAt ? parseUtc(b.createdAt).getTime() : 0) - (a.createdAt ? parseUtc(a.createdAt).getTime() : 0));
+  const newestPermit = pendingPermits[0];
+  const showPermitAlert = !!newestPermit && activeTab !== 'verification' && dismissedPermit !== newestPermit.id;
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const adminNotes: AdminNote[] = [
+    ...pendingPermits.map((v): AdminNote => ({
+      key: `permit-${v.id}`, Icon: Shield, tone: 'amber',
+      title: `${v.businessName || 'A business'} needs permit review`,
+      body: `${v.email || 'New account'} uploaded a business permit.`,
+      at: v.createdAt, actionLabel: 'Review permit', onAction: () => reviewVerification(v.id),
+    })),
+    ...pendingTxns.map((t): AdminNote => ({
+      key: `pay-${t.id}`, Icon: Wallet, tone: 'amber',
+      title: `Payment to verify · ${peso(t.amount)}`,
+      body: `${t.userEmail || t.userId} · ${t.description || 'Wallet top-up'}`,
+      at: t.date, actionLabel: 'Open billing', onAction: () => setActiveTab('billing'),
+    })),
+    ...tickets.filter((t) => t.status === 'Open').map((t): AdminNote => ({
+      key: `ticket-${t.id}`, Icon: MessageSquare, tone: t.priority === 'Critical' || t.priority === 'High' ? 'red' : 'muted',
+      title: `Ticket #${t.ticketNum} · ${t.priority}`,
+      body: `${t.subject} · ${t.userEmail}`,
+      at: t.createdAt, actionLabel: 'Open help desk', onAction: () => setActiveTab('helpdesk'),
+    })),
+  ];
+  const needsAction = adminNotes.length;
+  // New sign-ups are news, not to-dos: listed, but not in the red count.
+  owners
+    .filter((u) => u.createdAt && parseUtc(u.createdAt).getTime() >= weekAgo && !pendingPermits.some((v) => v.userId === u.id))
+    .sort((a, b) => parseUtc(b.createdAt).getTime() - parseUtc(a.createdAt).getTime())
+    .slice(0, 5)
+    .forEach((u) => adminNotes.push({
+      key: `signup-${u.id}`, Icon: UserPlus, tone: 'green',
+      title: `New sign-up: ${u.businessName || u.email}`,
+      body: verifications.some((v) => v.userId === u.id) ? u.email : `${u.email} · No permit uploaded yet`,
+      at: u.createdAt, actionLabel: 'View account', onAction: () => { setActiveTab('users'); setSearchTerm(u.email); },
+    }));
   const signupBars = signupDays.map((d) => {
     const next = d.getTime() + 86_400_000;
     return { d, n: users.filter((u) => u.createdAt && parseUtc(u.createdAt).getTime() >= d.getTime() && parseUtc(u.createdAt).getTime() < next).length };
@@ -729,7 +803,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
   const sysRows: SysRow[] = [
     { icon: Activity, label: 'API', state: health.status === 'checking' ? 'checking' : health.status === 'api-down' ? 'down' : 'up', note: health.latencyMs != null && health.status !== 'api-down' ? `${health.latencyMs}ms` : undefined },
     { icon: Server, label: 'Database', state: sys ? (sys.database.ok ? 'up' : 'down') : health.status === 'checking' ? 'checking' : health.status === 'ok' ? 'up' : 'down' },
-    { icon: Sparkles, label: 'AI generation', state: !sys ? 'checking' : sys.ai.configured ? 'up' : 'off' },
+    { icon: Cpu, label: 'AI generation', state: !sys ? 'checking' : sys.ai.configured ? 'up' : 'off' },
     { icon: Link2, label: 'Zernio publishing', state: !sys ? 'checking' : sys.zernio.configured ? 'up' : 'off' },
     { icon: CreditCard, label: 'PayMongo', state: !sys ? 'checking' : !sys.paymongo.configured ? 'off' : sys.paymongo.testMode ? 'test' : 'up' },
   ];
@@ -795,7 +869,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
           {health.latencyMs != null && <p className="text-(--fg-muted)">API and database · <span className="mono">{health.latencyMs} ms</span></p>}
         </div>
         <div className="kw-side__me">
-          <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} placement="sidebar" />
+          <AccountMenu user={user} onSignOut={onSignOut} placement="sidebar" />
         </div>
       </div>
       </Sidebar>
@@ -813,13 +887,14 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
           <div className="flex min-w-0 flex-1 justify-end">
             <AdminSearch hitsFor={searchHits} onPick={pickSearchHit} />
           </div>
+          <AdminNotifications notes={adminNotes} needsAction={needsAction} />
           {toggleTheme && (
             <button type="button" className="kw-icon-btn" onClick={toggleTheme} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
               {darkMode ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
             </button>
           )}
           <span className="md:hidden">
-            <AccountMenu user={user} onSignOut={onSignOut} onSwitchAccount={onSwitchAccount} onSettings={() => setActiveTab('settings')} />
+            <AccountMenu user={user} onSignOut={onSignOut} />
           </span>
         </header>
 
@@ -840,6 +915,17 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
 
         {/* App's <main> already wraps the console, so this is a plain region. */}
         <div className="mx-auto w-full max-w-[1440px] min-w-0 flex-1 p-4 md:p-6">
+          {showPermitAlert && (
+            <div className="kw-alert kw-alert--warn mb-4 items-center" role="status">
+              <Shield className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1 text-(--fg)">
+                New registration: <b>{newestPermit.businessName || newestPermit.email}</b> sent a business permit{newestPermit.createdAt ? ` ${timeAgo(newestPermit.createdAt)}` : ''} and is waiting for review.
+                {pendingPermits.length > 1 && <span className="text-(--fg-muted)"> {pendingPermits.length - 1} more waiting.</span>}
+              </span>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => reviewVerification(newestPermit.id)}>Review now</button>
+              <button type="button" className="kw-icon-btn h-8 w-8" aria-label="Dismiss" onClick={() => dismissPermitAlert(newestPermit.id)}><X className="h-4 w-4" aria-hidden /></button>
+            </div>
+          )}
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{head.title}</h1>
@@ -1037,7 +1123,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                   className="lg:col-span-2"
                   title="Latest activity"
                   actions={
-                    <button type="button" onClick={() => setActiveTab('logs')} className="flex items-center gap-1 text-xs font-semibold text-(--primary) hover:underline">
+                    <button type="button" onClick={() => setActiveTab('logs')} className="flex min-h-6 items-center gap-1 text-xs font-semibold text-(--primary) hover:underline">
                       View all <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                   }
@@ -1106,108 +1192,33 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                 </label>
                 <span className="ml-auto text-xs text-(--fg-muted)">{getFilteredAndSortedUsers().length} of {users.length} accounts</span>
               </div>
-              <div className="adm-table-wrap">
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      {[
-                        { key: 'email', label: 'User' },
-                        { key: 'role', label: 'Role' },
-                        { key: 'businessName', label: 'Business' },
-                        { key: 'subscription', label: 'Plan' },
-                        { key: 'balance', label: 'Wallet' },
-                        { key: 'createdAt', label: 'Joined' },
-                      ].map((h) => (
-                        <th key={h.key} aria-sort={sortConfig.key === h.key ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}>
-                          <button type="button" onClick={() => handleSort(h.key)} className="inline-flex items-center gap-1 hover:text-(--fg)">
-                            {h.label}
-                            <ArrowUpDown className={cx('h-3 w-3', sortConfig.key === h.key ? 'text-(--primary)' : 'opacity-30')} aria-hidden />
-                          </button>
-                        </th>
-                      ))}
-                      <th className="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getFilteredAndSortedUsers().map((u) => (
-                      <tr key={u.id}>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-(--green-soft) text-xs font-semibold uppercase text-(--primary)">
-                              {(u.businessName || u.email || '?').charAt(0)}
-                            </span>
-                            <span className="min-w-0">
-                              <span className="adm-table__primary block truncate">{u.email}</span>
-                              <span className="adm-table__mono block truncate">{u.id}</span>
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          {editingUser === u.id ? (
-                            <KwSelect
-                              aria-label="Role"
-                              size="sm"
-                              className="w-auto! min-w-28"
-                              value={editForm.role || u.role}
-                              onValueChange={(v) => setEditForm({ ...editForm, role: v as any })}
-                              options={[{ value: 'user', label: 'User' }, { value: 'admin', label: 'Admin' }, { value: 'support', label: 'Support' }]}
-                            />
-                          ) : (
-                            <RoleBadge role={u.role} />
-                          )}
-                        </td>
-                        <td className="text-(--fg-muted)">
-                          {editingUser === u.id ? (
-                            <input
-                              type="text"
-                              aria-label="Business name"
-                              value={editForm.businessName ?? u.businessName ?? ''}
-                              onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })}
-                              className="input py-1! text-xs!"
-                            />
-                          ) : (
-                            u.businessName || '—'
-                          )}
-                        </td>
-                        <td>{u.role === 'user' ? <PlanBadge plan={u.subscription} /> : <span className="text-(--fg-subtle)">—</span>}</td>
-                        <td className="adm-table__money">{peso(u.balance)}</td>
-                        <td className="whitespace-nowrap text-xs text-(--fg-subtle)">{u.createdAt ? parseUtc(u.createdAt).toLocaleDateString() : '—'}</td>
-                        <td>
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              className="adm-icon-btn adm-icon-btn--primary"
-                              aria-label={`Wallet and plan for ${u.email}`}
-                              title="Wallet and plan"
-                              onClick={() => {
-                                setManagingUser(u);
-                                setManageAction('balance');
-                                setBalanceForm({ amount: 0, reason: '' });
-                                setSubForm({ plan: u.subscription || 'FREE', expiresAt: '' });
-                              }}
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </button>
-                            {editingUser === u.id ? (
-                              <>
-                                <button type="button" aria-label="Save" title="Save" className="adm-icon-btn adm-icon-btn--primary" onClick={() => handleUserUpdate(u.id)}><Save className="h-4 w-4" /></button>
-                                <button type="button" aria-label="Cancel" title="Cancel" className="adm-icon-btn" onClick={() => { setEditingUser(null); setEditForm({}); }}><X className="h-4 w-4" /></button>
-                              </>
-                            ) : (
-                              <>
-                                <button type="button" aria-label={`Edit ${u.email}`} title="Edit role and business" className="adm-icon-btn" onClick={() => { setEditingUser(u.id); setEditForm({}); }}><Edit className="h-4 w-4" /></button>
-                                <button type="button" aria-label={`Delete ${u.email}`} title="Delete account" className="adm-icon-btn adm-icon-btn--danger" onClick={() => handleDeleteUser(u.id)}><Trash2 className="h-4 w-4" /></button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {getFilteredAndSortedUsers().length === 0 && (
-                      <tr><td colSpan={7}><Empty>No users match your search.</Empty></td></tr>
-                    )}
-                  </tbody>
-                </table>
+              {/* Master list: who, their business and plan, and a chevron. Everything else is in the drawer. */}
+              <div className="adm-ulist" role="list" aria-label="Accounts">
+                <div className="adm-ulist__head" aria-hidden>
+                  <span>User</span>
+                  <span>Business</span>
+                  <span>Plan</span>
+                  <span />
+                </div>
+                {getFilteredAndSortedUsers().map((u) => (
+                  <div key={u.id} role="listitem">
+                    <button type="button" className="adm-urow" aria-current={drawerUserId === u.id ? 'true' : undefined} onClick={() => openUser(u)}>
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-(--muted) text-xs font-semibold uppercase text-(--fg)">
+                          {(u.businessName || u.email || '?').charAt(0)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-(--fg)">{u.email}</span>
+                          <span className="mono block truncate text-xs text-(--fg-subtle)">{u.id}</span>
+                        </span>
+                      </span>
+                      <span className="adm-urow__biz">{u.businessName || '—'}</span>
+                      <span className="adm-urow__plan">{u.role === 'user' ? <PlanBadge plan={u.subscription} /> : <RoleBadge role={u.role} />}</span>
+                      <ChevronRight className="h-4 w-4 text-(--fg-subtle)" aria-hidden />
+                    </button>
+                  </div>
+                ))}
+                {getFilteredAndSortedUsers().length === 0 && <Empty>No users match your search.</Empty>}
               </div>
             </Panel>
           )}
@@ -1273,7 +1284,7 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
                 )}
                 <div className="border-t border-(--border) px-5 py-3 text-xs text-(--fg-muted)">
                   Manage each user's plan and billing cycle from the{' '}
-                  <button type="button" onClick={() => setActiveTab('users')} className="font-semibold text-(--primary) hover:underline">Users</button> tab.
+                  <button type="button" onClick={() => setActiveTab('users')} className="inline-flex min-h-6 items-center font-semibold text-(--primary) hover:underline">Users</button> tab.
                 </div>
               </Panel>
             </div>
@@ -1479,43 +1490,113 @@ const AdminDashboard: React.FC<Props> = ({ darkMode, toggleTheme, user, onSignOu
         </div>
       </div>
 
-      {/* ── Manage-user dialog ── */}
-      {managingUser && (
-        <AdminModal title="Manage user" sub={managingUser.email} onClose={() => setManagingUser(null)}>
-          <Tabs value={manageAction} onValueChange={(v) => setManageAction(v as 'balance' | 'subscription')}>
-            <TabsList className="mb-4 w-full">
-              <TabsTrigger value="balance">Wallet balance</TabsTrigger>
-              <TabsTrigger value="subscription">Subscription</TabsTrigger>
-            </TabsList>
-            <TabsContent value="balance" className="space-y-3">
-              <div className="rounded-xl border border-(--border) bg-(--bg-alt) p-4 text-center">
-                <span className="eyebrow text-(--fg-subtle)">Current balance</span>
-                <p className="mt-1 font-display text-2xl font-semibold">{peso(managingUser.balance)}</p>
-              </div>
-              <div>
-                <FieldLabel htmlFor="adj-amount">Amount to add (negative to subtract)</FieldLabel>
-                <input id="adj-amount" type="number" value={balanceForm.amount} onChange={(e) => setBalanceForm({ ...balanceForm, amount: Number(e.target.value) })} className="input" />
-              </div>
-              <div>
-                <FieldLabel htmlFor="adj-reason">Reason / reference</FieldLabel>
-                <input id="adj-reason" type="text" value={balanceForm.reason} onChange={(e) => setBalanceForm({ ...balanceForm, reason: e.target.value })} placeholder="e.g. Manual top-up" className="input" />
-              </div>
-              <button type="button" onClick={handleAdjustBalance} className="btn btn-primary w-full">Confirm adjustment</button>
-            </TabsContent>
-            <TabsContent value="subscription" className="space-y-4">
-              <div>
-                <FieldLabel htmlFor="sub-plan">Plan</FieldLabel>
-                <KwSelect id="sub-plan" value={subForm.plan} onValueChange={(v) => setSubForm({ ...subForm, plan: v })} options={[{ value: 'FREE', label: 'Free' }, { value: 'PRO', label: 'Pro' }, { value: 'ENTERPRISE', label: 'Enterprise' }]} />
-              </div>
-              <div>
-                <FieldLabel htmlFor="sub-expiry">Expiry date</FieldLabel>
-                <input id="sub-expiry" type="date" value={subForm.expiresAt} onChange={(e) => setSubForm({ ...subForm, expiresAt: e.target.value })} className="input" />
-              </div>
-              <button type="button" onClick={handleUpdateSubscription} className="btn btn-primary w-full">Update subscription</button>
-            </TabsContent>
-          </Tabs>
-        </AdminModal>
-      )}
+      {/* ── User drawer: account, wallet, plan and delete for the user picked in the list ── */}
+      <Sheet open={!!drawerUser} onOpenChange={(o) => { if (!o) setDrawerUserId(null); }}>
+        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+          {drawerUser && (() => {
+            const u = drawerUser;
+            const isSelf = u.id === user?.id;
+            const owner = (u.role ?? 'user') === 'user';
+            const dirty = (editForm.role != null && editForm.role !== u.role) || (editForm.businessName != null && editForm.businessName !== (u.businessName ?? ''));
+            return (
+              <>
+                <SheetHeader className="gap-3 border-b border-(--border) px-5 py-4 pr-12">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-(--muted) text-sm font-semibold uppercase">{(u.businessName || u.email || '?').charAt(0)}</span>
+                    <div className="min-w-0">
+                      <SheetTitle className="truncate text-base font-semibold">{u.businessName || u.email}</SheetTitle>
+                      <SheetDescription className="truncate text-xs">{u.email}</SheetDescription>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5"><RoleBadge role={u.role} />{owner && <PlanBadge plan={u.subscription} />}{isSelf && <span className="badge badge-sage">You</span>}</div>
+                </SheetHeader>
+
+                <div className="min-h-0 flex-1 divide-y divide-(--border) overflow-y-auto">
+                  <section className="grid gap-4 px-5 py-5" aria-label="Account">
+                    <h3 className="text-xs font-semibold tracking-wide text-(--fg-subtle)">ACCOUNT</h3>
+                    <div>
+                      <FieldLabel htmlFor="ud-role">Role</FieldLabel>
+                      <KwSelect
+                        id="ud-role"
+                        value={editForm.role || u.role}
+                        disabled={isSelf}
+                        onValueChange={(v) => setEditForm({ ...editForm, role: v as any })}
+                        options={[{ value: 'user', label: 'Business owner' }, { value: 'support', label: 'Support' }, { value: 'admin', label: 'Admin' }]}
+                      />
+                      {isSelf && <p className="mt-1.5 text-xs text-(--fg-subtle)">You can’t change your own role.</p>}
+                    </div>
+                    <div>
+                      <FieldLabel htmlFor="ud-biz">Business name</FieldLabel>
+                      <input id="ud-biz" className="input" value={editForm.businessName ?? u.businessName ?? ''} onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })} />
+                    </div>
+                    <dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5 text-sm">
+                      <dt className="text-(--fg-muted)">Joined</dt><dd>{u.createdAt ? parseUtc(u.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</dd>
+                      <dt className="text-(--fg-muted)">User ID</dt><dd className="mono truncate text-xs leading-5">{u.id}</dd>
+                    </dl>
+                    <button type="button" className="btn btn-primary justify-self-start" disabled={!dirty} onClick={() => handleUserUpdate(u.id)}>
+                      <Save className="h-4 w-4" aria-hidden /> Save changes
+                    </button>
+                  </section>
+
+                  {owner && (
+                    <section className="grid gap-4 px-5 py-5" aria-label="Wallet">
+                      <h3 className="text-xs font-semibold tracking-wide text-(--fg-subtle)">WALLET</h3>
+                      <p className="mono text-2xl font-semibold">{peso(u.balance)}</p>
+                      <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+                        <div>
+                          <FieldLabel htmlFor="ud-amt">Amount</FieldLabel>
+                          <input id="ud-amt" type="number" className="input" value={balanceForm.amount || ''} placeholder="e.g. 500 or -150" onChange={(e) => setBalanceForm({ ...balanceForm, amount: Number(e.target.value) })} />
+                        </div>
+                        <div>
+                          <FieldLabel htmlFor="ud-reason">Reason</FieldLabel>
+                          <input id="ud-reason" className="input" value={balanceForm.reason} placeholder="e.g. Manual top-up, GCash ref 1234" onChange={(e) => setBalanceForm({ ...balanceForm, reason: e.target.value })} />
+                        </div>
+                      </div>
+                      <button type="button" className="btn btn-outline justify-self-start" disabled={!balanceForm.amount || !balanceForm.reason.trim()} onClick={handleAdjustBalance}>
+                        <Wallet className="h-4 w-4" aria-hidden /> {balanceForm.amount < 0 ? `Remove ${peso(-balanceForm.amount)}` : balanceForm.amount > 0 ? `Add ${peso(balanceForm.amount)}` : 'Adjust balance'}
+                      </button>
+                    </section>
+                  )}
+
+                  {owner && (
+                    <section className="grid gap-4 px-5 py-5" aria-label="Plan">
+                      <h3 className="text-xs font-semibold tracking-wide text-(--fg-subtle)">PLAN</h3>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="min-w-44 flex-1">
+                          <FieldLabel htmlFor="ud-plan">Plan</FieldLabel>
+                          <KwSelect id="ud-plan" value={subForm.plan} onValueChange={(v) => setSubForm({ ...subForm, plan: v })} options={[{ value: 'FREE', label: 'Free' }, { value: 'PRO', label: 'Pro' }, { value: 'ENTERPRISE', label: 'Enterprise' }]} />
+                        </div>
+                        <button type="button" className="btn btn-outline" disabled={subForm.plan === (u.subscription || 'FREE')} onClick={handleUpdateSubscription}>Update plan</button>
+                      </div>
+                    </section>
+                  )}
+
+                  {!isSelf && (
+                    <section className="grid gap-3 px-5 py-5" aria-label="Delete account">
+                      <h3 className="text-xs font-semibold tracking-wide text-(--danger)">DELETE ACCOUNT</h3>
+                      {confirmDelete ? (
+                        <div className="grid gap-3 rounded-xl border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_6%,var(--card))] p-3.5">
+                          <p className="text-sm">This permanently deletes <b>{u.email}</b> and all their posts, wallet and history. It can’t be undone.</p>
+                          <div className="flex gap-2">
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                            <button type="button" className="btn btn-sm text-white" style={{ background: 'var(--danger)' }} onClick={() => handleDeleteUser(u.id)}>
+                              <Trash2 className="h-4 w-4" aria-hidden /> Delete permanently
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button type="button" className="btn btn-outline btn-sm justify-self-start text-(--danger)" onClick={() => setConfirmDelete(true)}>
+                          <Trash2 className="h-4 w-4" aria-hidden /> Delete account
+                        </button>
+                      )}
+                    </section>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
 
       {/* ── Reject-verification dialog ── */}
       {rejectModal && (

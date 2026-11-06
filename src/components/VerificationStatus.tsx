@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut,
-  Shield, ArrowRight, Check, Sparkles, Send, LifeBuoy, Lock,
+  Clock, CheckCircle, XCircle, Upload, FileText, X, RefreshCw, LogOut, Shield, ArrowRight, Check, Send, LifeBuoy, Lock, Store,
 } from 'lucide-react';
 import { VerificationStatus as VStatus } from '../types';
 import { getStoredToken, getStoredUserId, isAuthResponse } from '../utils/authSession';
@@ -250,19 +249,28 @@ const VerificationStatus: React.FC<Props> = ({
   const meta = META[(status as MetaKey)] ?? META.none;
   const showForm = (status === 'rejected' || status === 'none') && !resubmitted;
 
-  // review timeline states
-  const tl: { label: string; state: 'done' | 'current' | 'todo' | 'fail'; icon: React.ReactNode }[] =
+  // Live tracker: each stage with what happens and when (like tracking a delivery).
+  const submittedAt = onFile?.at ? new Date(onFile.at) : null;
+  const stamp = (d: Date) => `${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}`;
+  const tl: { label: string; detail: string; time?: string; state: 'done' | 'current' | 'todo' | 'fail'; icon: React.ReactNode }[] =
     status === 'rejected'
       ? [
-          { label: 'Submitted', state: 'done', icon: <Check /> },
-          { label: 'Reviewed', state: 'done', icon: <Check /> },
-          { label: 'Not approved', state: 'fail', icon: <X /> },
+          { label: 'Submitted', detail: 'We received your permit', time: submittedAt ? stamp(submittedAt) : undefined, state: 'done', icon: <Check /> },
+          { label: 'Reviewed', detail: 'Checked by a person on our team', state: 'done', icon: <Check /> },
+          { label: 'Needs a new file', detail: 'Upload a clearer copy below and we’ll check it again', state: 'fail', icon: <X /> },
         ]
       : [
-          { label: 'Submitted', state: 'done', icon: <Check /> },
-          { label: 'Under review', state: 'current', icon: <Clock /> },
-          { label: 'Approved', state: 'todo', icon: <Sparkles /> },
+          { label: 'Submitted', detail: 'We received your permit', time: submittedAt ? stamp(submittedAt) : undefined, state: 'done', icon: <Check /> },
+          { label: 'Under review', detail: 'A person on our team is checking it. Usually 1–2 business days', time: 'now', state: 'current', icon: <Clock /> },
+          { label: 'Approved', detail: 'Your workspace opens and we email you', state: 'todo', icon: <Check /> },
         ];
+  // Expected by: two business days after it was sent.
+  const expected = (() => {
+    if (!submittedAt) return null;
+    const d = new Date(submittedAt);
+    for (let left = 2; left > 0;) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) left--; }
+    return d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+  })();
 
   const replacing = status === 'pending' && !!document; // a new file picked to replace the one under review
   const TITLE: Record<MetaKey, string> = {
@@ -289,7 +297,7 @@ const VerificationStatus: React.FC<Props> = ({
     <div className="ob-screen vs-screen">
       <div className="ob-inner vs-split">
         {/* ── Status ── */}
-        <section className="vs-status card" aria-labelledby="vs-title">
+        <section className="vs-status" aria-labelledby="vs-title">
           <span className={`badge ${badgeClass} self-start`}><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />{key === 'pending' ? 'Under review' : meta.badge}</span>
           <div>
             <h1 id="vs-title" className="vs-status__title">{TITLE[key]}</h1>
@@ -297,12 +305,17 @@ const VerificationStatus: React.FC<Props> = ({
             <p className="vs-status__line">{resubmitted ? 'Document submitted. Your account is now pending review. This page updates by itself.' : LINE[key]}</p>
           </div>
 
+          {status === 'pending' && expected && !resubmitted && (
+            <p className="vs-eta"><Clock aria-hidden /> Expected by <b>{expected}</b> · we’ll email you</p>
+          )}
+
           {(status === 'pending' || status === 'rejected') && (
-            <ol className="vs-steps" aria-label="Verification progress">
+            <ol className="vs-track" aria-label="Verification progress">
               {tl.map((st) => (
-                <li key={st.label} className={`vs-steps__s is-${st.state}`} aria-current={st.state === 'current' ? 'step' : undefined}>
-                  <span className="vs-steps__dot">{st.state === 'done' ? <Check /> : st.state === 'fail' ? <X /> : null}</span>
-                  <span>{st.label}</span>
+                <li key={st.label} className={`vs-track__s is-${st.state}`} aria-current={st.state === 'current' ? 'step' : undefined}>
+                  <span className="vs-track__dot" aria-hidden>{st.icon}</span>
+                  <span className="vs-track__txt"><b>{st.label}</b><span>{st.detail}</span></span>
+                  {st.time && <time className="vs-track__time">{st.time}</time>}
                 </li>
               ))}
             </ol>
@@ -399,7 +412,7 @@ const VerificationStatus: React.FC<Props> = ({
           <h2 id="vs-wait-h" className="vs-wait__h">While you wait</h2>
           {onOpenBrandDna && (
             <button type="button" className="vs-wait__c is-primary" onClick={onOpenBrandDna}>
-              <Sparkles aria-hidden />
+              <Store aria-hidden />
               <span><b>Review your Brand DNA</b><span>Tell Kawayan how your shop sounds. Every caption follows it once you’re approved.</span></span>
               <ArrowRight className="vs-wait__go" aria-hidden />
             </button>

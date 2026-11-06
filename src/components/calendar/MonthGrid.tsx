@@ -3,7 +3,9 @@ import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor,
   useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { GripVertical, Plus, Sparkles } from 'lucide-react';
+import { CircleDashed, GripVertical, Plus } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { FacebookGlyph, InstagramGlyph } from '../SocialAccounts';
 import clsx from 'clsx';
 import { AnimatePresence, m } from 'motion/react';
 import type { GeneratedPost } from '../../types';
@@ -12,7 +14,8 @@ import type { TimelineCardItem } from './mapCalendarEvents';
 interface Props {
   currentDate: Date;
   byDay: Map<number, TimelineCardItem[]>;
-  onOpenPost: (post: GeneratedPost) => void;
+  /** The clicked post's element comes along so the floating card can sit beside it. */
+  onOpenPost: (post: GeneratedPost, anchor?: HTMLElement) => void;
   /** Empty day or idea: open the studio for that day. */
   onOpenDay: (day: number) => void;
   onMovePost: (post: GeneratedPost, day: number) => void;
@@ -28,47 +31,35 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const movable = (i: TimelineCardItem) => i.status === 'draft' || i.status === 'failed' || i.status === 'idea';
 const dragId = (i: TimelineCardItem) => (i.post ? `post:${i.post.id}` : `idea:${i.ideaIndex}`);
 
-const CHIP_TONE: Record<TimelineCardItem['status'], string> = {
-  idea: 'border-dashed border-(--border) bg-(--muted) text-(--fg-muted)',
-  draft: 'border-dashed border-(--border-strong) bg-(--card)',
-  scheduled: 'border-(--border) bg-(--card)',
-  published: 'border-transparent bg-(--green-soft)',
-  failed: 'border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-(--card)',
+// Calendar post cards: a status stripe, the thumbnail with its pages on the corner, a two-line title,
+// then a short status (or the time, once scheduled). The full title and status are in the tooltip.
+const TILE: Record<TimelineCardItem['status'] | 'held', { label: string; short: string; tone: string }> = {
+  idea: { label: 'Idea', short: 'Idea', tone: 'is-idea' },
+  draft: { label: 'Pending approval', short: 'Approve', tone: 'is-amber' },
+  scheduled: { label: 'Scheduled', short: 'Scheduled', tone: 'is-brand' },
+  published: { label: 'Published', short: 'Posted', tone: 'is-done' },
+  failed: { label: 'Failed', short: 'Failed', tone: 'is-red' },
+  held: { label: 'Held: a page lost access', short: 'Held', tone: 'is-red' },
 };
-const CHIP_LABEL: Record<TimelineCardItem['status'], string> = { idea: 'Idea', draft: 'Draft', scheduled: 'Scheduled', published: 'Posted', failed: 'Failed' };
+const GLYPH: Record<string, React.FC<{ className?: string }>> = { facebook: FacebookGlyph, instagram: InstagramGlyph };
+const tileStatus = (item: TimelineCardItem) => TILE[item.held ? 'held' : item.status];
 
-/** The post chip used in day cells and while dragging (mockup .pchip): thumbnail, title, time or status. */
-const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boolean; selected?: boolean }> = ({ item, lifted, selected }) => (
-  <span
-    className={clsx(
-      'group/tile flex w-full items-center gap-1.5 rounded-[7px] border py-[3px] pl-[3px] pr-1.5 text-left transition-colors duration-150 hover:bg-(--muted)',
-      CHIP_TONE[item.status],
-      item.held && 'border-[color-mix(in_srgb,var(--danger)_45%,transparent)]',
-      lifted && 'shadow-lg outline-2 outline-(--fg)',
-      selected && 'outline-2 -outline-offset-1 outline-(--fg)',
-    )}
-  >
-    {item.imageUrl ? (
-      <img decoding="async" src={item.imageUrl} alt="" loading="lazy" className="h-[22px] w-[22px] shrink-0 rounded object-cover" />
-    ) : (
-      <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded bg-(--muted) text-(--fg-muted)">
-        <Sparkles className="h-3 w-3" strokeWidth={2} aria-hidden />
-      </span>
-    )}
-    <span className={clsx('min-w-0 flex-1 truncate text-xs font-medium', item.status === 'idea' ? 'text-(--fg-muted)' : 'text-(--fg)')}>{item.title}</span>
-    {item.time && item.status !== 'idea' ? (
-      <time
-        className={clsx(
-          'mono shrink-0 text-2xs',
-          item.status === 'published' ? 'text-(--green-ink)' : item.status === 'failed' || item.held ? 'text-(--danger)' : 'text-(--fg-muted)',
+const Tile: React.FC<{ item: TimelineCardItem; compact?: boolean; lifted?: boolean; selected?: boolean }> = ({ item, lifted, selected }) => {
+  const t = tileStatus(item);
+  const pages = (item.platforms || []).filter((pl) => GLYPH[pl]);
+  return (
+    <span className={clsx('kw-ptile', t.tone, lifted && 'is-lifted', selected && 'is-selected')}>
+      <span className="kw-ptile__thumb">
+        {item.imageUrl ? <img decoding="async" src={item.imageUrl} alt="" loading="lazy" /> : <span className="kw-ptile__ph"><CircleDashed aria-hidden /></span>}
+        {item.status !== 'idea' && pages.length > 0 && (
+          <span className="kw-ptile__pages">{pages.map((pl) => { const G = GLYPH[pl]; return <G key={pl} className="h-3 w-3" />; })}</span>
         )}
-      >
-        {item.time}
-      </time>
-    ) : null}
-    <span className="sr-only">{item.held ? 'Held' : CHIP_LABEL[item.status]}</span>
-  </span>
-);
+      </span>
+      <span className="kw-ptile__title">{item.title}</span>
+      <span className="kw-ptile__status"><i aria-hidden />{item.status === 'scheduled' && item.time && !item.held ? item.time : t.short}</span>
+    </span>
+  );
+};
 
 /**
  * Splits dnd-kit's listeners: pointer and touch go on the whole card (a click still opens it, since a drag
@@ -90,15 +81,33 @@ const KeyHandle: React.FC<{ title: string; attributes: ReturnType<typeof useDrag
   </span>
 );
 
-const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selected?: boolean; onOpen: () => void }> = ({ item, compact, selected, onOpen }) => {
+const DraggableTile: React.FC<{ item: TimelineCardItem; compact?: boolean; selected?: boolean; onOpen: (el: HTMLElement) => void }> = ({ item, compact, selected, onOpen }) => {
   const can = movable(item);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `grid:${dragId(item)}`, data: { item }, disabled: !can });
   const drag = dragProps(listeners);
   return (
-    <div ref={setNodeRef} {...(can ? drag.card : {})} className={clsx('relative', can && 'cursor-grab active:cursor-grabbing', isDragging && 'opacity-30')}>
-      <button type="button" onClick={onOpen} aria-pressed={selected || undefined} className={clsx('block w-full rounded-md', can && 'cursor-grab active:cursor-grabbing')} title={item.title}>
-        <Tile item={item} compact={compact} selected={selected} />
-      </button>
+    <div ref={setNodeRef} data-post-tile {...(can ? drag.card : {})} className={clsx('relative', can && 'cursor-grab active:cursor-grabbing', isDragging && 'opacity-30')}>
+      {/* A real tooltip (portaled, so the calendar's edges don't clip it) carries the full title and status. */}
+      <Tooltip>
+        <TooltipTrigger
+          delay={250}
+          render={
+            <button
+              type="button"
+              onClick={(e) => onOpen(e.currentTarget)}
+              aria-pressed={selected || undefined}
+              aria-label={`${item.title}. ${tileStatus(item).label}${item.time ? `, ${item.time}` : ''}`}
+              className={clsx('block w-full rounded-md', can && 'cursor-grab active:cursor-grabbing')}
+            />
+          }
+        >
+          <Tile item={item} compact={compact} selected={selected} />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="block max-w-[260px] py-2 leading-snug">
+          <span className="block font-medium">{item.title}</span>
+          <span className="block opacity-75">{tileStatus(item).label}{item.time ? ` · ${item.time}` : ''}</span>
+        </TooltipContent>
+      </Tooltip>
       {can && <KeyHandle title={item.title} attributes={attributes} onKeyDown={drag.keys.onKeyDown} />}
     </div>
   );
@@ -124,7 +133,7 @@ const DayCellBase: React.FC<{
     <div
       ref={setNodeRef}
       className={clsx(
-        'group/cell relative flex min-h-[108px] flex-col gap-1 border-b border-r border-(--border) p-1.5 transition-colors [&:nth-child(7n)]:border-r-0',
+        'group/cell relative flex min-h-[92px] flex-col gap-1 border-b border-r border-[color-mix(in_srgb,var(--fg)_7%,transparent)] p-1.5 transition-colors [&:nth-child(7n)]:border-r-0',
         day === null && 'bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--dot)_6px_7px)]',
         past && day !== null && 'bg-(--muted)/50',
         dropping && 'bg-(--green-soft) ring-2 ring-inset ring-(--green)',
@@ -136,7 +145,7 @@ const DayCellBase: React.FC<{
             <span
               className={clsx(
                 'mono grid h-6 min-w-6 place-items-center rounded-md px-1 text-xs font-medium',
-                today ? 'bg-(--green) text-(--green-fg)' : past ? 'text-(--fg-muted) opacity-70' : 'text-(--fg)',
+                today ? 'bg-(--fg) text-(--bg)' : past ? 'text-(--fg-muted) opacity-70' : 'text-(--fg)',
               )}
             >
               {day}
@@ -166,7 +175,7 @@ const DayCellBase: React.FC<{
                 animate={{ opacity: 1, y: 0, transition: { duration: 0.2, delay: Math.min(0.2, (day ?? 0) * 0.006), ease: [0.2, 0.8, 0.2, 1] } }}
                 exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.16 } }}
               >
-                <DraggableTile item={item} compact selected={!!item.post && item.post.id === selectedPostId} onOpen={() => (item.post ? onOpenPost(item.post) : onOpenDay(item.day))} />
+                <DraggableTile item={item} compact selected={!!item.post && item.post.id === selectedPostId} onOpen={(el) => (item.post ? onOpenPost(item.post, el) : onOpenDay(item.day))} />
               </m.div>
             ))}
           </AnimatePresence>
@@ -218,7 +227,7 @@ const MonthGrid: React.FC<Props> = ({ currentDate, byDay, onOpenPost, onOpenDay,
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
       <div>
         <div className="min-w-0">
-          <div className="grid grid-cols-7 border-b border-(--border)">
+          <div className="grid grid-cols-7 border-b border-[color-mix(in_srgb,var(--fg)_7%,transparent)]">
             {WEEKDAYS.map((d) => (
               <span key={d} className="px-2.5 py-2 text-xs font-medium text-(--fg-muted)">{d}</span>
             ))}

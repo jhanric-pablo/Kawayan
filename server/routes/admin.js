@@ -5,6 +5,7 @@ import { logger } from '../../src/utils/logger.ts';
 import { sendEmail } from '../../src/utils/mailer.ts';
 import { dbService, authenticateToken, requireAdmin, validate, text, id } from '../shared.js';
 import { broadcastVerificationChanged } from '../realtime.js';
+import { verifiedEmail } from '../verifiedEmail.js';
 
 const router = Router();
 // Every route in this file is admin-only.
@@ -17,7 +18,7 @@ const updateUserSchema = z.object({
 });
 const balanceSchema = z.object({
   userId: id,
-  amount: z.number({ error: 'Enter an amount' }).refine((n) => n !== 0, 'Enter an amount other than 0'),
+  amount: z.number({ error: 'Enter an amount' }).finite().min(-1_000_000).max(1_000_000).refine((n) => n !== 0, 'Enter an amount other than 0'),
   reason: text('A reason is required', 300),
 });
 const subscriptionSchema = z.object({
@@ -51,7 +52,7 @@ router.get('/api/admin/system-status', async (req, res) => {
   res.json({
     api: { ok: true },
     database: { ok: dbOk, latencyMs: Date.now() - started },
-    ai: { configured: has('GROQ_API_KEY') || has('CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN') },
+    ai: { configured: has('AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY') || has('GROQ_API_KEY') || has('CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN') },
     zernio: { configured: has('ZERNIO_API_KEY') },
     paymongo: { configured: has('PAYMONGO_SECRET_KEY'), testMode: String(process.env.PAYMONGO_SECRET_KEY || '').startsWith('sk_test_') },
     chat: { configured: has('STREAM_API_KEY', 'STREAM_API_SECRET') },
@@ -61,7 +62,7 @@ router.get('/api/admin/system-status', async (req, res) => {
 
 router.get('/api/admin/logs', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 100));
     res.json(await dbService.getAuditLogs(limit));
   } catch (error) {
     logger.error('Admin logs error', { error: error.message });
@@ -88,8 +89,14 @@ router.get('/api/admin/tickets', async (req, res) => {
 });
 
 router.put('/api/admin/users/:id', validate(updateUserSchema), async (req, res) => {
+  // An admin can't demote themselves (the console could end up with no admin).
+  if (req.params.id === req.user.userId && req.body.role && req.body.role !== 'admin') {
+    return res.status(400).json({ error: 'You can’t change your own role.' });
+  }
   try {
     await dbService.updateUser(req.params.id, req.body);
+    const changes = [req.body.role && `role to ${req.body.role}`, req.body.businessName !== undefined && `business name to "${req.body.businessName}"`].filter(Boolean).join(', ');
+    if (changes) await dbService.logAudit(req.user.userId, 'update_user', `admin: ${await dbService.describeUser(req.user.userId)} changed ${await dbService.describeUser(req.params.id)}: ${changes}`);
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     logger.error('Admin update user error', { error: error.message });
@@ -99,6 +106,7 @@ router.put('/api/admin/users/:id', validate(updateUserSchema), async (req, res) 
 
 router.delete('/api/admin/users/:id', async (req, res) => {
   const { id } = req.params;
+  if (id === req.user.userId) return res.status(400).json({ error: 'You can’t delete your own account here.' });
   try {
     // Fetch identities before deleting — audit_logs.user_id cascades on delete,
     // so the log is attributed to the admin, not the (about to be gone) account.
@@ -118,7 +126,13 @@ router.delete('/api/admin/users/:id', async (req, res) => {
 router.post('/api/admin/balance', validate(balanceSchema), async (req, res) => {
   const { userId, amount, reason } = req.body;
   try {
+    // Taking money out can't push the wallet below zero.
+    if (amount < 0) {
+      const balance = Number((await dbService.getWallet(userId))?.balance ?? 0);
+      if (balance + amount < 0) return res.status(400).json({ error: `The wallet only has ₱${balance.toLocaleString('en-PH')}.` });
+    }
     await dbService.adminAdjustBalance(userId, amount, reason);
+    await dbService.logAudit(req.user.userId, 'adjust_balance', `admin: ${await dbService.describeUser(req.user.userId)} ${amount > 0 ? 'added' : 'removed'} ₱${Math.abs(amount).toLocaleString('en-PH')} ${amount > 0 ? 'to' : 'from'} ${await dbService.describeUser(userId)}: ${reason}`);
     res.json({ message: 'Balance adjusted successfully' });
   } catch (error) {
     logger.error('Admin balance error', { error: error.message });
@@ -130,6 +144,7 @@ router.post('/api/admin/subscription', validate(subscriptionSchema), async (req,
   const { userId, plan, expiresAt } = req.body;
   try {
     await dbService.adminUpdateSubscription(userId, plan, expiresAt);
+    await dbService.logAudit(req.user.userId, 'change_plan', `admin: ${await dbService.describeUser(req.user.userId)} set ${await dbService.describeUser(userId)} to ${plan}`);
     res.json({ message: 'Subscription updated successfully' });
   } catch (error) {
     logger.error('Admin subscription error', { error: error.message });
@@ -179,14 +194,8 @@ router.post('/api/admin/verifications/:id/approve', async (req, res) => {
     await dbService.logAudit(req.user.userId, 'approve_verification', `admin: ${adminInfo} approved client: ${clientInfo}`);
     broadcastVerificationChanged(verif?.userId);
     if (clientUser?.email) {
-      await sendEmail(
-        clientUser.email,
-        'Your Kawayan business verification is approved',
-        `<p>Hi ${clientUser.businessName || 'there'},</p>
-         <p>Your business verification for this Kawayan account has been approved.</p>
-         <p><a href="https://kawayan-ai.onrender.com/">Sign in to your account</a></p>
-         <p>Thanks for using Kawayan.</p>`
-      );
+      const mail = verifiedEmail({ businessName: clientUser.businessName, appUrl: process.env.APP_URL });
+      await sendEmail(clientUser.email, mail.subject, mail.html, mail.text);
     }
     res.json({ message: 'Verification approved' });
   } catch (error) {

@@ -68,27 +68,24 @@ const Stepper: React.FC<StepperProps> = ({
 
   return (
     <div className="kw-stepper">
+      {/* Step chips: done steps turn light green with a check (tap to go back), the current one fills green. */}
       <ol className="kw-stepper__track">
         {steps.map((step, i) => {
           const state = i < index ? 'done' : i === index ? 'current' : 'todo';
           return (
             <li key={i} className={`kw-stepper__item is-${state}`}>
+              {i > 0 && <span className="kw-stepper__sep" aria-hidden />}
               <button
                 type="button"
-                className="kw-stepper__dot"
+                className="kw-stepper__chip"
                 onClick={() => goTo(i)}
                 disabled={i >= index}
                 aria-current={state === 'current' ? 'step' : undefined}
                 aria-label={`Step ${i + 1}: ${step.props.label}${state === 'done' ? ', completed' : ''}`}
               >
-                {state === 'done' ? <Check aria-hidden /> : i + 1}
+                <i>{state === 'done' ? <Check aria-hidden /> : i + 1}</i>
+                <span>{step.props.label}</span>
               </button>
-              <span className="kw-stepper__label">{step.props.label}</span>
-              {i < last && (
-                <span className="kw-stepper__line" aria-hidden>
-                  <b />
-                </span>
-              )}
             </li>
           );
         })}

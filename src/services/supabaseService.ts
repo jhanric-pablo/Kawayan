@@ -786,6 +786,7 @@ export class SupabaseService {
         status: ticket.status,
         created_at: ticket.createdAt,
         messages: JSON.stringify(ticket.messages || []),
+        ...(ticket.labels?.length ? { labels: ticket.labels } : {}),
       });
     if (error) throw error;
   }

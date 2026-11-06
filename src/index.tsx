@@ -25,8 +25,16 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+// The scroll story stands alone: no session, no app shell. Loaded only on its own address.
+const HowItWorksStory = React.lazy(() => import('./components/story/HowItWorksStory'));
+const isStory = window.location.pathname.replace(/\/$/, '') === '/how-it-works';
+
 const root = ReactDOM.createRoot(rootElement);
-root.render(
+root.render(isStory ? (
+  <React.StrictMode>
+    <React.Suspense fallback={null}><HowItWorksStory /></React.Suspense>
+  </React.StrictMode>
+) : (
   <React.StrictMode>
     <BrowserRouter>
       <ToastProvider>
@@ -36,4 +44,4 @@ root.render(
       </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>
-);
+));

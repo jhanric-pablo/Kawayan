@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Channel } from 'stream-chat';
 import TextareaAutosize from 'react-textarea-autosize';
 import Markdown from 'react-markdown';
-import { ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessagesSquare, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowUp, CheckCircle2, Loader2, MessagesSquare, Plus, Search } from 'lucide-react';
+import { KawayanMark } from './KawayanLogo';
 import clsx from 'clsx';
 import type { Ticket } from '../types';
 import { chatWithSupportBot } from '../services/aiService';
@@ -212,7 +213,7 @@ const HelpDesk: React.FC<{ initialTicketId?: string | null }> = ({ initialTicket
             </div>
 
             <form onSubmit={askAi} className="card m-3 flex flex-col gap-2 p-3.5">
-              <b className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="h-4 w-4 text-(--green-ink)" aria-hidden /> Ask the assistant</b>
+              <b className="flex items-center gap-1.5 text-sm font-semibold"><KawayanMark size={16} /> Ask the assistant</b>
               <p className="kw-hint">Quick answers about using Kawayan. It can’t see your account.</p>
               <div className="relative">
                 <input className="input" style={{ paddingRight: 40 }} value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="How do I change my posting time?" aria-label="Ask the assistant a question" />

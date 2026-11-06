@@ -3,19 +3,17 @@ import { BrandProfile, ContentIdea, GeneratedPost, PostVersion } from '../../typ
 import type { SocialAccount } from '../../services/socialService';
 import type { CaptionRewrite } from '../../services/aiService';
 import {
-  X, RefreshCcw, Loader2, Upload, Image as ImageIcon, Send, Facebook, Instagram, Scissors, Smile, Briefcase, Megaphone,
-  Languages, Hash, ArrowUp, ArrowUpRight, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine,
-  CircleAlert, Clock, Globe, AudioLines, Sparkles, Video, Type,
+  X, RefreshCcw, Loader2, Upload, Image as ImageIcon, Send, Facebook, Instagram, Scissors, Smile, Briefcase, Megaphone, Languages, Hash, ArrowUp, ArrowUpRight, Undo2, Check, ChevronDown, CalendarClock, Zap, ExternalLink, PencilLine, CircleAlert, Clock, Globe, AudioLines,
 } from 'lucide-react';
+import { KawayanMark } from '../KawayanLogo';
 import TextareaAutosize from 'react-textarea-autosize';
 import clsx from 'clsx';
-import type { PostFormat } from './FormatPicker';
 import PhonePreview from './PhonePreview';
 import { StatusBadge } from './TimelinePostCard';
 import { normalizeFormat } from '../../services/validationService';
 import { useFocusTrap } from '../../utils/useFocusTrap';
 import { phDatesInMonth } from '../../utils/phCalendar';
-import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
+import { ProgressBar } from '../ui/progress-bar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 // react-day-picker + date-fns load only when the date popover opens.
@@ -173,7 +171,8 @@ const PostComposer: React.FC<Props> = ({
   const [time, setTime] = useState('20:00');
   const [chosen, setChosen] = useState<string[]>([]);
   const [brief, setBrief] = useState(''); // what the post is about; also the paid extra post's topic
-  const [format, setFormat] = useState<PostFormat>('Image');
+  // Every post is a caption plus an image, so there's no format to pick.
+  const format: ContentIdea['format'] = 'Image';
   const [extraBusy, setExtraBusy] = useState(false);
   const [extraError, setExtraError] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
@@ -297,7 +296,6 @@ const PostComposer: React.FC<Props> = ({
   useEffect(() => {
     const idea = ideas.find((i) => i.day === selectedDay);
     setBrief(idea?.topic || '');
-    setFormat(idea?.format || 'Image');
     setExtraError('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay]);
@@ -480,19 +478,12 @@ const PostComposer: React.FC<Props> = ({
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {!limitReached && (
-                      <ToggleGroup aria-label="Post format" value={[format]} onValueChange={(v) => v[0] && setFormat(v[0] as PostFormat)} disabled={generatingPost} variant="outline" size="sm" spacing={0} className="kw-toggle">
-                        {FORMAT_ITEMS.map(({ key, Icon }) => (
-                          <ToggleGroupItem key={key} value={key} aria-label={key}><Icon aria-hidden /> {key}</ToggleGroupItem>
-                        ))}
-                      </ToggleGroup>
-                    )}
                     <button
                       type="submit"
                       disabled={brief.trim().length === 0 || generatingPost || extraBusy}
                       className="btn btn-primary kw-draft-btn ml-auto"
                     >
-                      {generatingPost || extraBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                      {generatingPost || extraBusy ? <Loader2 className="animate-spin" /> : <KawayanMark size={16} />}
                       {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
                       <span className="ml-1 hidden gap-0.5 opacity-70 sm:inline-flex" aria-hidden>
                         <kbd className="rounded border border-white/30 px-1 font-sans text-xs">{MOD_KEY}</kbd>
@@ -614,6 +605,7 @@ const PostComposer: React.FC<Props> = ({
                     {loadingImage && (
                       <span className="absolute inset-0 grid place-items-center bg-black/45 text-white">
                         <Loader2 className="h-5 w-5 animate-spin" aria-label="Creating a new image" />
+                        <ProgressBar done={0} total={1} running partMs={15000} label="Creating the image" className="absolute inset-x-2 bottom-2" />
                       </span>
                     )}
                   </div>
@@ -621,7 +613,7 @@ const PostComposer: React.FC<Props> = ({
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap gap-1.5">
                         <button type="button" className={CHIP} onClick={onGenerateImage} disabled={loadingImage}>
-                          <RefreshCcw /> {post.imageUrl ? 'Try another image' : 'Create image'}
+                          <RefreshCcw /> {post.imageUrl ? 'Regenerate image' : 'Create image'}
                         </button>
                         <button type="button" className={CHIP} onClick={() => photoInputRef.current?.click()}>
                           <Upload /> Upload photo
@@ -645,7 +637,7 @@ const PostComposer: React.FC<Props> = ({
                         className="block w-full resize-y bg-transparent p-3 text-ui outline-hidden"
                       />
                     </div>
-                    <span className="mt-1.5 block text-xs text-(--fg-muted)">Describe the picture in English. “Try another image” uses this.</span>
+                    <span className="mt-1.5 block text-xs text-(--fg-muted)">Describe the picture in English. “Regenerate image” uses this.</span>
                   </div>
                 )}
                 <input
@@ -826,7 +818,7 @@ const PostComposer: React.FC<Props> = ({
               <div className="relative aspect-square bg-(--muted)">
                 {post.imageUrl ? <img decoding="async" src={post.imageUrl} alt="Post visual" className="h-full w-full object-cover" /> : <ImageIcon className="absolute inset-0 m-auto h-8 w-8 text-(--fg-muted)" aria-hidden />}
                 {loadingImage && (
-                  <span className="absolute inset-0 grid place-items-center bg-black/45 text-white"><Loader2 className="h-6 w-6 animate-spin" aria-label="Creating a new image" /></span>
+                  <span className="absolute inset-0 grid place-items-center bg-black/45 text-white"><Loader2 className="h-6 w-6 animate-spin" aria-label="Creating a new image" /><ProgressBar done={0} total={1} running partMs={15000} label="Creating the image" className="absolute inset-x-4 bottom-4" /></span>
                 )}
               </div>
               <div className="flex flex-col gap-3 p-4">
@@ -837,7 +829,7 @@ const PostComposer: React.FC<Props> = ({
                 {!isPublished && (
                   <>
                     <div className="flex gap-2">
-                      <button type="button" className="btn btn-outline btn-sm flex-1" onClick={onGenerateImage} disabled={loadingImage}><RefreshCcw className="h-4 w-4" /> New image</button>
+                      <button type="button" className="btn btn-outline btn-sm flex-1" onClick={onGenerateImage} disabled={loadingImage}><RefreshCcw className="h-4 w-4" /> {post.imageUrl ? 'Regenerate image' : 'Create image'}</button>
                       <button type="button" className="btn btn-outline btn-sm flex-1" onClick={() => photoInputRef.current?.click()}><Upload className="h-4 w-4" /> Upload my own photo</button>
                     </div>
                     <button type="button" className="btn btn-ghost btn-sm self-start" onClick={() => setShowPrompt((v) => !v)} aria-expanded={showPrompt}>
@@ -1052,25 +1044,7 @@ const PostComposer: React.FC<Props> = ({
                   {limitReached ? (
                     <p className="text-ui text-(--fg-muted)">You’ve used all {planPostCount} posts for {monthName}. Add this one as an extra post for ₱{addOnPrice}, paid from your wallet.</p>
                   ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label htmlFor="ps-brief" className="text-ui font-semibold">What should this post say?</label>
-                      <ToggleGroup
-                        aria-label="Post format"
-                        value={[format]}
-                        onValueChange={(v) => v[0] && setFormat(v[0] as PostFormat)}
-                        disabled={generatingPost}
-                        variant="outline"
-                        size="sm"
-                        spacing={0}
-                        className="kw-toggle"
-                      >
-                        {FORMAT_ITEMS.map(({ key, Icon }) => (
-                          <ToggleGroupItem key={key} value={key} aria-label={key}>
-                            <Icon aria-hidden /> {key}
-                          </ToggleGroupItem>
-                        ))}
-                      </ToggleGroup>
-                    </div>
+                    <label htmlFor="ps-brief" className="text-ui font-semibold">What should this post say?</label>
                   )}
                   <div className={clsx(FIELD, 'p-3')}>
                     <TextareaAutosize
@@ -1094,7 +1068,7 @@ const PostComposer: React.FC<Props> = ({
                     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Ideas">
                       {ideaChips.map((c) => (
                         <button key={c} type="button" className="kw-chip" onClick={() => setBrief(c)} disabled={generatingPost || extraBusy}>
-                          <Sparkles className="h-3 w-3" aria-hidden /> {c}
+                          {c}
                         </button>
                       ))}
                     </div>
@@ -1116,7 +1090,7 @@ const PostComposer: React.FC<Props> = ({
                       )}
                     </p>
                     <button type="submit" disabled={draftDisabled} className="btn btn-primary kw-draft-btn">
-                      {generatingPost || extraBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {generatingPost || extraBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KawayanMark size={16} />}
                       {limitReached ? (extraBusy ? 'Paying…' : `Pay ₱${addOnPrice} and draft it`) : generatingPost ? 'Drafting…' : 'Draft with AI'}
                       <span className="hidden gap-0.5 opacity-70 sm:inline-flex" aria-hidden>
                         <kbd className="rounded border border-current/30 px-1 font-sans text-xs">{MOD_KEY}</kbd>
@@ -1358,11 +1332,6 @@ function ideaSuggestions(profile: BrandProfile, month: Date, day: number | null,
   return [...new Set(out)].slice(0, 4);
 }
 
-const FORMAT_ITEMS: { key: PostFormat; Icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: 'Image', Icon: ImageIcon },
-  { key: 'Video', Icon: Video },
-  { key: 'Text', Icon: Type },
-];
 
 /** Writing caption → Scoring → Making image, each ticked as it really finishes. */
 const GenerationProgress: React.FC<{ post: GeneratedPost | null; loadingImage: boolean }> = ({ post, loadingImage }) => {
@@ -1373,7 +1342,9 @@ const GenerationProgress: React.FC<{ post: GeneratedPost | null; loadingImage: b
   ];
   const current = steps.findIndex((s) => !s.done);
   return (
-    <ol className="card grid gap-2 px-4 py-3" aria-live="polite" aria-label="Drafting progress">
+    <div className="card grid gap-3 px-4 py-3">
+    <ProgressBar done={steps.filter((s) => s.done).length} total={steps.length} running partMs={9000} label="Drafting progress" />
+    <ol className="grid gap-2" aria-live="polite" aria-label="Drafting steps">
       {steps.map((s, i) => (
         <li key={s.label} className={clsx('flex items-center gap-2.5 text-ui', s.done ? 'text-(--fg-muted)' : i === current ? 'font-medium text-(--fg)' : 'text-(--fg-subtle)')}>
           <span className={clsx('grid h-5 w-5 place-items-center rounded-full border', s.done ? 'border-transparent bg-(--green) text-(--green-fg)' : i === current ? 'border-(--fg)' : 'border-(--border-strong)')}>
@@ -1383,6 +1354,7 @@ const GenerationProgress: React.FC<{ post: GeneratedPost | null; loadingImage: b
         </li>
       ))}
     </ol>
+    </div>
   );
 };
 

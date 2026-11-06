@@ -15,9 +15,9 @@
 @media (min-width: 640px) { .ax { padding: 1.25rem 1.75rem 3rem; } }
 /* Wide screens: form on the left, a muted dotted panel on the right (mockup .auth) */
 @media (min-width: 1024px) {
-  .ax:not(.ax--center) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 0; }
-  .ax:not(.ax--center) .ax__bar { grid-column: 1; padding: 20px 28px; }
-  .ax:not(.ax--center) .ax__stage { grid-column: 1; grid-row: 2; padding: 2.5rem 1.75rem 4.5rem; }
+  .ax:not(.ax--center):not(.ax--solo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 0; }
+  .ax:not(.ax--center):not(.ax--solo) .ax__bar { grid-column: 1; padding: 20px 28px; }
+  .ax:not(.ax--center):not(.ax--solo) .ax__stage { grid-column: 1; grid-row: 2; padding: 2.5rem 1.75rem 4.5rem; }
 }
 .ax__side { display: none; }
 @media (min-width: 1024px) {
@@ -33,10 +33,16 @@
   }
   .ax__side > * { position: relative; }
   .ax__side:has(.ax__aside) { justify-content: center; align-items: center; }
+  .ax__side { animation: ax-side-in 0.5s var(--ease) both; }
 }
-.ax-collage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.ax-collage img { aspect-ratio: 3 / 4; width: 100%; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
-.ax-collage img:nth-child(2) { transform: translateY(-24px); }
+
+/* Sign-in: one centred column, a soft dot grid fading out around the form */
+.ax--solo { position: relative; isolation: isolate; }
+.ax--solo::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px;
+  -webkit-mask-image: radial-gradient(ellipse 50% 55% at 50% 50%, #000 10%, transparent 75%); mask-image: radial-gradient(ellipse 50% 55% at 50% 50%, #000 10%, transparent 75%);
+}
 
 /* Password reset: one card centred on a dotted page */
 .ax--center { background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 18px 18px; }
@@ -278,53 +284,27 @@
 .ax__foot-item { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--text-xs); color: var(--fg-muted); }
 .ax__foot-item svg { width: 14px; height: 14px; color: var(--green-ink); }
 
-/* ── Step bar (also used by the product tour) ─────────────────── */
-.ax-steps { margin-bottom: 1.25rem; }
-.ax-steps__top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.6rem;
+/* ── Sign-up stepper: numbered circles joined by a line that fills in ─── */
+.ax-steps { display: flex; align-items: flex-start; margin: 0 0 1.25rem; padding: 0; list-style: none; }
+.ax-steps__item { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; }
+.ax-steps__item + .ax-steps__item::before,
+.ax-steps__item + .ax-steps__item::after {
+  content: ""; position: absolute; top: 14px; left: calc(-50% + 18px); right: calc(50% + 18px); height: 2px; border-radius: 2px; background: var(--border);
 }
-.ax-steps__label {
-  font-weight: 600;
-  font-size: var(--text-sm);
-  letter-spacing: -0.01em;
-  color: var(--fg);
+.ax-steps__item + .ax-steps__item::after { background: var(--green); transform: scaleX(0); transform-origin: left; transition: transform 0.45s var(--ease); }
+.ax-steps__item.is-done::after, .ax-steps__item.is-current::after { transform: scaleX(1); }
+.ax-steps__dot {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--card); font-size: var(--text-xs); font-weight: 600; color: var(--fg-muted);
+  transition: background-color 0.3s var(--ease), border-color 0.3s var(--ease), color 0.3s var(--ease), box-shadow 0.3s var(--ease);
 }
-.ax-steps__count {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.ax-steps__track {
-  display: flex;
-  gap: 0.3rem;
-}
-.ax-steps__seg {
-  flex: 1;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--border);
-  overflow: hidden;
-}
-.ax-steps__seg i {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: inherit;
-  width: 100%;
-  background: var(--green);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.32s var(--ease);
-}
-.ax-steps__seg.is-done i,
-.ax-steps__seg.is-current i { transform: none; }
+.ax-steps__dot svg { width: 14px; height: 14px; stroke-width: 3; }
+.is-done > .ax-steps__dot { background: var(--green); border-color: var(--green); color: var(--green-fg); }
+.is-current > .ax-steps__dot { border-color: var(--green); color: var(--green-ink); box-shadow: 0 0 0 5px var(--green-soft); }
+.ax-steps__name { font-size: var(--text-xs); color: var(--fg-muted); transition: color 0.3s; }
+.is-done > .ax-steps__name, .is-current > .ax-steps__name { color: var(--fg); }
+.is-current > .ax-steps__name { font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .ax-steps__item::after, .ax-steps__dot { transition: none; } }
 
 /* Label with a link on the same line ("Password · Forgot password?") */
 .ax-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
@@ -334,3 +314,6 @@
 /* "Kept safe" divider over the trust list */
 .ax-or { display: flex; align-items: center; gap: 0.75rem; font-size: var(--text-xs); color: var(--fg-muted); }
 .ax-or::before, .ax-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+@keyframes ax-side-in { from { opacity: 0; transform: translateX(32px); } }
+@media (prefers-reduced-motion: reduce) { .ax__side { animation: none; } }

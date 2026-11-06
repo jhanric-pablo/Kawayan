@@ -388,15 +388,7 @@
   margin: 0 auto;
   animation: vs-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-@media (min-width: 940px) {
-  .bs-wrap {
-    max-width: 940px;
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 28px;
-    align-items: start;
-  }
-}
+@media (min-width: 940px) { .bs-wrap { max-width: 600px; } }
 
 .bs-head { text-align: center; margin-bottom: 1.4rem; }
 @media (min-width: 940px) { .bs-head { text-align: left; } }
@@ -524,83 +516,6 @@
 .bs-voice__check svg { width: 11px; height: 11px; }
 
 
-/* ── Live brand preview ── */
-.bs-preview {
-  display: none;
-  position: sticky;
-  top: 2rem;
-}
-@media (min-width: 940px) { .bs-preview { display: block; } }
-.bs-preview__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  margin-bottom: 10px;
-}
-.bs-preview__label b { width: 5px; height: 5px; border-radius: 50%; background: var(--success); animation: vs-blink 2s ease-in-out infinite; }
-.bs-preview__card {
-  border-radius: var(--radius-xl);
-  background: linear-gradient(165deg, #163a2d, #0f2a20 60%, #0b1e16);
-  border: 1px solid rgba(156, 176, 128, 0.18);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  color: #E9EEEB;
-}
-.bs-preview__top { padding: 16px 16px 12px; display: flex; align-items: center; gap: 10px; }
-.bs-preview__logo {
-  width: 34px; height: 34px;
-  border-radius: 10px;
-  display: grid; place-items: center;
-  background: linear-gradient(135deg, var(--color-sage-400), var(--color-emerald-500));
-  color: #fff;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-ui);
-  flex-shrink: 0;
-}
-.bs-preview__name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-sm); color: #fff; line-height: 1.2; }
-.bs-preview__ind { font-size: var(--text-2xs); color: rgba(233, 238, 235, 0.5); }
-.bs-preview__row { padding: 0 16px 12px; display: flex; flex-wrap: wrap; gap: 5px; }
-.bs-preview__tag {
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(156, 176, 128, 0.16);
-  color: var(--color-sage-200);
-}
-.bs-preview__post {
-  margin: 0 12px 12px;
-  padding: 12px 13px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-.bs-preview__post-k {
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(233, 238, 235, 0.4);
-  margin-bottom: 6px;
-}
-.bs-preview__post-t {
-  font-size: var(--text-ui);
-  line-height: 1.5;
-  color: rgba(233, 238, 235, 0.92);
-  transition: opacity 0.3s ease;
-}
-.bs-preview__foot {
-  padding: 10px 16px 14px;
-  font-size: var(--text-2xs);
-  color: rgba(233, 238, 235, 0.45);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
 
 /* ═══════════════ Redesign: neutral cards, one green touch (docs/redesign/mockup.html #v-brand, #v-verify) ═══════════════ */
 .ob-orb { display: none; }
@@ -665,18 +580,6 @@
 .bs-voice__t { font-weight: 500; }
 .bs-voice__opt.is-active .bs-voice__t, .dark .bs-voice__opt.is-active .bs-voice__t { color: var(--fg); }
 .bs-voice__check, .dark .bs-voice__check { background: var(--green); color: var(--green-fg); }
-/* Live preview: the mockup's .vp — a muted panel holding a white post card */
-.bs-preview__label { font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.06em; color: var(--fg-muted); }
-.bs-preview__label b { background: var(--green); }
-.bs-preview__card { background: var(--muted); border: 1px solid var(--border); border-radius: 12px; box-shadow: none; color: var(--fg); }
-.bs-preview__logo { background: var(--green); color: var(--green-fg); font-family: var(--font-sans); font-weight: 600; border-radius: 50%; }
-.bs-preview__name { font-family: var(--font-sans); font-weight: 600; color: var(--fg); }
-.bs-preview__ind { color: var(--fg-muted); }
-.bs-preview__tag { font-weight: 500; background: var(--card); color: var(--fg); border: 1px solid var(--border); }
-.bs-preview__post { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-.bs-preview__post-k { font-family: var(--font-mono); font-weight: 500; color: var(--fg-muted); }
-.bs-preview__post-t { color: var(--fg); }
-.bs-preview__foot { color: var(--fg-muted); border-top-color: var(--border); }
 
 /* ═══════════════ Onboarding steps in the top bar (mockup .ob-top) ═══════════ */
 .ob-top { display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0; margin: 0 1.25rem; }
@@ -694,42 +597,55 @@
 
 /* ═══════════════ Verification: one screen, status (≈60%) | while you wait (≈40%) ═══════════ */
 .vs-screen { min-height: calc(100svh - 3.75rem); padding-top: clamp(1.5rem, 5vh, 3rem); padding-bottom: clamp(1.5rem, 5vh, 3rem); }
-.vs-split { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; align-items: start; animation: vs-rise 0.28s var(--ease) both; }
-@media (min-width: 900px) { .vs-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; } }
+/* Live tracker: one centred column (status, stages with times, the file), then "While you wait" as three cards */
+.vs-split { max-width: 760px; margin: 0 auto; display: grid; gap: 28px; animation: vs-rise 0.28s var(--ease) both; }
 @media (prefers-reduced-motion: reduce) { .vs-split { animation: none; } }
-.vs-status { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
-.vs-status__title { font-size: clamp(22px, 2.4vw, 28px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; color: var(--fg); }
-.vs-status__biz { margin-top: 6px; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
+.vs-status { display: flex; flex-direction: column; gap: 18px; }
+.vs-status__title { font-size: clamp(26px, 3.2vw, 36px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; color: var(--fg); }
+.vs-status__biz { margin-top: 8px; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
 .vs-status__line { margin-top: 6px; font-size: var(--text-sm); color: var(--fg-muted); }
 .vs-status .vs-file { margin: 0; }
 .vs-status .vs-form { margin: 0; padding: 0; border: 0; display: grid; gap: 12px; }
-.vs-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.vs-steps__s { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 2px solid var(--border); font-size: var(--text-ui); color: var(--fg-muted); }
-.vs-steps__s.is-done { border-top-color: var(--green); color: var(--fg); }
-.vs-steps__s.is-current { border-top-color: var(--amber); color: var(--fg); font-weight: 500; }
-.vs-steps__s.is-fail { border-top-color: var(--danger); color: var(--danger); font-weight: 500; }
-.vs-steps__dot { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 999px; border: 1px solid var(--border-strong); }
-.vs-steps__dot svg { width: 11px; height: 11px; }
-.vs-steps__s.is-done .vs-steps__dot { background: var(--green); border-color: var(--green); color: #fff; }
-.vs-steps__s.is-current .vs-steps__dot { border-color: var(--amber); background: var(--amber-soft); }
-.vs-steps__s.is-fail .vs-steps__dot { background: var(--danger); border-color: var(--danger); color: #fff; }
-
-/* "While you wait": three compact action cards */
-.vs-wait { display: grid; gap: 10px; }
+.vs-eta { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 8px 12px; border-radius: 12px; background: var(--muted); font-size: var(--text-ui); color: var(--fg-muted); }
+.vs-eta svg { width: 15px; height: 15px; }
+.vs-eta b { font-weight: 600; color: var(--fg); }
+.vs-track { display: grid; }
+.vs-track__s { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; padding-bottom: 20px; }
+.vs-track__s:last-child { padding-bottom: 0; }
+.vs-track__s:not(:last-child)::before { content: ""; position: absolute; left: 16px; top: 34px; bottom: 0; width: 2px; background: var(--border); }
+.vs-track__s.is-done:not(:last-child)::before { background: var(--green); }
+.vs-track__dot { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border); background: var(--card); color: var(--fg-muted); }
+.vs-track__dot svg { width: 16px; height: 16px; }
+.vs-track__s.is-done .vs-track__dot { background: var(--green); border-color: var(--green); color: var(--green-fg); }
+.vs-track__s.is-current .vs-track__dot { border-color: var(--amber); color: var(--amber); }
+.vs-track__s.is-current .vs-track__dot::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--amber); opacity: 0; animation: vs-ripple 1.8s var(--ease) infinite; }
+.vs-track__s.is-fail .vs-track__dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+@keyframes vs-ripple { 0% { transform: scale(0.8); opacity: 0.7; } 100% { transform: scale(1.35); opacity: 0; } }
+.vs-track__txt { padding-top: 5px; }
+.vs-track__txt b { display: block; font-size: 15px; font-weight: 600; color: var(--fg); }
+.vs-track__txt span { display: block; margin-top: 2px; font-size: var(--text-ui); color: var(--fg-muted); line-height: 1.45; }
+.vs-track__s.is-todo .vs-track__txt b { font-weight: 500; color: var(--fg-muted); }
+.vs-track__s.is-fail .vs-track__txt b { color: var(--danger); }
+.vs-track__time { padding-top: 7px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .vs-track__s.is-current .vs-track__dot::after { animation: none; } }
+.vs-wait { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.vs-wait__h { grid-column: 1 / -1; }
 .vs-wait__h { font-size: 15px; font-weight: 600; color: var(--fg); }
-.vs-wait__c { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: left; transition: border-color 0.15s, transform 0.15s var(--ease); }
+.vs-wait__c { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; width: 100%; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); text-align: left; transition: border-color 0.2s, transform 0.2s var(--ease); }
+button.vs-wait__c:hover { transform: translateY(-2px); }
 button.vs-wait__c:hover { border-color: var(--border-strong); }
 button.vs-wait__c:active { transform: scale(0.99); }
-.vs-wait__c > svg:first-child { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--fg-muted); }
+.vs-wait__c > svg:first-child { width: 34px; height: 34px; padding: 8px; flex: none; border-radius: 10px; background: var(--green-soft); color: var(--green-ink); }
 .vs-wait__c b { display: block; font-size: var(--text-ui); font-weight: 500; color: var(--fg); }
 .vs-wait__c span span { display: block; margin-top: 2px; font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.45; }
-.vs-wait__go { width: 16px; height: 16px; flex: none; margin: 2px 0 0 auto; color: var(--fg-muted); }
+.vs-wait__go { display: none; }
 .vs-wait__c.is-primary { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
 .vs-wait__c.is-primary > svg:first-child { color: var(--green-ink); }
 .vs-wait__c.is-locked { background: var(--muted); border-style: dashed; }
-.vs-wait__c.is-locked b, .vs-wait__c.is-locked > svg { color: var(--fg-muted); }
+.vs-wait__c.is-locked b { color: var(--fg-muted); }
+.vs-wait__c.is-locked > svg:first-child { background: var(--card); color: var(--fg-muted); }
 .vs-split > * { min-width: 0; }
 .vs-status .vs-file { flex-wrap: wrap; }
 .vs-status .vs-file__meta { min-width: 0; flex: 1 1 10rem; }
 .vs-status .vs-file__name { overflow-wrap: anywhere; }
-@media (max-width: 480px) { .vs-status { padding: 18px; } .vs-steps__s { font-size: var(--text-xs); gap: 6px; } }
+@media (max-width: 480px) { .vs-track__time { display: none; } }

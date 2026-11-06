@@ -53,6 +53,11 @@ router.post('/api/profiles', authenticateToken, validate(profileSchema), async (
   if (!isSelfOrAdmin(req.user, profile.userId)) return res.status(403).json({ error: 'Unauthorized' });
 
   try {
+    // The industry is set once during brand setup; only an admin can change it afterwards.
+    if (req.user.role !== 'admin') {
+      const existing = await dbService.getProfile(profile.userId);
+      if (existing?.industry) profile.industry = existing.industry;
+    }
     await dbService.saveProfile(profile);
     res.json({ message: 'Profile saved successfully' });
   } catch (error) {

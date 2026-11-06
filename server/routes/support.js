@@ -13,6 +13,8 @@ const createTicketSchema = z.object({
   priority: z.enum(['Low', 'Medium', 'High', 'Critical']).catch('Medium'),
   message: z.string().max(5000).default(''),
   category: z.enum(['Technical', 'Billing', 'General']).catch('General'),
+  /** "kawi": handed off from the Kawi help bot, so agents see where it came from. */
+  source: z.enum(['kawi']).optional(),
 });
 const updateTicketSchema = z.object({
   status: z.enum(['Open', 'Pending', 'Resolved']).optional(),
@@ -68,7 +70,7 @@ router.get('/api/support/tickets', authenticateToken, async (req, res) => {
 });
 
 router.post('/api/support/tickets', authenticateToken, validate(createTicketSchema), async (req, res) => {
-  const { subject, priority, message, category } = req.body;
+  const { subject, priority, message, category, source } = req.body;
   const user = req.user;
 
   try {
@@ -82,7 +84,8 @@ router.post('/api/support/tickets', authenticateToken, validate(createTicketSche
       priority,
       status: 'Open',
       createdAt: new Date().toISOString(),
-      messages: [{ sender: 'user', text: message, timestamp: new Date().toISOString() }]
+      messages: [{ sender: 'user', text: message, timestamp: new Date().toISOString() }],
+      ...(source === 'kawi' ? { labels: ['kawi'] } : {}),
     };
 
     await dbService.createTicket(ticket);

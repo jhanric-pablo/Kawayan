@@ -214,7 +214,11 @@ const NotificationCenter: React.FC<{
         className="relative grid h-9 w-9 place-items-center rounded-lg text-(--fg) transition-colors hover:bg-(--muted) data-popup-open:bg-(--muted)"
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
-        {unread > 0 && <span className="absolute right-[7px] top-[6px] h-2 w-2 rounded-full bg-(--green) ring-2 ring-(--bg)" aria-hidden />}
+        {unread > 0 && (
+          <span className="mono absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d93025] px-1 text-[11px] font-semibold leading-none text-white ring-2 ring-(--bg)" aria-hidden>
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-[min(92vw,380px)] gap-0 overflow-hidden rounded-xl p-0">
         <Tabs.Root defaultValue="needs">

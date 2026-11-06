@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { industryLabel } from '../constants/industries';
 import { RadioGroup } from '@base-ui/react/radio-group';
 import { Radio } from '@base-ui/react/radio';
-import { AlertTriangle, CreditCard, Download, Eye, Link2, Lock, MapPin, MessageSquare, Moon, PlayCircle, ShieldCheck, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Download, Eye, Lock, MapPin, MessageSquare, Moon, PlayCircle, ShieldCheck, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { BrandProfile, User } from '../types';
 import { BRAND_VOICES, isCustomVoice } from '../constants/brandVoices';
@@ -11,15 +12,12 @@ import PasswordMeter from './auth/PasswordMeter';
 import { useToast } from './ui/Toast';
 import { AccessibilityOptions } from './AccessibilityWidget';
 import SettingsAppearance from './SettingsAppearance';
-import { LockedValue, SettingRow, SettingsSection } from './settings/SettingsParts';
+import { LockedValue, SettingRow, SettingsActive, SettingsSection } from './settings/SettingsParts';
 import VoicePreview from './settings/VoicePreview';
-import SocialAccounts from './SocialAccounts';
-import { socialService } from '../services/socialService';
-import { paymentService, Wallet } from '../services/paymentService';
+import { paymentService } from '../services/paymentService';
 import { supportService } from '../services/supportService';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import type { ThemePref } from '../utils/sessionView';
-import IndustryPicker from './forms/IndustryPicker';
 
 interface Props {
   profile?: BrandProfile | null;
@@ -33,8 +31,6 @@ interface Props {
   /** Light / Dark / System. When given, Appearance offers System too. */
   themePref?: ThemePref;
   onChooseTheme?: (pref: ThemePref) => void;
-  /** Payments & plans → the Plan and billing page. */
-  onOpenBilling?: () => void;
   /** Called after the owner deletes their account (signs out). */
   onAccountDeleted?: () => void;
   /** Section to open on arrival, e.g. 'channels'. */
@@ -44,56 +40,33 @@ interface Props {
 const SECTIONS = [
   { id: 'business', label: 'Business', brand: true, icon: MapPin },
   { id: 'voice', label: 'Voice & audience', brand: true, icon: MessageSquare },
-  { id: 'channels', label: 'Channels', brand: true, icon: Link2 },
   { id: 'appearance', label: 'Appearance', brand: false, icon: Moon },
   { id: 'security', label: 'Login & security', brand: false, icon: Lock },
-  { id: 'payments', label: 'Payments & plans', brand: true, icon: CreditCard },
   { id: 'accessibility', label: 'Accessibility', brand: false, icon: Eye },
 ];
 /** Sections that share the brand draft (an unsaved dot shows on them). */
 const BRAND_DRAFT = new Set(['business', 'voice']);
 const anchor = (id: string) => `settings-${id}`;
 
-const DEFAULT_COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
-const COLOR_NAMES = ['Primary', 'Secondary', 'Accent'];
-
 const toForm = (profile: BrandProfile | null | undefined, user: User | null): BrandProfile => ({
   ...(profile || { industry: '', targetAudience: '', brandVoice: '', keyThemes: '' }),
   userId: user?.id || profile?.userId || '',
   // The verified name on the user record always wins over the brand-profile copy.
   businessName: user?.businessName || profile?.businessName || '',
-  brandColors: profile?.brandColors?.length ? profile.brandColors : DEFAULT_COLORS,
 });
 
 const splitThemes = (s: string) => s.split(',').map((t) => t.trim()).filter(Boolean);
 const smooth = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 
 /** Settings as one scrolling page of sections, with a section index that follows along. */
-const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, toggleDarkMode, onReplayTour, themePref, onChooseTheme, onOpenBilling, onAccountDeleted, initialSection }) => {
+const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, toggleDarkMode, onReplayTour, themePref, onChooseTheme, onAccountDeleted, initialSection }) => {
   const toast = useToast();
   const [dbService] = useState(() => new UniversalDatabaseService());
   const isSupport = user?.role === 'support';
   const sections = SECTIONS.filter((s) => !(isSupport && s.brand));
 
-  // ── Section index: highlights the section in view; clicking scrolls to it ──
+  // ── Section menu: one section shows at a time, so the page never gets long ──
   const [active, setActive] = useState(sections.some((x) => x.id === initialSection) ? initialSection! : sections[0].id);
-  useEffect(() => {
-    if (!initialSection || !sections.some((x) => x.id === initialSection)) return;
-    const t = window.setTimeout(() => document.getElementById(anchor(initialSection))?.scrollIntoView({ block: 'start' }), 60);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSection]);
-
-  // ── Channel problems (for the menu badge) and the wallet (Payments & plans) ──
-  const [expiredCount, setExpiredCount] = useState(0);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  useEffect(() => {
-    if (isSupport) return;
-    let live = true;
-    socialService.listAccounts().then((a) => live && setExpiredCount(a.filter((x) => !x.isActive).length)).catch(() => undefined);
-    paymentService.getWalletData().then((w) => live && setWallet(w)).catch(() => undefined);
-    return () => { live = false; };
-  }, [isSupport]);
 
   // ── Your data: export everything as JSON; delete the account ──
   const [exporting, setExporting] = useState(false);
@@ -147,22 +120,9 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
       setDeleting(false);
     }
   };
-  useEffect(() => {
-    const els = sections.map((s) => document.getElementById(anchor(s.id))).filter((el): el is HTMLElement => !!el);
-    const io = new IntersectionObserver(
-      (entries) => {
-        const hit = entries.find((e) => e.isIntersecting);
-        if (hit) setActive(hit.target.id.replace('settings-', ''));
-      },
-      { rootMargin: '-25% 0px -65% 0px' },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSupport]);
   const go = (id: string) => {
     setActive(id);
-    document.getElementById(anchor(id))?.scrollIntoView({ behavior: smooth(), block: 'start' });
+    window.scrollTo({ top: 0, behavior: smooth() });
   };
 
   // ── Brand profile (Business + Voice share one draft and one save bar) ──
@@ -181,12 +141,6 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
   const setBrandField = (field: keyof BrandProfile, value: any) => {
     setBrand((prev) => ({ ...prev, [field]: value }));
     setBrandDirty(true);
-  };
-
-  const setColor = (i: number, value: string) => {
-    const colors = [...(brand.brandColors || DEFAULT_COLORS)];
-    colors[i] = value;
-    setBrandField('brandColors', colors);
   };
 
   const themes = splitThemes(brand.keyThemes);
@@ -269,7 +223,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
       <div className="page-head">
         <div>
           <h1 className="page-head__title">Settings</h1>
-          <p className="page-head__sub">{isSupport ? 'Your sign-in and how Kawayan looks.' : 'Your business, voice, channels and account.'}</p>
+          <p className="page-head__sub">{isSupport ? 'Your sign-in and how Kawayan looks.' : 'Your business, voice and account. Channels and billing have their own pages.'}</p>
         </div>
       </div>
 
@@ -294,17 +248,16 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
               <s.icon className="hidden h-4 w-4 shrink-0 text-(--fg-muted) lg:block" aria-hidden />
               {s.label}
               {BRAND_DRAFT.has(s.id) && brandDirty && <span className="h-1.5 w-1.5 rounded-full bg-(--amber)" aria-label="Unsaved changes" />}
-              {s.id === 'channels' && expiredCount > 0 && <span className="badge badge-red ml-auto px-1.5! py-0! text-[11px]" aria-label={`${expiredCount} channel problem${expiredCount > 1 ? 's' : ''}`}>{expiredCount}</span>}
             </button>
           ))}
         </div>
       </nav>
 
       <div>
-        <div className="space-y-6">
+        <SettingsActive.Provider value={anchor(active)}>
           {!isSupport && (
             <SettingsSection id={anchor('business')} title="Business" description="The details Kawayan uses to introduce your brand.">
-              <SettingRow label="Business name" hint="From your approved business documents. Contact support to change it.">
+              <SettingRow label="Business name" hint="From your approved documents. Ask support to change it.">
                 <LockedValue
                   id="st-biz"
                   value={brand.businessName}
@@ -324,17 +277,17 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                 </SettingRow>
               )}
 
-              <SettingRow label="Industry" htmlFor="st-industry" hint="Shapes the topics and examples in your captions.">
-                <IndustryPicker id="st-industry" value={brand.industry} onChange={(v) => setBrandField('industry', v)} />
+              <SettingRow label="Industry" hint="Set during brand setup. Ask support to change it.">
+                <LockedValue id="st-industry" value={industryLabel(brand.industry)} />
               </SettingRow>
 
               {'city' in brand && (
-                <SettingRow label="Where are you?" htmlFor="st-city" hint="Your city or area. Captions can mention nearby places and local events.">
+                <SettingRow label="Where are you?" htmlFor="st-city" hint="Captions can mention nearby places and events.">
                   <input id="st-city" className="input" placeholder="e.g. Parañaque City" value={brand.city || ''} onChange={(e) => setBrandField('city', e.target.value)} maxLength={120} />
                 </SettingRow>
               )}
 
-              <SettingRow label="Contact details" hint="Saved on your brand profile, so they’re in one place.">
+              <SettingRow label="Contact details" hint="Kept on your brand profile.">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="st-email" className="mb-1 block text-xs font-medium text-(--fg-muted)">Email</label>
@@ -344,25 +297,6 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                     <label htmlFor="st-phone" className="mb-1 block text-xs font-medium text-(--fg-muted)">Mobile number</label>
                     <input id="st-phone" type="tel" className="input" placeholder="0917 123 4567" value={brand.contactPhone || ''} onChange={(e) => setBrandField('contactPhone', e.target.value)} />
                   </div>
-                </div>
-              </SettingRow>
-
-              <SettingRow label="Brand colours" labelId="st-colors" hint="Your shop’s colours, saved with your brand profile.">
-                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="st-colors">
-                  {COLOR_NAMES.map((name, i) => {
-                    const color = brand.brandColors?.[i] || DEFAULT_COLORS[i];
-                    return (
-                      <label key={name} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-(--border) bg-(--card) py-1.5 pl-1.5 pr-3.5 shadow-xs hover:bg-(--muted) focus-within:ring-2 focus-within:ring-(--ring)">
-                        <span className="relative h-8 w-8 overflow-hidden rounded-lg border border-(--border)" style={{ background: color }}>
-                          <input type="color" value={color} onChange={(e) => setColor(i, e.target.value)} aria-label={`${name} brand colour`} className="absolute inset-0 cursor-pointer opacity-0" />
-                        </span>
-                        <span className="leading-tight">
-                          <span className="block text-ui font-medium text-(--fg)">{name}</span>
-                          <span className="mono block text-xs uppercase text-(--fg-muted)">{color}</span>
-                        </span>
-                      </label>
-                    );
-                  })}
                 </div>
               </SettingRow>
             </SettingsSection>
@@ -413,11 +347,11 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
                 </SettingRow>
               )}
 
-              <SettingRow label="Target audience" htmlFor="st-audience" hint="Who your posts speak to. Be specific: place, age, what they care about.">
+              <SettingRow label="Target audience" htmlFor="st-audience" hint="Be specific: place, age, what they care about.">
                 <input id="st-audience" className="input" placeholder="e.g. Working moms in Quezon City" value={brand.targetAudience} onChange={(e) => setBrandField('targetAudience', e.target.value)} />
               </SettingRow>
 
-              <SettingRow label="Content themes" htmlFor="st-themes" hint="Topics Kawayan rotates through. Press Enter or a comma after each one.">
+              <SettingRow label="Content themes" htmlFor="st-themes" hint="Press Enter after each topic.">
                 <div
                   className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-(--radius-md) border border-(--border-strong) bg-(--card) px-2 py-1.5 focus-within:border-(--primary) focus-within:ring-3 focus-within:ring-(--ring)"
                   onClick={() => document.getElementById('st-themes')?.focus()}
@@ -450,20 +384,13 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
             </SettingsSection>
           )}
 
-          {!isSupport && (
-            <SettingsSection id={anchor('channels')} title="Channels" description="The pages Kawayan posts to, through Zernio.">
-              <div className="p-4 sm:p-5">
-                <SocialAccounts embedded />
-              </div>
-            </SettingsSection>
-          )}
 
           <SettingsSection id={anchor('appearance')} title="Appearance" description="How Kawayan looks on this device.">
-            <SettingRow label="Theme" labelId="st-theme-label" hint="Light and Dark are saved to your account, so they follow you. System follows this device." wide>
+            <SettingRow label="Theme" labelId="st-theme-label" hint="Light and Dark follow your account. System follows this device." wide>
               <SettingsAppearance darkMode={darkMode} toggleDarkMode={toggleDarkMode} labelId="st-theme-label" themePref={themePref} onChooseTheme={onChooseTheme} />
             </SettingRow>
             {onReplayTour && (
-              <SettingRow label="Product walkthrough" hint="About two minutes: your calendar, planning and writing posts, and your account pages.">
+              <SettingRow label="Product walkthrough" hint="A two-minute tour of the app.">
                 <button type="button" onClick={onReplayTour} className="btn btn-outline">
                   <PlayCircle className="h-4 w-4" aria-hidden /> Replay tour
                 </button>
@@ -472,11 +399,11 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
           </SettingsSection>
 
           <SettingsSection id={anchor('security')} title="Login & security" description="How you sign in to Kawayan.">
-            <SettingRow label="Email" hint="You sign in with this email. It can’t be changed.">
+            <SettingRow label="Email" hint="Used to sign in. It can’t be changed.">
               <LockedValue id="st-login" value={user?.email || ''} />
             </SettingRow>
 
-            <SettingRow label="Password" hint={pwOpen ? 'At least 8 characters, with upper and lower case letters, a number and a symbol.' : 'Change it any time. You’ll stay signed in on this device.'}>
+            <SettingRow label="Password" hint={pwOpen ? 'At least 8 characters, with upper and lower case letters, a number and a symbol.' : 'You’ll stay signed in on this device.'}>
               {!pwOpen ? (
                 <button type="button" onClick={() => setPwOpen(true)} className="btn btn-outline">Change password</button>
               ) : (
@@ -509,7 +436,7 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
               )}
             </SettingRow>
             {user?.role === 'user' && (
-              <SettingRow label="Your data" hint="Download everything Kawayan keeps about you, or delete your account (Data Privacy Act, RA 10173).">
+              <SettingRow label="Your data" hint="Export or delete your data (Data Privacy Act, RA 10173).">
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="btn btn-outline btn-sm" onClick={exportData} disabled={exporting}>
                     <Download className="h-3.5 w-3.5" aria-hidden /> {exporting ? 'Preparing…' : 'Export my data'}
@@ -522,25 +449,12 @@ const Settings: React.FC<Props> = ({ profile, user, onProfileUpdate, darkMode, t
             )}
           </SettingsSection>
 
-          {!isSupport && (
-            <SettingsSection id={anchor('payments')} title="Payments & plans" description="Your plan and wallet. Payments and receipts are on Plan and billing.">
-              <SettingRow label="Plan" hint="Change plans or buy extra posts on Plan and billing.">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="badge badge-green">{wallet ? (wallet.subscription === 'PRO' ? 'Pro' : wallet.subscription === 'ENTERPRISE' ? 'Enterprise' : 'Free Trial') : '—'}</span>
-                  {onOpenBilling && <button type="button" className="btn btn-outline btn-sm" onClick={onOpenBilling}>Open Plan and billing</button>}
-                </div>
-              </SettingRow>
-              <SettingRow label="Wallet balance" hint="For extra posts beyond your plan.">
-                <p className="mono text-lg font-semibold">{wallet ? `₱${wallet.balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p>
-              </SettingRow>
-            </SettingsSection>
-          )}
 
           <SettingsSection id={anchor('accessibility')} title="Accessibility" description="Text size, contrast and motion. Saved in this browser.">
             <div className="p-3 sm:p-4"><AccessibilityOptions /></div>
           </SettingsSection>
 
-        </div>
+        </SettingsActive.Provider>
       </div>
       </div>
 

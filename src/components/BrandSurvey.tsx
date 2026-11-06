@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrandProfile } from '../types';
-import { Store, Users, MessageCircle, PenTool, Check, Sparkles, Lock } from 'lucide-react';
+import { Store, Users, MessageCircle, PenTool, Check, Lock } from 'lucide-react';
 import { BRAND_VOICES } from '../constants/brandVoices';
 import Stepper, { Step } from './ui/Stepper';
 import './onboarding.css';
@@ -54,26 +54,7 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '', initialPr
     });
   };
 
-  // ── live preview copy keyed to the chosen brand voice ──
-  const previewPost = (() => {
-    const name = profile.businessName.trim() || 'your brand';
-    switch (profile.brandVoice) {
-      case 'Professional & Trustworthy':
-        return `Introducing the latest from ${name}. Crafted with care, built to deliver. Learn more today.`;
-      case 'Makulit & Fun (Kwelang Pinoy)':
-        return `GRABE guys, may bago na naman kami sa ${name}! 🤯 Type mo? Comment ng "AKO NA" 👇`;
-      case 'Inspirational (Hugot)':
-        return `Sa bawat simula, may kwento. ${name} is here for yours. Keep going. ✨`;
-      case 'Premium & Minimalist':
-        return `${name}. Less, but better.`;
-      case 'Friendly Tita':
-        return `Anak, tara na! Bagong labas sa ${name} — subukan mo, promise sulit. 💚`;
-      default:
-        return `Hi there! Something new just dropped at ${name} — come check it out. 😊`;
-    }
-  })();
 
-  const themeTags = profile.keyThemes.split(',').map(t => t.trim()).filter(Boolean).slice(0, 4);
 
   return (
     <div className="ob-screen">
@@ -81,14 +62,13 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '', initialPr
       <div className="ob-orb ob-orb--2" />
 
       <div className="ob-inner bs-wrap">
-        {/* ─────────── main column ─────────── */}
         <div>
           <div className="mb-6 grid justify-items-start gap-2 [&_.ob-top]:mx-0 [&_.ob-top]:w-full">
             {onBack && <button type="button" className="btn btn-ghost btn-sm -ml-2" onClick={onBack}>← Back to verification</button>}
             <OnboardingBar current={2} help={!!verificationPending} verificationPending={verificationPending} />
           </div>
           <div className="bs-head">
-            <span className="bs-eyebrow"><Sparkles /> Brand DNA Setup</span>
+            <span className="bs-eyebrow">Brand DNA Setup</span>
             <h1>Let&apos;s set up your brand</h1>
             <p>This helps Kawayan AI create content that truly sounds like you.</p>
           </div>
@@ -105,10 +85,11 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '', initialPr
                 {sectionHead(Store, 'Business Basics', 'Tell us about your business')}
                 <div className="space-y-5">
                   <div>
-                    <label className="bs-label">Business Name</label>
+                    <label className="bs-label" htmlFor="bs-bizname">Business Name</label>
                     {/* Verified identity from sign-up — shown, not edited, so the
                         brand profile can never drift from the approved name. */}
                     <input
+                      id="bs-bizname"
                       type="text"
                       className="input"
                       value={profile.businessName}
@@ -192,39 +173,6 @@ const BrandSurvey: React.FC<Props> = ({ onComplete, businessName = '', initialPr
           </div>
         </div>
 
-        {/* ─────────── live preview ─────────── */}
-        <aside className="bs-preview">
-          <div className="bs-preview__label"><b /> Live preview</div>
-          <div className="bs-preview__card">
-            <div className="bs-preview__top">
-              <div className="bs-preview__logo">
-                {(profile.businessName.trim()[0] || 'K').toUpperCase()}
-              </div>
-              <div>
-                <div className="bs-preview__name">{profile.businessName.trim() || 'Your Business'}</div>
-                <div className="bs-preview__ind">{profile.industry.trim() || 'Your industry'}</div>
-              </div>
-            </div>
-
-            <div className="bs-preview__row">
-              <span className="bs-preview__tag">{profile.brandVoice}</span>
-              {themeTags.map((t) => (
-                <span key={t} className="bs-preview__tag">{t}</span>
-              ))}
-            </div>
-
-            <div className="bs-preview__post">
-              <div className="bs-preview__post-k">Sample caption</div>
-              <div className="bs-preview__post-t">{previewPost}</div>
-            </div>
-
-            <div className="bs-preview__foot">
-              {profile.targetAudience.trim()
-                ? `Speaking to: ${profile.targetAudience.trim().slice(0, 70)}${profile.targetAudience.trim().length > 70 ? '…' : ''}`
-                : 'Add your audience to sharpen the tone'}
-            </div>
-          </div>
-        </aside>
       </div>
     </div>
   );

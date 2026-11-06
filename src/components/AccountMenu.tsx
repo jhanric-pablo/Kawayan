@@ -1,35 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, ChevronDown, ChevronsUpDown, CreditCard, LifeBuoy, LogOut, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, LogOut } from 'lucide-react';
 import type { ThemePref } from '../utils/sessionView';
 import { User } from '../types';
 import { paymentService } from '../services/paymentService';
-import { HELP_EVENT } from '../utils/usePhone';
 import './appShell.css';
 
 interface Props {
   user: User;
   onSignOut: () => void;
-  /** Sign out and go straight to the sign-in screen. */
-  onSwitchAccount?: () => void;
-  onSettings?: () => void;
-  onBilling?: () => void;
-  /** Phones have no sidebar help button, so help lives here. */
-  showHelp?: boolean;
   /** The plan when the caller already knows it; otherwise it's fetched on open. */
   plan?: string | null;
   /** 'sidebar': full-width row at the foot of the sidebar, menu opens upward. */
   placement?: 'header' | 'sidebar';
-  /** Opens the Help desk (owner accounts). */
-  onHelpDesk?: () => void;
-  /** Replays the product walkthrough. */
-  onTour?: () => void;
   /** Appearance: Light / Dark / System. */
   themePref?: ThemePref;
   onChooseTheme?: (pref: ThemePref) => void;
 }
 
-/** Avatar + name button → who you're signed in as, your plan, Switch account, Settings, Help and Sign out. */
-const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSettings, onBilling, showHelp, plan: knownPlan, placement = 'header', onHelpDesk, onTour, themePref, onChooseTheme }) => {
+/**
+ * Avatar + name button → who you're signed in as (name, email, plan), Appearance, and Log out.
+ * Settings, Channels, Plan and billing and Help desk live in the sidebar, so they aren't repeated here.
+ */
+const AccountMenu: React.FC<Props> = ({ user, onSignOut, plan: knownPlan, placement = 'header', themePref, onChooseTheme }) => {
   const inSidebar = placement === 'sidebar';
   const [open, setOpen] = useState(false);
   const [fetchedPlan, setPlan] = useState<string | null>(null);
@@ -96,43 +88,13 @@ const AccountMenu: React.FC<Props> = ({ user, onSignOut, onSwitchAccount, onSett
       {open && (
         <div className="am__menu" role="menu" aria-label="Account" onKeyDown={moveFocus}>
           <div className="am__who">
-            <span className="flex items-center justify-between gap-2">
+            <span className="am__avatar" aria-hidden>{name[0]?.toUpperCase()}</span>
+            <span className="min-w-0 flex-1">
               <b>{name}</b>
-              {user.role === 'user' && plan && <span className={plan === 'FREE' ? 'badge badge-sage' : 'badge badge-green'}>{plan === 'FREE' ? 'Free' : 'Pro'}</span>}
+              {user.businessName && <span>{user.email}</span>}
             </span>
-            {user.businessName && <span>{user.email}</span>}
-            {user.role === 'user' && plan === 'FREE' && onBilling && (
-              <span className="am__plan">
-                Free plan
-                <button type="button" onClick={run(onBilling)}>Upgrade</button>
-              </span>
-            )}
+            {user.role === 'user' && plan && <span className={plan === 'FREE' ? 'badge badge-sage' : 'badge badge-green'}>{plan === 'FREE' ? 'Free' : plan === 'ENTERPRISE' ? 'Enterprise' : 'Pro'}</span>}
           </div>
-          {onSwitchAccount && (
-            <button type="button" role="menuitem" className="am__item" onClick={run(onSwitchAccount)}>
-              <ArrowLeftRight aria-hidden /> Switch account
-            </button>
-          )}
-          {onSettings && (
-            <button type="button" role="menuitem" className="am__item" onClick={run(onSettings)}>
-              <SettingsIcon aria-hidden /> Settings
-            </button>
-          )}
-          {onBilling && (
-            <button type="button" role="menuitem" className="am__item" onClick={run(onBilling)}>
-              <CreditCard aria-hidden /> Plan and billing
-            </button>
-          )}
-          {(onHelpDesk || showHelp) && (
-            <button type="button" role="menuitem" className="am__item" onClick={run(onHelpDesk ?? (() => window.dispatchEvent(new Event(HELP_EVENT))))}>
-              <LifeBuoy aria-hidden /> Help desk
-            </button>
-          )}
-          {onTour && (
-            <button type="button" role="menuitem" className="am__item" onClick={run(onTour)}>
-              <MapIcon aria-hidden /> Take the tour
-            </button>
-          )}
           {onChooseTheme && (
             <div className="am__seg">
               <p className="am__seg-label" id="am-theme-label">Appearance</p>

@@ -55,7 +55,8 @@ export function getScheduleDayRange(calendarMonth: Date, now: Date = new Date())
   return { minDay, maxDay };
 }
 
-const FORMATS: ContentIdea['format'][] = ['Image', 'Video', 'Text'];
+// Video isn't offered yet: Kawayan makes captions and images only.
+const FORMATS: ContentIdea['format'][] = ['Image', 'Text'];
 
 /**
  * Place a plan's ideas on the calendar: one idea per open day, never two on the same day.

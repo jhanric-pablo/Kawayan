@@ -23,12 +23,9 @@ interface Props {
   children: React.ReactNode;
 }
 
-/** Sample images from the AI generator, for the panel beside the form. Decorative. */
-const COLLAGE = ['/hero/ai/panaderia-1.jpg', '/hero/ai/milktea-2.jpg', '/hero/ai/carinderia-1.jpg'];
-
 /**
- * Open page: logo top-left, the form centred, and an optional panel beside it.
- * Switching modes animates: the title slides, the form resizes, the panel glides in.
+ * Open page: logo top-left, the form centred, and an optional panel beside it (sign-up only).
+ * Switching modes animates: the title slides, the fields swap, the form glides aside as the panel comes in.
  * Shared by sign-in, sign-up, staff login and password reset.
  */
 const AuthShell: React.FC<Props> = ({
@@ -36,7 +33,8 @@ const AuthShell: React.FC<Props> = ({
 }) => (
   <MotionConfig reducedMotion="user">
     <LazyMotion features={domMax} strict>
-      <div className={layout === 'center' ? 'ax ax--center' : 'ax'}>
+      {/* Split only while there is something to show beside the form (sign-up); sign-in is one centred column. */}
+      <div className={layout === 'center' ? 'ax ax--center' : aside ? 'ax' : 'ax ax--solo'}>
         <header className="ax__bar">
           <button type="button" className="ax__brand" onClick={onBack} aria-label="Kawayan home">
             <KawayanLogo size={17} />
@@ -64,7 +62,7 @@ const AuthShell: React.FC<Props> = ({
         </header>
 
         <main className="ax__stage">
-          <m.section layout="position" className="ax__panel" transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}>
+          <m.section layout="position" className="ax__panel" transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}>
             <div className="ax__head">
               <AnimatePresence mode="wait" initial={false}>
                 <m.h1
@@ -85,14 +83,9 @@ const AuthShell: React.FC<Props> = ({
             {footer}
           </m.section>
         </main>
-        {layout === 'split' && (
-          <aside className="ax__side" aria-hidden={aside ? undefined : true}>
+        {layout === 'split' && aside && (
+          <aside className="ax__side">
             <AnimatePresence>{aside}</AnimatePresence>
-            {!aside && (
-              <div className="ax-collage">
-                {COLLAGE.map((src) => <img decoding="async" key={src} src={src} alt="" loading="lazy" />)}
-              </div>
-            )}
           </aside>
         )}
       </div>

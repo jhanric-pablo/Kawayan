@@ -6,7 +6,7 @@ import { GeneratedPost, User, ViewState } from '../../types';
 import UniversalDatabaseService from '../../services/universalDatabaseService';
 import { socialService, SocialAccount } from '../../services/socialService';
 import { paymentService } from '../../services/paymentService';
-import { SubscriptionTier, countPostsInMonth, getBatchLimitForSubscription } from '../../utils/tierLimits';
+import { ADDON_POST_PRICE_PHP, SubscriptionTier, countPostsInMonth, getBatchLimitForSubscription } from '../../utils/tierLimits';
 import { HELP_EVENT } from '../../utils/usePhone';
 import { Sidebar, SidebarProvider, useSidebar } from '../ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -19,6 +19,9 @@ import { useToast } from '../ui/Toast';
 import NotificationCenter from './NotificationCenter';
 import AccountMenu from '../AccountMenu';
 const HelpPanel = React.lazy(() => import('../HelpPanel'));
+const KawiWidget = React.lazy(() => import('../kawi/KawiWidget'));
+import type { KawiHandoff } from '../HelpPanel';
+import type { KawiAction } from '../../services/aiService';
 import '../appShell.css';
 import { KawayanMark } from '../KawayanLogo';
 import type { ThemePref } from '../../utils/sessionView';
@@ -42,7 +45,7 @@ interface Props {
   navItems: NavItem[];
   phone: boolean;
   /** Account actions; App owns sign-out, switching, Settings and Billing. */
-  account: { onSignOut: () => void; onSwitchAccount?: () => void; onSettings?: () => void; onBilling?: () => void };
+  account: { onSignOut: () => void };
   onNavigate: (view: ViewState) => void;
   onHome: () => void;
   onCreatePost: () => void;
@@ -246,10 +249,31 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
     feed.accountsState === 'loading' ? { tone: 'idle' as const, label: 'Checking engine…' }
     : feed.accountsState === 'error' ? { tone: 'down' as const, label: 'Posting engine offline' }
     : feed.accounts.length === 0 ? { tone: 'idle' as const, label: 'No pages connected' }
-    : expired.length ? { tone: 'warn' as const, label: 'Engine needs attention' }
-    : { tone: 'ok' as const, label: 'Engine active' };
+    : expired.length ? { tone: 'warn' as const, label: 'A page needs reconnecting' }
+    : { tone: 'ok' as const, label: feed.accounts.length === 1 ? `${PLATFORM_LABEL[feed.accounts[0].platform] ?? 'Page'} connected` : `${feed.accounts.length} pages connected` };
   const used = countPostsInMonth(feed.posts, new Date());
   const limit = getBatchLimitForSubscription(plan ?? 'FREE');
+
+  // Kawi, the help bubble: what it knows about this owner (plain text, read as data by the bot), where its
+  // buttons go, and the conversation it hands to the help panel when the owner asks for a person.
+  const [handoff, setHandoff] = useState<KawiHandoff | null>(null);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const failedPosts = feed.posts.filter((p) => p.status === 'Draft' && feed.failedIds.includes(p.id));
+  const kawiAccount = [
+    `Business: ${businessName || user.businessName || 'unknown'}`,
+    `Plan: ${plan ?? 'FREE'}, ${used} of ${limit} posts used this month`,
+    `Pages: ${feed.accounts.length ? feed.accounts.map((a) => `${PLATFORM_LABEL[a.platform] ?? a.platform} @${a.username} (${a.isActive ? 'connected' : 'lost access, needs reconnecting'})`).join('; ') : 'none connected'}`,
+    `Drafts waiting for approval: ${feed.posts.filter((p) => p.status === 'Draft' && p.date >= todayKey).length}`,
+    `Scheduled posts: ${feed.posts.filter((p) => p.status === 'Scheduled').length}`,
+    `Posts that didn't go out: ${failedPosts.length ? failedPosts.slice(0, 5).map((p) => `"${p.topic}" on ${p.date}`).join(', ') : 'none'}`,
+    `Business permit: ${user.verificationStatus ?? 'unknown'}`,
+    `Open support conversations: ${tickets.filter((t) => t.status !== 'Resolved').length}`,
+    `Page they're on: ${view}`,
+  ].join('\n');
+  const KAWI_VIEW: Record<Exclude<KawiAction, 'talk_to_person'>, ViewState> = {
+    open_calendar: ViewState.CALENDAR, open_planner: ViewState.PLANNER, open_studio: ViewState.STUDIO, open_channels: ViewState.SOCIAL,
+    open_billing: ViewState.BILLING, open_settings: ViewState.SETTINGS, open_insights: ViewState.INSIGHTS,
+  };
 
   // Desktop: the top-bar toggle (or ⌘/Ctrl+B) collapses the sidebar to an icon rail; remembered on
   // this device. Phones (< 768px): the shadcn Sheet drawer.
@@ -349,21 +373,37 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
         ))}
       </nav>
 
-      {/* Monthly post quota + posting engine */}
+      {/* Plan usage ("10 of 8 used", meter stops at full, amber note at or over the limit) + page connection */}
       {isUser && (
-        <SideTip label={`${monthName} posts ${used} / ${limit} · ${engine.label}`} show={narrow}>
-          <div className="kw-side__quota card" data-tour="posts-used">
-            <p className="kw-side__label flex items-center justify-between gap-2 text-ui">
+        <SideTip label={`${monthName} posts: ${used} of ${limit} used · ${engine.label}`} show={narrow}>
+          <div className={clsx('kw-side__quota card', used >= limit && 'is-full')} data-tour="posts-used">
+            <p className="kw-side__label flex items-baseline justify-between gap-2 text-ui">
               <b className="font-medium text-(--fg)">{monthName} posts</b>
-              <span className="mono text-(--fg-muted)">{used} / {limit}</span>
+              <span className="mono text-(--fg-muted)"><b className="font-semibold text-(--fg)">{used}</b> of {limit} used</span>
             </p>
-            <div className="kw-side__label h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label="Posts used this month" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used}>
-              <div className="h-full rounded-full bg-(--green)" style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
+            <div className="kw-side__label h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label={`${monthName} posts used`} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={Math.min(used, limit)}>
+              <div className={clsx('h-full rounded-full', used >= limit ? 'bg-(--amber)' : 'bg-(--meter)')} style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
             </div>
-            <p className="kw-side__label text-xs text-(--fg-muted)">Resets {resets}. Drafts count too.</p>
-            <p className="flex items-center gap-2 text-xs text-(--fg-muted)">
+            {used >= limit ? (
+              <p className="kw-side__label kw-side__warn">
+                <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>
+                  {used > limit ? `${used - limit} over your plan. ` : `You’ve used all ${limit}. `}
+                  Extra posts are ₱{ADDON_POST_PRICE_PHP} each from your wallet.{' '}
+                  {(plan ?? 'FREE') === 'FREE' && <button type="button" onClick={() => onNavigate(ViewState.BILLING)}>Upgrade to Pro</button>}
+                </span>
+              </p>
+            ) : (
+              <p className="kw-side__label text-xs text-(--fg-muted)">{limit - used} left · resets {resets}. Drafts count too.</p>
+            )}
+            <p className="flex items-center gap-2 border-t border-(--border) pt-2 text-xs text-(--fg-muted)">
               <span className={clsx('inline-flex h-2 w-2 shrink-0 rounded-full', ENGINE_DOT[engine.tone])} aria-hidden />
-              <span className="kw-side__label truncate">{engine.label}</span>
+              <span className="kw-side__label min-w-0 flex-1 truncate">{engine.label}</span>
+              {feed.accountsState === 'ok' && (feed.accounts.length === 0 || expired.length > 0) && (
+                <button type="button" className="kw-side__label font-semibold text-(--green-ink)" onClick={() => onNavigate(ViewState.SOCIAL)}>
+                  {feed.accounts.length === 0 ? 'Connect' : 'Fix'}
+                </button>
+              )}
               <span className="sr-only">{engine.label}</span>
             </p>
           </div>
@@ -376,8 +416,6 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
           plan={plan}
           {...account}
           placement="sidebar"
-          onHelpDesk={isUser ? () => (navItems.some((i) => i.id === ViewState.HELP) ? onNavigate(ViewState.HELP) : setHelpOpen(true)) : undefined}
-          onTour={onReplayTour}
           themePref={themePref}
           onChooseTheme={onChooseTheme}
         />
@@ -458,7 +496,18 @@ const DashboardLayout: React.FC<Props> = ({ user, view, navItems, phone, account
       {/* Loaded on first open (it pulls in the chat client), then kept mounted so it can slide closed. */}
       {isUser && helpEverOpened && (
         <React.Suspense fallback={null}>
-          <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
+          <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} handoff={handoff} onHandoffDone={() => setHandoff(null)} />
+        </React.Suspense>
+      )}
+      {isUser && (
+        <React.Suspense fallback={null}>
+          <KawiWidget
+            account={kawiAccount}
+            businessName={businessName || user.businessName || ''}
+            hidden={helpOpen}
+            onAction={(a) => onNavigate(KAWI_VIEW[a])}
+            onHandoff={(h) => { setHandoff({ ...h, key: Date.now() }); setHelpOpen(true); }}
+          />
         </React.Suspense>
       )}
     </SidebarProvider>

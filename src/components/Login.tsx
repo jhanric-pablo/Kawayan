@@ -404,6 +404,16 @@ const Login: React.FC<Props> = ({
       ) : (
         <>
           <m.form onSubmit={handleSubmit} className="ax-form" animate={shake}>
+            {/* Sign in ⇄ sign up: the old fields lift out, the new ones settle in. */}
+            <AnimatePresence mode="wait" initial={false}>
+            <m.div
+              key={isSignUp && !isAdminLogin ? 'up' : 'in'}
+              className="ax-form"
+              initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+              transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
+            >
             {isSignUp && !isAdminLogin ? (
               /* Submit (Continue / Enter) drives the steps and their validation; the header shows progress. */
               <AnimatePresence mode="wait" initial={false} custom={stepDir}>
@@ -509,6 +519,8 @@ const Login: React.FC<Props> = ({
             ) : (
               accountFields
             )}
+            </m.div>
+            </AnimatePresence>
 
             {messages}
 

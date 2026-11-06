@@ -1,6 +1,6 @@
 import React from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { Clock, Ellipsis, ExternalLink, Image as ImageIcon, PanelRight, PencilLine, RotateCcw, Sparkles, Type, Video } from 'lucide-react';
+import { Clock, Ellipsis, ExternalLink, Image as ImageIcon, PanelRight, PencilLine, RotateCcw, Type, Video, CircleDashed } from 'lucide-react';
 import clsx from 'clsx';
 import type { CardStatus, TimelineCardItem } from './mapCalendarEvents';
 
@@ -10,10 +10,11 @@ const BADGE: Record<CardStatus, string> = {
   idea: 'border-dashed border-(--border) bg-(--muted) text-(--fg-muted)',
   draft: 'border-dashed border-(--border-strong) bg-(--card) text-(--fg)',
   scheduled: 'border-(--border) bg-(--card) text-(--fg)',
-  published: 'border-transparent bg-(--green-soft) text-(--green-ink)',
+  published: 'border-transparent bg-(--muted) text-(--fg-muted)',
   failed: 'border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_7%,var(--card))] text-(--danger)',
 };
-const LABEL: Record<CardStatus, string> = { idea: 'Idea', draft: 'Draft', scheduled: 'Scheduled', published: 'Posted', failed: 'Failed' };
+// Every Kawayan draft waits for the owner, so drafts read as "Pending approval" everywhere.
+const LABEL: Record<CardStatus, string> = { idea: 'Idea', draft: 'Pending approval', scheduled: 'Scheduled', published: 'Posted', failed: 'Failed' };
 
 export const StatusBadge: React.FC<{ status: CardStatus; time?: string; className?: string }> = ({ status, time, className }) => (
   <span className={clsx('inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-xs font-medium', BADGE[status], className)}>
@@ -35,7 +36,7 @@ interface Props {
 /** A post (or idea) sitting in its channel lane: thumbnail, headline, status and actions. */
 const TimelinePostCard: React.FC<Props> = ({ item, onOpen, onEdit, onRetry }) => {
   const failed = item.status === 'failed';
-  const FormatIcon = item.status === 'idea' ? Sparkles : FORMAT_ICON[item.format || 'Image'] || ImageIcon;
+  const FormatIcon = item.status === 'idea' ? CircleDashed : FORMAT_ICON[item.format || 'Image'] || ImageIcon;
   const link = item.post?.externalLink;
 
   return (

@@ -18,15 +18,33 @@ export const authenticateToken = (req, res, next) => {
   next();
 };
 
-export const requireAdmin = (req, res, next) => {
+export const isStaff = (user) => user.role === 'admin' || user.role === 'support';
+
+// The role inside a login token can be up to a day old, so staff routes also check the account's current
+// role: someone demoted (or deleted) loses access on their next request, not when the token expires.
+const currentRole = async (req) => {
+  const fresh = await dbService.getUserById(req.user.userId);
+  if (fresh) req.user.role = fresh.role;
+  return fresh?.role;
+};
+
+export const requireAdmin = async (req, res, next) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  try {
+    if ((await currentRole(req)) !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  } catch {
+    return res.status(503).json({ error: 'Could not check your access. Try again.' });
+  }
   next();
 };
 
-export const isStaff = (user) => user.role === 'admin' || user.role === 'support';
-
-export const requireStaff = (req, res, next) => {
+export const requireStaff = async (req, res, next) => {
   if (!isStaff(req.user)) return res.status(403).json({ error: 'Unauthorized' });
+  try {
+    if (!isStaff({ role: await currentRole(req) })) return res.status(403).json({ error: 'Unauthorized' });
+  } catch {
+    return res.status(503).json({ error: 'Could not check your access. Try again.' });
+  }
   next();
 };
 

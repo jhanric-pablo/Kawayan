@@ -6,8 +6,8 @@ import { countPostsInMonth } from '../utils/tierLimits';
 import { paymentService, Wallet, Transaction } from '../services/paymentService';
 import { useOrganicDialog } from './OrganicDialog';
 import { useToast } from './ui/Toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { ADDON_POST_PRICE_PHP, PRO_POST_LIMIT, PRO_PRICE_PHP, TRIAL_POST_LIMIT } from '../utils/tierLimits';
-import PageSkeleton from './PageSkeleton';
 
 const QUICK_AMOUNTS = [100, 500, 1000];
 const TOPUP_MIN = 100;
@@ -37,7 +37,12 @@ interface Props {
   onTalkToUs?: () => void;
 }
 
+/** Payment history rows shown before "Show all". */
+const TX_PREVIEW = 5;
+
 const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
+  const [showAllTx, setShowAllTx] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
   const dialog = useOrganicDialog();
   const toast = useToast();
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -191,6 +196,26 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
     { id: 'ENTERPRISE', name: 'Enterprise', price: 'Custom', items: ['For chains and franchises', 'Talk to us about volume'] },
   ] as const;
 
+  /** The receipt / next step for one payment, shared by the table and the phone list. */
+  const txAction = (t: Transaction) => {
+    const { ref } = describe(t);
+    const credit = t.type === 'CREDIT';
+    return t.status === 'COMPLETED' && ref ? (
+            <button type="button" className="text-xs underline underline-offset-2" style={labelStyle} onClick={() => copyRef(ref)} title={ref}>Copy ref</button>
+          ) : t.status === 'PENDING' ? (
+            <span className="flex gap-1.5">
+              {checkoutUrl && <a href={checkoutUrl} className="btn btn-outline btn-sm">Continue</a>}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleCancelPending(t)} disabled={busy === 'cancel'}>Cancel</button>
+            </span>
+          ) : t.status === 'FAILED' && credit ? (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => startTopUp(t.amount)} disabled={busy === 'topup' || !!pending}>Retry</button>
+          ) : t.status === 'FAILED' && /^Pro plan/.test(t.description) ? (
+            <button type="button" className="btn btn-outline btn-sm" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Retry</button>
+          ) : (
+            <span style={labelStyle}>—</span>
+          );
+  };
+
   return (
     <div className="max-w-5xl space-y-5 animate-fade-in">
       <div className="kw-page-h">
@@ -251,11 +276,12 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
               <b className="mono font-medium">{postsUsed == null ? '—' : `${postsUsed} of ${limit}`}</b>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--fg)_9%,transparent)]" role="progressbar" aria-label={`${monthName} posts used`} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={postsUsed ?? 0}>
-              <div className="h-full rounded-full bg-(--green)" style={{ width: `${Math.min(100, ((postsUsed ?? 0) / limit) * 100)}%` }} />
+              <div className="h-full rounded-full bg-(--meter)" style={{ width: `${Math.min(100, ((postsUsed ?? 0) / limit) * 100)}%` }} />
             </div>
           </div>
           <p className="text-xs" style={labelStyle}>Your post count resets {resets}. Extra posts are ₱{ADDON_POST_PRICE_PHP} each, paid from the wallet.</p>
           <div className="mt-auto flex flex-wrap gap-2">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPlansOpen(true)}>Compare plans</button>
             {onBuyExtra && (
               <button type="button" className="btn btn-outline btn-sm" onClick={onBuyExtra}>Buy 1 extra post · ₱{ADDON_POST_PRICE_PHP}</button>
             )}
@@ -270,12 +296,12 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
         </section>
 
         {/* Wallet: the mockup's inverted card */}
-        <section className="surface kw-wallet p-6">
+        <section className="surface kw-wallet p-5">
           <div className="flex items-center justify-between gap-2"><p className="flex items-center gap-2 text-ui font-medium" style={labelStyle}><WalletIcon className="h-4 w-4" aria-hidden /> Wallet balance</p><span className="text-xs" style={labelStyle}>PayMongo</span></div>
           <p className="text-[34px] leading-tight font-semibold tracking-tight mt-1 tabular-nums" style={{ color: 'var(--fg)' }}>{peso(wallet.balance)}</p>
           <p className="text-sm mt-1" style={labelStyle}>Use it for extra posts beyond your plan, ₱{ADDON_POST_PRICE_PHP} each.</p>
 
-          <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
             <label htmlFor="topup-amount" className="text-ui font-medium" style={labelStyle}>Add funds</label>
             <div className="flex gap-2 mt-2">
               {QUICK_AMOUNTS.map((v) => (
@@ -294,7 +320,8 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
                 </button>
               ))}
             </div>
-            <div className="relative mt-2">
+            <div className="mt-2 flex gap-2">
+            <div className="relative min-w-0 flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={labelStyle}>₱</span>
               <input
                 id="topup-amount"
@@ -309,6 +336,16 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
                 aria-describedby="topup-hint"
               />
             </div>
+            <button
+              onClick={() => startTopUp(amountValue)}
+              disabled={!amountValid || busy === 'topup' || !!pending}
+              className="btn btn-primary shrink-0"
+              title={pending ? 'Finish or cancel the payment in progress first' : undefined}
+            >
+              {busy === 'topup' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <Plus className="w-3.5 h-3.5" /> Add funds
+            </button>
+            </div>
             <p id="topup-hint" className="text-xs mt-1.5" style={{ color: amount && !amountValid ? 'var(--danger)' : 'var(--fg-subtle)' }}>
               {amount && !amountValid
                 ? `Enter a whole amount from ₱${TOPUP_MIN} to ₱${TOPUP_MAX.toLocaleString()}.`
@@ -316,46 +353,44 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
                   ? 'Finish or cancel the payment above before adding more.'
                   : 'GCash, Maya or card, processed securely by PayMongo.'}
             </p>
-            <button
-              onClick={() => startTopUp(amountValue)}
-              disabled={!amountValid || busy === 'topup' || !!pending}
-              className="btn btn-primary btn-sm w-full mt-3"
-              title={pending ? 'Finish or cancel the payment in progress first' : undefined}
-            >
-              {busy === 'topup' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <Plus className="w-3.5 h-3.5" /> Add funds
-            </button>
           </div>
         </section>
       </div>
 
-      {/* Plans (mockup .cells .prices) */}
-      <div className="kw-cells kw-cells--3" aria-label="Plans">
-        {PLANS.map((pl) => {
-          const current = pl.id === (wallet.subscription ?? 'FREE');
-          return (
-            <div key={pl.id} className={current ? 'is-hl' : undefined}>
-              <h3 className="flex items-center gap-2 text-base font-semibold">{pl.name}{current && <span className="badge badge-green">Your plan</span>}</h3>
-              <p className="text-[30px] font-semibold leading-none tracking-tight tabular-nums">{pl.price}</p>
-              <ul className="flex flex-col gap-2 text-sm">
-                {pl.items.map((it) => <li key={it} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-(--green-ink)" aria-hidden />{it}</li>)}
-              </ul>
-              <div className="mt-auto">
-                {current ? (
-                  <button type="button" className="btn btn-outline w-full" disabled>Current plan</button>
-                ) : pl.id === 'FREE' ? (
-                  <button type="button" className="btn btn-outline w-full" onClick={handleDowngrade} disabled={busy === 'plan'}>Switch to Free</button>
-                ) : pl.id === 'PRO' ? (
-                  <button type="button" className="btn btn-primary w-full" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Upgrade to Pro</button>
-                ) : (
-                  <button type="button" className="btn btn-outline w-full" onClick={onTalkToUs} disabled={!onTalkToUs}>Talk to us</button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {!isPro && <p className="kw-hint -mt-2">Pay with GCash, Maya or card. Your wallet isn’t used for the plan.</p>}
+      {/* Plans: the full comparison opens on request; the current-plan card already has Upgrade. */}
+      <Dialog open={plansOpen} onOpenChange={setPlansOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Compare plans</DialogTitle>
+          </DialogHeader>
+          <div className="kw-cells kw-cells--3" aria-label="Plans">
+            {PLANS.map((pl) => {
+              const current = pl.id === (wallet.subscription ?? 'FREE');
+              return (
+                <div key={pl.id} className={current ? 'is-hl' : undefined}>
+                  <h3 className="flex items-center gap-2 text-base font-semibold">{pl.name}{current && <span className="badge badge-green">Your plan</span>}</h3>
+                  <p className="text-[30px] font-semibold leading-none tracking-tight tabular-nums">{pl.price}</p>
+                  <ul className="flex flex-col gap-2 text-sm">
+                    {pl.items.map((it) => <li key={it} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-(--green-ink)" aria-hidden />{it}</li>)}
+                  </ul>
+                  <div className="mt-auto">
+                    {current ? (
+                      <button type="button" className="btn btn-outline w-full" disabled>Current plan</button>
+                    ) : pl.id === 'FREE' ? (
+                      <button type="button" className="btn btn-outline w-full" onClick={handleDowngrade} disabled={busy === 'plan'}>Switch to Free</button>
+                    ) : pl.id === 'PRO' ? (
+                      <button type="button" className="btn btn-primary w-full" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Upgrade to Pro</button>
+                    ) : (
+                      <button type="button" className="btn btn-outline w-full" onClick={onTalkToUs} disabled={!onTalkToUs}>Talk to us</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!isPro && <p className="kw-hint">Pay with GCash, Maya or card. Your wallet isn’t used for the plan.</p>}
+        </DialogContent>
+      </Dialog>
 
       {/* History (mockup .tbl) */}
       <section className="surface overflow-hidden">
@@ -369,13 +404,13 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
           <p className="px-6 py-10 text-sm text-center" style={{ color: 'var(--fg-muted)' }}>No payments yet.</p>
         ) : (
           <div className="scroll-x">
-            <table className="kw-tbl kw-tbl--static">
+            <table className="kw-tbl kw-tbl--static hidden sm:table">
               <thead>
                 <tr><th>Date</th><th>Description</th><th>Method</th><th className="text-right">Amount</th><th>Status</th><th>Receipt</th></tr>
               </thead>
               <tbody>
-                {wallet.transactions.map((t) => {
-                  const { title, ref } = describe(t);
+                {(showAllTx ? wallet.transactions : wallet.transactions.slice(0, TX_PREVIEW)).map((t) => {
+                  const { title } = describe(t);
                   const credit = t.type === 'CREDIT';
                   return (
                     <tr key={t.id}>
@@ -384,27 +419,36 @@ const Billing: React.FC<Props> = ({ onBuyExtra, onTalkToUs }) => {
                       <td style={labelStyle}>{method(t)}</td>
                       <td className={`mono text-right whitespace-nowrap ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}>{credit ? '+' : '−'}{peso(t.amount)}</td>
                       <td>{statusBadge(t)}</td>
-                      <td>
-                        {t.status === 'COMPLETED' && ref ? (
-                          <button type="button" className="text-xs underline underline-offset-2" style={labelStyle} onClick={() => copyRef(ref)} title={ref}>Copy ref</button>
-                        ) : t.status === 'PENDING' ? (
-                          <span className="flex gap-1.5">
-                            {checkoutUrl && <a href={checkoutUrl} className="btn btn-outline btn-sm">Continue</a>}
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleCancelPending(t)} disabled={busy === 'cancel'}>Cancel</button>
-                          </span>
-                        ) : t.status === 'FAILED' && credit ? (
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => startTopUp(t.amount)} disabled={busy === 'topup' || !!pending}>Retry</button>
-                        ) : t.status === 'FAILED' && /^Pro plan/.test(t.description) ? (
-                          <button type="button" className="btn btn-outline btn-sm" onClick={handleUpgrade} disabled={busy === 'plan' || !!pending}>Retry</button>
-                        ) : (
-                          <span style={labelStyle}>—</span>
-                        )}
-                      </td>
+                      <td>{txAction(t)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            {/* Phones: one two-line row per payment instead of a six-column table. */}
+            <ul className="divide-y divide-(--border) sm:hidden">
+              {(showAllTx ? wallet.transactions : wallet.transactions.slice(0, TX_PREVIEW)).map((t) => {
+                const credit = t.type === 'CREDIT';
+                return (
+                  <li key={t.id} className="grid gap-1 px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm">{describe(t).title}</span>
+                      <span className={`mono shrink-0 text-sm ${t.status === 'FAILED' || t.status === 'CANCELLED' ? 'line-through decoration-1' : ''}`}>{credit ? '+' : '−'}{peso(t.amount)}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs" style={labelStyle}>
+                      <span className="mono">{new Date(t.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      {statusBadge(t)}
+                      <span className="ml-auto">{txAction(t)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {wallet.transactions.length > TX_PREVIEW && (
+              <button type="button" className="btn btn-ghost btn-sm m-2" onClick={() => setShowAllTx((v) => !v)} aria-expanded={showAllTx}>
+                {showAllTx ? 'Show fewer' : `Show all ${wallet.transactions.length} payments`}
+              </button>
+            )}
           </div>
         )}
       </section>

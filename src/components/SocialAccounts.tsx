@@ -187,7 +187,7 @@ const SocialAccounts: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                         <button
                           onClick={() => handleDisconnect(a)}
                           disabled={busy === a.id}
-                          className="ml-auto shrink-0 text-xs font-medium hover:underline disabled:opacity-50"
+                          className="ml-auto inline-flex min-h-6 shrink-0 items-center text-xs font-medium hover:underline disabled:opacity-50"
                           style={{ color: 'var(--fg-muted)' }}
                         >
                           {busy === a.id ? 'Disconnecting…' : 'Disconnect'}

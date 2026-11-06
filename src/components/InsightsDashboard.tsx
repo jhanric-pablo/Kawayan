@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from './ui/chart';
 import {
-  ArrowDown, ArrowDownRight, ArrowUp, ArrowUpDown, ArrowUpRight, ChevronDown, Download,
-  FileJson, FileSpreadsheet, GitCompareArrows, Image as ImageIcon, Trophy, X, Users, Eye, Heart, BarChart3,
+  ArrowDown, ArrowDownRight, ArrowUp, ArrowUpDown, ArrowUpRight, ChevronDown, Download, FileJson, FileSpreadsheet, GitCompareArrows, Image as ImageIcon, Trophy, X,
 } from 'lucide-react';
 import UniversalDatabaseService from '../services/universalDatabaseService';
 import { GeneratedPost } from '../types';
@@ -20,6 +19,9 @@ import './insights.css';
 import KwSelect from './ui/kw-select';
 
 // 'year' = since January 1 (mockup "This year"); the numbers are "last N days".
+
+/** Post rows shown before "Show all"; sorting still runs over every post. */
+const ROW_PREVIEW = 5;
 const RANGES = [7, 30, 90, 'year'] as const;
 type Range = (typeof RANGES)[number];
 const RANGE_LABEL: Record<string, string> = { 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days', year: 'This year' };
@@ -75,8 +77,8 @@ const Spark: React.FC<{ values: number[] }> = ({ values }) => {
   const line = pts.map(([x, y]) => `${x},${y}`).join(' ');
   return (
     <svg className="in-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden>
-      <polygon points={`0,30 ${line} 100,30`} fill="var(--green-soft)" />
-      <polyline points={line} fill="none" stroke="var(--green)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <polygon points={`0,30 ${line} 100,30`} fill="color-mix(in srgb, var(--chart-ink) 7%, transparent)" />
+      <polyline points={line} fill="none" stroke="var(--chart-ink)" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 };
@@ -286,6 +288,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
   const [selected, setSelected] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
   const [moreCols, setMoreCols] = useState(false);
+  const [allRows, setAllRows] = useState(false);
   const closeCompare = useCallback(() => setComparing(false), []);
 
   useEffect(() => {
@@ -435,7 +438,6 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
     );
   };
 
-  const KPI_ICON: Record<string, React.FC<{ className?: string }>> = { followers: Users, reach: Eye, interactions: Heart };
   const changeLine = (k: (typeof kpis)[number]) => {
     const diff = k.current - k.previous;
     const shown = k.key === 'followers' ? `${diff >= 0 ? '+' : '−'}${num(Math.abs(diff))}` : `${k.change >= 0 ? '+' : '−'}${Math.abs(k.change * 100).toFixed(0)}%`;
@@ -444,8 +446,9 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
   };
   const metricName = CHART_METRICS.find((m) => m.key === metric)!.label;
   const chartConfig = {
-    cur: { label: span(current), color: 'var(--green)' },
-    prev: { label: span(previous), color: 'var(--fg-muted)' },
+    // Neutral lines; the green dot marks today, the one point that matters.
+    cur: { label: span(current), color: 'var(--chart-ink)' },
+    prev: { label: span(previous), color: 'var(--chart-muted)' },
   } satisfies ChartConfig;
 
   return (
@@ -465,9 +468,10 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
             onValueChange={(v) => setFilter(v as PlatformFilter)}
             options={[{ value: 'all', label: 'All platforms' }, { value: 'facebook', label: 'Facebook' }, { value: 'instagram', label: 'Instagram' }]}
           />
+          {/* Phones get downloads from "More" at the bottom, so the filters fit on one row. */}
           <button
             type="button"
-            className="btn btn-outline"
+            className="btn btn-outline hidden sm:inline-flex"
             onClick={() => {
               const [name, body, type] = downloads[0].file();
               saveFile(name, body, type);
@@ -482,10 +486,9 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
       {/* 4 KPI cards with sparklines */}
       <div className="kw-stats">
         {kpis.filter((k) => k.key !== 'rate').map((k) => {
-          const Icon = KPI_ICON[k.key] ?? Eye;
           return (
             <div key={k.key} className="card kw-stat">
-              <div className="kw-stat__h">{k.label} <Icon aria-hidden /></div>
+              <div className="kw-stat__h">{k.label}</div>
               <b>{compactKpi(k.current)}</b>
               <small>{changeLine(k)}</small>
               <Spark values={current.map((d) => d[k.key as 'followers' | 'reach' | 'interactions'])} />
@@ -493,7 +496,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
           );
         })}
         <div className="card kw-stat">
-          <div className="kw-stat__h">Avg reach score <BarChart3 aria-hidden /></div>
+          <div className="kw-stat__h">Avg reach score</div>
           <b>{avgNow ?? '—'}</b>
           <small>
             {avgNow == null ? 'No scored posts in this period' : avgPrev != null ? <><span className={avgNow >= avgPrev ? 'in-up' : 'in-down'}>{avgNow >= avgPrev ? '+' : '−'}{Math.abs(avgNow - avgPrev)}</span> vs previous {days} days</> : `From ${scoredNow.length} post${scoredNow.length > 1 ? 's' : ''}`}
@@ -513,7 +516,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
             </div>
           </div>
           <div className="px-3 pb-3 pt-4">
-            <ChartContainer config={chartConfig} className="aspect-auto! h-[240px] w-full">
+            <ChartContainer config={chartConfig} className="aspect-auto! h-[180px] w-full sm:h-[200px]">
               <AreaChart data={chartData} margin={{ top: 8, right: 10, bottom: 4, left: 4 }} accessibilityLayer>
                 <defs>
                   <linearGradient id="inFill" x1="0" y1="0" x2="0" y2="1">
@@ -592,10 +595,10 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
         <div className="kw-card-h">
           <h3>Post performance</h3>
           <div className="flex items-center gap-2">
-            <button type="button" className="btn btn-ghost btn-sm" aria-pressed={moreCols} onClick={() => setMoreCols((v) => !v)} title="Link clicks and engagement rate">
+            <button type="button" className="btn btn-ghost btn-sm in-hide-sm" aria-pressed={moreCols} onClick={() => setMoreCols((v) => !v)} title="Link clicks and engagement rate">
               {moreCols ? 'Fewer columns' : 'More columns'}
             </button>
-            <span className="text-xs text-(--fg-muted)">{selectedPosts.length < 2 ? `Pick ${2 - selectedPosts.length} to compare` : `${selectedPosts.length} picked`}</span>
+            <span className="in-hide-sm text-xs text-(--fg-muted)">{selectedPosts.length < 2 ? `Pick ${2 - selectedPosts.length} to compare` : `${selectedPosts.length} picked`}</span>
             <button type="button" className="btn btn-outline btn-sm" disabled={selectedPosts.length < 2} onClick={() => setComparing(true)}>
               <GitCompareArrows className="w-3.5 h-3.5" /> Compare
             </button>
@@ -622,7 +625,7 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                       <td colSpan={moreCols ? 8 : 6}><div className="in-skel" /></td>
                     </tr>
                   ))
-                : sorted.map((p) => {
+                : (allRows ? sorted : sorted.slice(0, ROW_PREVIEW)).map((p) => {
                     const isSelected = selectedIds.includes(p.id);
                     const locked = !isSelected && selectedIds.length >= MAX_COMPARE;
                     const Glyph = GLYPHS[p.platform];
@@ -676,6 +679,11 @@ const InsightsDashboard: React.FC<{ userId: string }> = ({ userId }) => {
                   })}
             </tbody>
           </table>
+          {posts && sorted.length > ROW_PREVIEW && (
+            <button type="button" className="btn btn-ghost btn-sm m-2" onClick={() => setAllRows((v) => !v)} aria-expanded={allRows}>
+              {allRows ? 'Show top 5' : `Show all ${sorted.length} posts`}
+            </button>
+          )}
         </div>
       </section>
 

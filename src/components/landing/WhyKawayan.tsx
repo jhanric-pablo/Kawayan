@@ -108,7 +108,6 @@ const WhyKawayan: React.FC = () => (
 
     <div className="lp-why__inner">
       <div className="text-center reveal">
-        <span className="lp-eyebrow lp-eyebrow--on-dark"><span className="lp-eyebrow__dot" /> Why the name</span>
         <h2 id="why-title" className="sr-only">Why Kawayan AI? Kaway means to wave hello. Kawayan means bamboo.</h2>
 
         <div className="lp-name" aria-hidden="true">

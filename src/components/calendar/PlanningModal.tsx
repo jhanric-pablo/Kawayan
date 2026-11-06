@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ProgressBar } from '../ui/progress-bar';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
@@ -6,13 +7,12 @@ import { Popover, PopoverClose, PopoverContent, PopoverTitle, PopoverTrigger } f
 import { ContentIdea, GeneratedPost } from '../../types';
 import type { SocialAccount } from '../../services/socialService';
 import {
-  X, RefreshCcw, Loader2, ArrowUpRight, Check, CircleAlert, Sparkles, Ellipsis, PencilLine, CalendarArrowUp, Trash2,
-  Image as ImageIcon, Video, Type,
+  X, RefreshCcw, Loader2, ArrowUpRight, Check, CircleAlert, Ellipsis, PencilLine, CalendarArrowUp, Trash2, Image as ImageIcon,
 } from 'lucide-react';
+import { KawayanMark } from '../KawayanLogo';
 import TextareaAutosize from 'react-textarea-autosize';
 import PostCountPicker from './PostCountPicker';
 import clsx from 'clsx';
-import FormatPicker from './FormatPicker';
 import ChannelTimelineTrack from './ChannelTimelineTrack';
 import type { TimelineCardItem } from './mapCalendarEvents';
 import type { PostChannels } from '../../utils/workspaceFeed';
@@ -69,11 +69,6 @@ interface Props {
   onPlanNextMonth: () => void;
 }
 
-const FORMATS: { key: ContentIdea['format']; color: string; Icon: React.ElementType }[] = [
-  { key: 'Image', color: 'var(--primary)', Icon: ImageIcon },
-  { key: 'Video', color: '#D9791F', Icon: Video },
-  { key: 'Text', color: '#7C93B8', Icon: Type },
-];
 
 const STRATEGY_PRESETS = [
   'Seasonal & local specials',
@@ -104,7 +99,6 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
   const [mode, setMode] = useState<'edit' | 'move' | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLButtonElement>(null);
-  const FormatIcon = FORMATS.find((f) => f.key === idea.format)?.Icon ?? ImageIcon;
   // Opened from the menu: wait for the menu to hand focus back before the editor takes it.
   const openAs = (m: 'edit' | 'move') => requestAnimationFrame(() => setMode(m));
 
@@ -124,7 +118,7 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
         >
           <span className="line-clamp-2 text-xs font-semibold leading-tight text-(--fg)">{idea.title || 'Untitled idea'}</span>
           <span className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-(--primary)">
-            {chip?.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FormatIcon className="h-3 w-3" aria-hidden />}
+            {chip?.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" aria-hidden />}
             {chip ? chip.label : 'Idea'}
           </span>
         </PopoverTrigger>
@@ -145,10 +139,6 @@ const IdeaCapsule: React.FC<CapsuleProps> = ({ idea, mon, chip, locked, dayOptio
                 <span className={LABEL}>What it’s about</span>
                 <textarea value={idea.topic} rows={3} onChange={(e) => onUpdate('topic', e.target.value)} placeholder="What the post is about" className={clsx(INPUT, 'resize-y')} />
               </label>
-              <div className="space-y-1">
-                <span className={LABEL}>Format</span>
-                <div><FormatPicker value={idea.format} onChange={(v) => onUpdate('format', v)} /></div>
-              </div>
             </>
           )}
           <label className="block space-y-1">
@@ -271,7 +261,6 @@ const PlanningModal: React.FC<Props> = ({
   const remaining = Math.max(0, batchPostCount - monthlyPostCount);
   const usagePct = batchPostCount > 0 ? Math.min(100, (monthlyPostCount / batchPostCount) * 100) : 0;
   const focus = batchStrategy.trim();
-  const mix = FORMATS.map((f) => ({ ...f, n: ideas.filter((i) => (i.format || 'Image') === f.key).length }));
 
   // Open days: in range, no post yet. They frame the plan and pulse while the AI fills them.
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -495,15 +484,6 @@ const PlanningModal: React.FC<Props> = ({
                   <>{monthName} on your channels</>
                 )}
               </h3>
-              {ideas.length > 0 && !planning && (
-                <div className="flex items-center gap-3 text-xs text-(--fg-muted)">
-                  {mix.map((f) => (
-                    <span key={f.key} className={clsx('inline-flex items-center gap-1.5', f.n === 0 && 'opacity-50')}>
-                      <i className="h-2 w-2 rounded-full" style={{ background: f.color }} /> {f.key} {f.n}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
             <div className="mx-5 mb-5 min-h-0 flex-1 overflow-y-auto rounded-2xl border border-(--border) bg-(--card) sm:mx-6">
               <ChannelTimelineTrack
@@ -533,9 +513,7 @@ const PlanningModal: React.FC<Props> = ({
                 <span>
                   <b>Writing post {Math.min(batchProgress!.current + 1, batchProgress!.total)} of {batchProgress!.total}</b> · captions and visuals
                 </span>
-                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-(--border-strong)" aria-hidden>
-                  <b className="block h-full rounded-full bg-(--green)" style={{ width: `${batchProgress!.total ? (batchProgress!.current / batchProgress!.total) * 100 : 0}%` }} />
-                </span>
+                <ProgressBar done={batchProgress!.current} total={batchProgress!.total} running label="Writing progress" className="w-40" />
               </div>
             ) : planning ? (
               <span>This takes about 15 seconds.</span>
@@ -555,7 +533,7 @@ const PlanningModal: React.FC<Props> = ({
           <div className="flex items-center gap-2">
             {ideas.length === 0 ? (
               <button type="button" className={PRIMARY_BTN} onClick={onGeneratePlan} disabled={busy || planCount === 0}>
-                {planning ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                {planning ? <Loader2 className="animate-spin" /> : <KawayanMark size={16} />}
                 {planning ? 'Planning…' : planCount ? `Plan ${planCount} idea${planCount === 1 ? '' : 's'}` : 'Nothing to plan'}
               </button>
             ) : (
@@ -569,7 +547,7 @@ const PlanningModal: React.FC<Props> = ({
                   {planning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Re-plan
                 </button>
                 <button type="button" className={PRIMARY_BTN} onClick={onBatchGenerate} disabled={busy || createCount === 0 || trialLimitReached}>
-                  {creating ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  {creating ? <Loader2 className="animate-spin" /> : <KawayanMark size={16} />}
                   {creating
                     ? `Creating ${batchProgress!.current}/${batchProgress!.total}…`
                     : createCount === 0

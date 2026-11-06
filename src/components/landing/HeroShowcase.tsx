@@ -1,124 +1,137 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import PhonePreview from '../calendar/PhonePreview';
-import { StatusBadge, type CardStatus } from '../calendar/TimelinePostCard';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { KawayanMark } from '../KawayanLogo';
 import { ViewState } from '../../types';
 import { prefersReducedMotion, useInView } from './useLandingMotion';
+import { SHOPS, shot, type Shop } from './shops';
 
-interface Shop {
-  type: string;
-  name: string;
-  caption: string;
-  week: [string, string, string];
-  /** Images are public/hero/ai/<key>-1..3.jpg, one per post of the week. */
-  key: string;
-}
+const TYPE_MS = 28;
+const PRESS_MS = 450;
+const HOLD_MS = 3400;
 
-/** Made with the same image model Kawayan uses for posts (Cloudflare Workers AI, SDXL), then picked by hand. */
-const shot = (shop: Shop, n: 1 | 2 | 3) => `/hero/ai/${shop.key}-${n}.jpg`;
-
-/** Sample shops for the hero. Each shows what Kawayan would draft for that kind of business. */
-const SHOPS: Shop[] = [
-  { type: 'Panaderia', name: 'Aling Nena’s Bakery', caption: 'Pandesal alert! Mainit pa at bagong luto, 6 AM pa lang. Kita-kits sa tindahan!', week: ['Pandesal alert', 'Ube ensaymada', 'Behind the oven'], key: 'panaderia' },
-  { type: 'Milk Tea Kiosk', name: 'Tea Tayo', caption: 'Payday treat! Buy 1 take 1 sa lahat ng milk tea hanggang Linggo. Tara na, bes!', week: ['Buy 1 take 1', 'New: brown sugar', 'Rainy-day combo'], key: 'milktea' },
-  { type: 'Sari-sari Store', name: 'Tindahan ni Aling Rosa', caption: 'Kumpleto na ulit! May yelo, load at paborito mong chichirya. Bukas hanggang 10 PM.', week: ['Restock day', 'Load promo', 'Bagong chichirya'], key: 'sarisari' },
-  { type: 'Carinderia', name: 'Kusina ni Lola', caption: 'Ulam of the day: sinigang na baboy at adobong manok. Unli rice pa rin, mga suki!', week: ['Ulam of the day', 'Lunch combo', 'Sunday special'], key: 'carinderia' },
-  { type: 'Coffee Shop', name: 'Barako Brew', caption: 'Antok pa? Kapeng barako na, mainit at matapang. 20% off para sa mga estudyante today.', week: ['Barako Monday', 'Student promo', 'Iced latte drop'], key: 'coffee' },
-  { type: 'Ukay Boutique', name: 'Ukay Finds QC', caption: 'New drop mamayang 7 PM! Vintage jackets at denim, tig-₱150 lang. First come, first served.', week: ['New drop 7 PM', 'Denim day', 'Customer OOTD'], key: 'ukay' },
-  { type: 'Barbershop', name: 'Gupit Kanto', caption: 'Fresh cut bago mag-weekend? Walk-in welcome, ₱120 lang ang gupit hanggang Sabado.', week: ['Weekend cuts', 'Fade of the week', 'Student rate'], key: 'barbershop' },
-  { type: 'Halamanan / Plant Shop', name: 'Halaman ni Mang Ben', caption: 'Bagong dating: monstera at snake plants. Libreng paso para sa unang 10 buyers!', week: ['New arrivals', 'Plant care tips', 'Free paso promo'], key: 'plants' },
-  { type: 'Lechon Manok Stall', name: 'Manok ni Juan', caption: 'Hot from the uling! Lechon manok + java rice combo, ₱299 lang ngayong araw.', week: ['Combo of the day', 'Family pack', 'Behind the grill'], key: 'lechon' },
-  { type: 'Beauty Salon', name: 'Salon de Gracia', caption: 'Rebond + treatment promo buong buwan. Book na sa Messenger, limited slots lang!', week: ['Rebond promo', 'Before & after', 'Nail art week'], key: 'salon' },
-  { type: 'Hardware Store', name: 'Ferreteria Santos', caption: 'Tag-ulan na, handa na ba ang bubong? Sealant at yero, kumpleto kami. May delivery sa Marikina.', week: ['Rainy-season prep', 'Paint week', 'Delivery reminder'], key: 'hardware' },
-  { type: 'Native Delicacies', name: 'Kakanin ni Aling Pacing', caption: 'Bibingka, puto at kutsinta, bagong luto ngayong umaga! Pre-order na para sa handaan.', week: ['Kakanin tray', 'Pre-order reminder', 'Fiesta special'], key: 'kakanin' },
+const WHEN = ['Mon 3 · 6:00 AM', 'Wed 5 · 9:00 AM', 'Fri 7 · 7:30 AM'];
+const label = (shop: Shop) => shop.type.split(' / ')[0].toLowerCase();
+const PROMPTS = [
+  (t: string) => `Gawan mo ako ng payday promo para sa ${t} ko`,
+  (t: string) => `Weekend posts para sa ${t} ko, Taglish please`,
+  (t: string) => `Plan this week's posts for my ${t}`,
 ];
 
-const STEP_MS = 4200;
-
-/** Every business type Kawayan is made for; shown in the strip under the hero. */
-export const BUSINESS_TYPES = [
-  'Coffee Shop', 'Sari-sari Store', 'Milk Tea Kiosk', 'Panaderia', 'Carinderia',
-  'Ukay Boutique', 'Barbershop', 'Hardware Store', 'Lechon Manok Stall', 'Beauty Salon',
-  'Frozen Goods Reseller', 'Halamanan / Plant Shop', 'Native Delicacies', 'Print & Layout Shop',
-  'Motoparts Supply', 'Poultry Farm',
-];
-
-/** The selected shop's week as three post cards (mockup .lane / .post). */
-const WeekLane: React.FC<{ shop: Shop }> = ({ shop }) => {
-  const items: { status: CardStatus; time?: string; title: string; img: string; when: string }[] = [
-    { status: 'published', title: shop.week[0], img: shot(shop, 1), when: 'Mon 3 · 6:00 AM' },
-    { status: 'scheduled', time: '9:00 AM', title: shop.week[1], img: shot(shop, 2), when: 'Wed 5 · 9:00 AM' },
-    { status: 'draft', title: shop.week[2], img: shot(shop, 3), when: 'Fri 7 · 7:30 AM' },
-  ];
+/** The shop type inside the sentence: a slot-machine roll, and the box resizes to the word. */
+const RollingType: React.FC<{ index: number }> = ({ index }) => {
+  const itemRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const [width, setWidth] = useState<number>();
+  // Past the last shop the track rolls onto a copy of the first, then snaps back without a transition.
+  const [row, setRow] = useState(index);
+  const [snap, setSnap] = useState(false);
+  useEffect(() => {
+    if (index === 0 && row === SHOPS.length - 1) {
+      setRow(SHOPS.length);
+      const t = setTimeout(() => { setSnap(true); setRow(0); }, 650);
+      return () => clearTimeout(t);
+    }
+    setSnap(false);
+    setRow(index);
+  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = itemRefs.current[row];
+    if (el) setWidth(el.getBoundingClientRect().width);
+  }, [row]);
+  const words = [...SHOPS, SHOPS[0]].map(label);
   return (
-    <div className="lp-shot__main" aria-hidden="true">
-      <div className="lp-shot__head">
-        <b>This week</b>
-        <span className="badge badge-sage mono">Mon 3 – Sun 9</span>
-        <span className="badge lp-shot__chan">Facebook</span>
-      </div>
-      <div className="lp-lane">
-        {items.map((item, i) => (
-          <article key={`${shop.key}-${i}`} className="lp-post" style={{ '--n': i } as React.CSSProperties}>
-            <img decoding="async" src={item.img} alt="" />
-            <div>
-              <StatusBadge status={item.status} time={item.time} />
-              <b>{item.title}</b>
-              <small className="mono">{item.when}</small>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
+    <span className="lp-roll" style={{ width }} aria-hidden="true">
+      <span className={`lp-roll__track${snap ? ' is-snap' : ''}`} style={{ transform: `translateY(-${row * 1.5}em)` }}>
+        {words.map((w, i) => <span key={i} ref={(el) => { itemRefs.current[i] = el; }}>{w}</span>)}
+      </span>
+    </span>
   );
 };
 
 /**
- * The hero: the pitch, centred over a dot grid, then a framed screenshot of the selected shop in the
- * real Kawayan UI. The shop changes on its own every few seconds (the business-type strip below lists them all).
+ * The hero: the pitch with a rolling shop type, then a prompt bar that types a request for that shop and
+ * fans out the three posts Kawayan makes, then a strip of every shop type with the current one lit.
+ * One loop drives all of it: roll the word, type the prompt, press Generate, show the posts, next shop.
  */
 const HeroShowcase: React.FC<{ onNavigate: (v: ViewState) => void }> = ({ onNavigate }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const inView = useInView(rootRef, 0.2);
   const [pos, setPos] = useState(0);
-  const shop = SHOPS[((pos % SHOPS.length) + SHOPS.length) % SHOPS.length];
+  const [typed, setTyped] = useState('');
+  const [phase, setPhase] = useState<'typing' | 'press' | 'shown'>('shown');
+  // The fanned posts belong to the last request that finished; they stay (dimmed) while the next one types.
+  const [fanPos, setFanPos] = useState<number | null>(null);
+  const shop = SHOPS[pos];
+  const prompt = PROMPTS[pos % PROMPTS.length](label(shop));
 
   useEffect(() => {
-    if (!inView || prefersReducedMotion()) return;
-    const t = setTimeout(() => setPos((p) => p + 1), STEP_MS);
+    if (prefersReducedMotion()) { setTyped(prompt); setPhase('shown'); setFanPos(pos); return; }
+    if (!inView) return;
+    let n = 0;
+    let t: ReturnType<typeof setTimeout>;
+    setTyped(''); setPhase('typing');
+    const type = () => {
+      setTyped(prompt.slice(0, ++n));
+      if (n < prompt.length) { t = setTimeout(type, TYPE_MS); return; }
+      setPhase('press');
+      t = setTimeout(() => {
+        setPhase('shown');
+        setFanPos(pos);
+        t = setTimeout(() => setPos((p) => (p + 1) % SHOPS.length), HOLD_MS);
+      }, PRESS_MS);
+    };
+    t = setTimeout(type, 500);
     return () => clearTimeout(t);
-  }, [pos, inView]);
+  }, [pos, inView, prompt]);
 
   return (
     <div ref={rootRef} className="lp-hs">
       {/* 1. The pitch */}
       <div className="lp-hs__copy">
-        <span className="lp-hs__kicker"><b>New</b> For every Filipino MSME</span>
+        <span className="lp-hs__kicker lp-rise" style={{ '--d': 0 } as React.CSSProperties}><i className="lp-ping" aria-hidden="true" /><b>New</b> For every Filipino MSME</span>
         <h1 className="lp-hs__title">
-          Social Media <em>On Autopilot.</em>
+          <span className="lp-rise" style={{ '--d': 1 } as React.CSSProperties}>Social Media</span>{' '}
+          <em className="lp-shiny" style={{ '--d': 2 } as React.CSSProperties}>
+            On Autopilot.
+            <svg viewBox="0 0 600 20" preserveAspectRatio="none" aria-hidden="true"><path d="M4 14 C 150 2, 300 4, 596 10" /></svg>
+          </em>
         </h1>
-        <p className="lp-hs__lede">
-          Taglish captions, images and a posting schedule for your{' '}
-          <b key={shop.type} className="lp-hs__type">{shop.type.toLowerCase()}</b>, all on one calendar.
+        <p className="lp-hs__lede lp-rise" style={{ '--d': 3 } as React.CSSProperties}>
+          Taglish captions, images and a posting schedule for your <RollingType index={pos} />
+          <span className="sr-only">{label(shop)}</span>, all on one calendar.
         </p>
-        <div className="lp-hs__actions">
-          <button type="button" onClick={() => onNavigate(ViewState.SIGNUP)} className="btn btn-primary btn-lg">
+
+        {/* 2. Ask Kawayan: a typed request, then the three posts it makes */}
+        <div className="lp-ask lp-rise" style={{ '--d': 4 } as React.CSSProperties} aria-hidden="true">
+          <KawayanMark className="lp-ask__icon" size={18} />
+          <span className={`lp-ask__txt${phase === 'typing' ? ' is-typing' : ''}`}>{typed}</span>
+          <span className={`lp-ask__go${phase === 'press' ? ' is-press' : ''}`}>Generate</span>
+        </div>
+        <div className={`lp-fan${phase === 'shown' ? '' : ' is-stale'}`} aria-hidden="true">
+          {fanPos !== null && SHOPS[fanPos].week.map((title, i) => (
+            <div key={`${fanPos}-${i}`} className="lp-fan__card">
+              <img decoding="async" src={shot(SHOPS[fanPos], (i + 1) as 1 | 2 | 3)} alt="" />
+              <b>{title}</b>
+              <small className="mono">{WHEN[i]}</small>
+            </div>
+          ))}
+        </div>
+
+        <div className="lp-hs__actions lp-rise" style={{ '--d': 5 } as React.CSSProperties}>
+          <button type="button" onClick={() => onNavigate(ViewState.SIGNUP)} className="btn btn-primary btn-lg lp-hs__cta">
             Start Free Trial <ArrowRight className="h-4 w-4" aria-hidden />
           </button>
-          <a href="#how" className="btn btn-outline btn-lg">See how it works</a>
+          <a href="/how-it-works" target="_blank" rel="noopener" className="btn btn-outline btn-lg">See how it works</a>
         </div>
-        <p className="lp-hs__fine">Create your first content calendar in minutes. No credit card required.</p>
+        <p className="lp-hs__fine lp-rise" style={{ '--d': 6 } as React.CSSProperties}>Create your first content calendar in minutes. No credit card required.</p>
         <p className="sr-only" aria-live="polite">Showing a sample post for a {shop.type}.</p>
       </div>
 
-      {/* 2. The selected shop, in the real UI */}
-      <div className="lp-shot">
-        <div className="lp-shot__in">
-          <WeekLane shop={shop} />
-          <div className="lp-shot__side">
-            <PhonePreview businessName={shop.name} caption={shop.caption} imageUrl={shot(shop, 1)} defaultPlatform="facebook" sampleStats />
-            <span className="lp-hs__ai"><Sparkles aria-hidden /> Image made by Kawayan AI</span>
-          </div>
+      {/* 3. Every business type, sliding past; the shop in the sentence above is lit up */}
+      <div className="lp-hs__strip" aria-hidden="true">
+        <div>
+          {[...SHOPS, ...SHOPS].map((s, i) => (
+            <span key={i} className={s.key === shop.key ? 'is-on' : undefined}>{label(s)}</span>
+          ))}
         </div>
       </div>
     </div>

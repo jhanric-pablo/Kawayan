@@ -19,17 +19,17 @@
    The ramp names (emerald, slate, sage…) are kept so existing utilities follow the new palette. */
 @theme static {
   /* Kawayan green. 500 is the main action colour, 700 the readable green ink. */
-  --color-emerald-50: #e6f3ec;
+  --color-emerald-50: #eaf1ec;
   --color-emerald-100: #cce7d9;
   --color-emerald-200: #99cfb3;
   --color-emerald-300: #5fb38a;
   --color-emerald-400: #2a9466;
   --color-emerald-450: #0f8556;
-  --color-emerald-500: #0b7a4e;
-  --color-emerald-600: #0a6a44;
-  --color-emerald-700: #0a5c3b;
+  --color-emerald-500: #2d6a4f;
+  --color-emerald-600: #255a42;
+  --color-emerald-700: #22523c;
   --color-emerald-800: #074029;
-  --color-emerald-900: #052e1c;
+  --color-emerald-900: #0d2318;
 
   /* Former sage accent, now a quiet grey */
   --color-sage-200: #e4e4e7;
@@ -39,8 +39,8 @@
   --color-logo-forest: #0a0a0a;
   --color-logo-bamboo: #0a0a0a;
   --color-logo-bamboo-deep: #0a0a0a;
-  --color-logo-leaf: #0b7a4e;
-  --color-logo-leaf-light: #34d399;
+  --color-logo-leaf: #2d6a4f;
+  --color-logo-leaf-light: #7bbf98;
   --color-logo-stalk-light: #fafafa;
   --color-logo-cream: #fafafa;
 
@@ -141,18 +141,20 @@
 
 /* ── 2. Themes ──────────────────────────────────────────────────── */
 
-/* Light (default). Values from docs/redesign/mockup.html. */
+/* Light (default). Warm paper neutrals and deep ink; bamboo green only for actions, links,
+   focus and selected states; success / warning / danger / info each have their own colour.
+   Every text pair below meets WCAG AA (4.5:1); checked with the contrast script in the PR notes. */
 :root {
-  /* Mockup tokens */
-  --green: #0b7a4e;
+  /* Bamboo green: the brand accent, used by purpose (see --primary-accent, --primary, --ring) */
+  --green: #2d6a4f;
   --green-fg: #ffffff;
-  --green-soft: #e6f3ec;
-  --green-ink: #0a5c3b;
-  --amber: #8a5300;
-  --amber-soft: #fff4e0;
-  --dot: rgba(10, 10, 10, 0.08);
-  --muted: #f4f4f5;
-  --muted-fg: #6b6b73;
+  --green-soft: #eaf1ec;
+  --green-ink: #22523c;
+  --amber: #8a5600;
+  --amber-soft: #fbf0db;
+  --dot: rgba(27, 33, 30, 0.07);
+  --muted: #f0eee9;
+  --muted-fg: #5f5d56;
   --mono: var(--font-mono);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   color-scheme: light;
@@ -165,15 +167,15 @@
   --kw-sage-light: var(--border);
   --kw-forest: var(--fg);
 
-  --bg: #fafafa;
-  --bg-alt: #f4f4f5;
+  --bg: #f6f5f1;
+  --bg-alt: #efede8;
   --card: #ffffff;
-  --card-hover: #f4f4f5;
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
-  --fg: #0a0a0a;
-  --fg-muted: #6b6b73;
-  --fg-subtle: #6b6b73;
+  --card-hover: #f6f5f1;
+  --border: #e4e1da;
+  --border-strong: #d2cec5;
+  --fg: #1b211e;
+  --fg-muted: #5f5d56;
+  --fg-subtle: #6e6b64;
 
   --glass-bg: color-mix(in srgb, var(--card) 85%, transparent);
   --glass-bg-strong: color-mix(in srgb, var(--card) 96%, transparent);
@@ -182,61 +184,82 @@
 
   /* Links, focus lines, active states: green ink (reads as text, not a fill) */
   --primary: var(--green-ink);
-  --primary-hover: #084a30;
+  --primary-hover: #1b4331;
   --on-accent: #ffffff;
   /* The main action button on each screen */
   --primary-accent: var(--green);
-  --primary-accent-hover: #0a6a44;
+  --primary-accent-hover: #255a42;
   --primary-accent-fg: var(--green-fg);
-  /* Good-news badges (posted, connected, paid) */
-  --badge-bg: var(--green-soft);
-  --badge-text: var(--green-ink);
+
+  /* Semantic colours: status, never decoration */
+  --success: #1f6440;
+  --success-soft: #e7f3eb;
+  --warning: var(--amber);
+  --warning-soft: var(--amber-soft);
+  --danger: #b3261e;
+  --danger-soft: #fcebe9;
+  --info: #2b5aa6;
+  --info-soft: #e8eefa;
+  /* Good-news badges (posted, connected, paid) are success, not brand */
+  --badge-bg: var(--success-soft);
+  --badge-text: var(--success);
   --badge-border: transparent;
+
+  /* Charts and meters stay neutral; colour marks the point that matters */
+  --chart-ink: #3a433e;
+  --chart-muted: #b8b3a8;
+  --meter: var(--chart-ink);
 
   --secondary: var(--fg-muted);
   --accent: var(--fg-muted);
-  --success: var(--green);
-  --warning: var(--amber);
-  --danger: #c2261d;
-  --ring: color-mix(in srgb, var(--green) 28%, transparent);
+  --ring: color-mix(in srgb, var(--green) 30%, transparent);
   /* Today's column on the timeline */
-  --today-highlight: color-mix(in srgb, var(--green) 6%, transparent);
+  --today-highlight: color-mix(in srgb, var(--fg) 4%, transparent);
 }
 
 /* Dark */
 .dark {
-  --green: #34d399;
-  --green-fg: #052e1c;
-  --green-soft: rgba(52, 211, 153, 0.12);
-  --green-ink: #6ee7b7;
-  --amber: #fbbf24;
-  --amber-soft: rgba(251, 191, 36, 0.12);
-  --dot: rgba(255, 255, 255, 0.07);
-  --muted: #1b1b1f;
-  --muted-fg: #a1a1aa;
+  /* Muted bamboo instead of neon mint; warm charcoal neutrals */
+  --green: #7bbf98;
+  --green-fg: #0d2318;
+  --green-soft: rgba(123, 191, 152, 0.13);
+  --green-ink: #9ed2b4;
+  --amber: #e5b25c;
+  --amber-soft: rgba(229, 178, 92, 0.12);
+  --dot: rgba(236, 235, 229, 0.06);
+  --muted: #21221f;
+  --muted-fg: #a9a69d;
   color-scheme: dark;
 
-  --bg: #09090b;
-  --bg-alt: #1b1b1f;
-  --card: #111113;
-  --card-hover: #1b1b1f;
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --fg: #fafafa;
-  --fg-muted: #a1a1aa;
-  --fg-subtle: #8f8f99;
+  --bg: #121311;
+  --bg-alt: #21221f;
+  --card: #171816;
+  --card-hover: #1f201d;
+  --border: #2b2c29;
+  --border-strong: #3a3b37;
+  --fg: #ecebe5;
+  --fg-muted: #a9a69d;
+  --fg-subtle: #918e86;
+
+  --success: #86cfa3;
+  --success-soft: rgba(134, 207, 163, 0.12);
+  --danger-soft: rgba(240, 139, 127, 0.12);
+  --info: #92b3ea;
+  --info-soft: rgba(146, 179, 234, 0.12);
+  --chart-ink: #d4d2ca;
+  --chart-muted: #6c6a63;
 
   --glass-shadow: 0 6px 24px -12px rgba(0, 0, 0, 0.6);
 
   --primary: var(--green-ink);
-  --primary-hover: #a7f3d0;
-  --on-accent: #052e1c;
+  --primary-hover: #b7e0c8;
+  --on-accent: #0d2318;
   --primary-accent: var(--green);
-  --primary-accent-hover: #6ee7b7;
+  --primary-accent-hover: #93cdab;
   --primary-accent-fg: var(--green-fg);
-  --danger: #f87171;
-  --ring: color-mix(in srgb, var(--green) 34%, transparent);
-  --today-highlight: color-mix(in srgb, var(--green) 8%, transparent);
+  --danger: #f08b7f;
+  --ring: color-mix(in srgb, var(--green) 36%, transparent);
+  --today-highlight: color-mix(in srgb, var(--fg) 5%, transparent);
 
   --shadow-xs: none;
   --shadow-sm: none;
@@ -260,6 +283,11 @@
   --color-green-ink: var(--green-ink);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-danger-soft: var(--danger-soft);
 
   /* shadcn/ui (src/components/ui) */
   --color-background: var(--bg);
@@ -359,9 +387,15 @@ body {
 .kw-mark .kw-stalk { fill: currentColor; }
 .kw-mark .kw-node { fill: var(--bg); }
 .kw-mark .kw-leaf { fill: var(--green); }
-.kw-logo--on-dark { color: #fafafa; }
-.kw-logo--on-dark .kw-node { fill: #0a0a0a; }
-.kw-logo--on-dark .kw-leaf { fill: #34d399; }
+/* The mark doubles as the "Kawayan AI does this" icon in buttons: nodes cut out in the button colour. */
+button .kw-mark .kw-node, .btn .kw-mark .kw-node { fill: var(--card); }
+.btn-primary .kw-mark .kw-node { fill: var(--primary-accent); }
+.btn-primary .kw-mark .kw-leaf { fill: currentColor; opacity: 0.7; }
+/* One stroke for every icon; Lucide's default 2 is the stock template look. */
+svg.lucide { stroke-width: 1.5; }
+.kw-logo--on-dark { color: #ecebe5; }
+.kw-logo--on-dark .kw-node { fill: #171c19; }
+.kw-logo--on-dark .kw-leaf { fill: #7bbf98; }
 
 /* Floating / top navigation bar */
 .glass-panel {
@@ -485,8 +519,8 @@ body {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px !important; }
 }
 
-/* One focus ring for every field */
-input:focus, textarea:focus, select:focus {
+/* One focus ring for every field (a field inside an input group lets the group draw it) */
+:is(input, textarea, select):focus:not([data-slot="input-group"] *) {
   outline: none !important;
   box-shadow: 0 0 0 3px var(--ring) !important;
   border-color: var(--green) !important;
@@ -508,11 +542,11 @@ input:focus, textarea:focus, select:focus {
   color: var(--fg);
 }
 /* Good news: posted, connected, paid */
-.badge-green { background: var(--green-soft); color: var(--green-ink); border-color: transparent; }
+.badge-green { background: var(--success-soft); color: var(--success); border-color: transparent; }
 /* Neutral */
 .badge-sage  { background: var(--muted); color: var(--fg); border-color: transparent; }
 .badge-amber { background: var(--amber-soft); color: var(--amber); border-color: transparent; }
-.badge-red   { background: color-mix(in srgb, var(--danger) 7%, var(--card)); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.badge-red   { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
 .badge-blue  { background: var(--card); color: var(--fg); border-color: var(--border); }
 .badge-dashed { border-style: dashed; }
 
@@ -580,15 +614,15 @@ input:focus, textarea:focus, select:focus {
 
 /* Inverted card (mockup .wallet): black on light pages, white on dark ones. Local tokens flip inside it. */
 .kw-wallet {
-  --card: #0a0a0a; --bg: #0a0a0a; --fg: #fafafa; --fg-muted: #a1a1aa; --fg-subtle: #a1a1aa;
-  --border: #27272a; --border-strong: #3f3f46; --muted: #1b1b1f; --bg-alt: #1b1b1f; --danger: #f87171;
-  --green: #34d399; --green-fg: #052e1c; --primary-accent: #34d399; --primary-accent-hover: #6ee7b7; --primary-accent-fg: #052e1c;
+  --card: #1b211e; --bg: #1b211e; --fg: #ecebe5; --fg-muted: #a9a69d; --fg-subtle: #a9a69d;
+  --border: #2f3632; --border-strong: #3f4741; --muted: #242a26; --bg-alt: #242a26; --danger: #f08b7f;
+  --green: #7bbf98; --green-fg: #0d2318; --primary-accent: #7bbf98; --primary-accent-hover: #93cdab; --primary-accent-fg: #0d2318;
   background: var(--card); color: var(--fg); border-color: var(--card);
 }
 .dark .kw-wallet {
-  --card: #fafafa; --bg: #fafafa; --fg: #0a0a0a; --fg-muted: #6b6b73; --fg-subtle: #6b6b73;
-  --border: #e4e4e7; --border-strong: #d4d4d8; --muted: #f4f4f5; --bg-alt: #f4f4f5; --danger: #c2261d;
-  --green: #0b7a4e; --green-fg: #ffffff; --primary-accent: #0b7a4e; --primary-accent-hover: #0a6a44; --primary-accent-fg: #ffffff;
+  --card: #f6f5f1; --bg: #f6f5f1; --fg: #1b211e; --fg-muted: #5f5d56; --fg-subtle: #5f5d56;
+  --border: #e4e1da; --border-strong: #d2cec5; --muted: #efede8; --bg-alt: #efede8; --danger: #b3261e;
+  --green: #2d6a4f; --green-fg: #ffffff; --primary-accent: #2d6a4f; --primary-accent-hover: #255a42; --primary-accent-fg: #ffffff;
 }
 
 /* Data table (mockup .tbl): sentence-case headers, hairline rows, muted hover */
@@ -608,7 +642,23 @@ input:focus, textarea:focus, select:focus {
 .kw-stat__h svg { width: 16px; height: 16px; flex: none; }
 .kw-stat b { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; color: var(--fg); font-variant-numeric: tabular-nums; }
 .kw-stat small { font-size: var(--text-xs); color: var(--fg-muted); }
-.kw-up { color: var(--green-ink); font-weight: 500; }
+/* Slim at-a-glance strip: four numbers in one card (calendar home). Label, then number + note on one line. */
+.kw-glance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Label, number, then the note: tight stack, no dividers; whitespace does the separating. */
+.kw-glance > div { display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; padding: 14px 18px; min-width: 0; } /* numbers stay level when a label wraps */
+.kw-glance span { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); line-height: 1.35; color: var(--fg-muted); }
+.kw-glance b { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; color: var(--fg); font-variant-numeric: tabular-nums; }
+.kw-glance b em { font-style: normal; font-size: var(--text-sm); font-weight: 500; color: var(--fg-subtle); margin-left: 3px; }
+.kw-glance small { font-size: var(--text-xs); line-height: 1.35; color: var(--fg-subtle); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1023px) {
+  .kw-glance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kw-glance > div { padding: 10px 12px; }
+}
+/* Three-stat version (calendar): stays one row down to phones */
+.kw-glance--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1023px) { .kw-glance--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 639px) { .kw-glance small { display: none; } }
+.kw-up { color: var(--success); font-weight: 500; }
 .kw-down { color: var(--danger); font-weight: 500; }
 
 /* Page header (mockup .page-h) */
@@ -631,15 +681,36 @@ input:focus, textarea:focus, select:focus {
 .kw-chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .kw-check { display: flex; align-items: flex-start; gap: 10px; min-height: 24px; cursor: pointer; }
 .kw-check input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--green); flex: none; }
+/* Number stepper: − value + in one bordered control (Month planner post count). */
+.kw-numstep { display: inline-flex; align-items: stretch; height: 40px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); overflow: hidden; }
+.kw-numstep button { width: 40px; display: grid; place-items: center; color: var(--fg); }
+.kw-numstep button:hover:not(:disabled) { background: var(--muted); }
+.kw-numstep button:disabled { color: var(--fg-muted); opacity: 0.5; cursor: not-allowed; }
+.kw-numstep input { width: 48px; border: 0; border-inline: 1px solid var(--border); background: transparent; text-align: center; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fg); -moz-appearance: textfield; }
+.kw-numstep input::-webkit-inner-spin-button, .kw-numstep input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.kw-numstep input:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .kw-segpick { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .kw-segpick button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); text-align: left; font-size: var(--text-xs); color: var(--fg-muted); cursor: pointer; }
 .kw-segpick button b { display: block; font-size: 18px; font-weight: 600; color: var(--fg); }
 .kw-segpick button[aria-pressed='true'], .kw-segpick button[aria-checked='true'] { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
 .kw-segpick button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Month planner page */
+/* Month planner page. Before generating: one wide card (numbers and dates | notes and focus).
+   After: the setup becomes a 320px sidebar and the posts slide in beside it. */
+.kw-plan-setup { width: 100%; max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.kw-plan-setup__cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 32px; padding: 18px 20px 20px; }
+@media (max-width: 760px) { .kw-plan-setup__cols { grid-template-columns: 1fr; padding: 16px; } }
+.kw-plan-cta { position: sticky; bottom: 0; z-index: 10; display: grid; gap: 6px; padding: 12px 20px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-xl) var(--radius-xl); background: var(--card); }
+.kw-plan-setup .kw-plan-cta { grid-template-columns: auto 1fr; align-items: center; column-gap: 14px; }
+.kw-plan-setup .kw-plan-cta .btn { min-width: 200px; }
+@media (max-width: 760px) { .kw-plan-setup .kw-plan-cta { grid-template-columns: 1fr; padding: 12px 16px; } }
 .kw-planner { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 900px) { .kw-planner { grid-template-columns: 1fr; } }
+.kw-planner--run { grid-template-columns: 320px minmax(0, 1fr); }
+.kw-planner--run .kw-plan-cta { padding: 12px 16px; }
+.kw-plan-results { animation: kw-plan-in .28s var(--ease) both; }
+@keyframes kw-plan-in { from { opacity: 0; transform: translateX(12px); } }
+@media (prefers-reduced-motion: reduce) { .kw-plan-results { animation: none; } }
+@media (max-width: 900px) { .kw-planner, .kw-planner--run { grid-template-columns: 1fr; } }
 .kw-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 640px) { .kw-gen-grid { grid-template-columns: 1fr 1fr; } }
 .kw-gen { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); animation: kw-rise 0.32s var(--ease) both; }
@@ -721,4 +792,21 @@ input:focus, textarea:focus, select:focus {
 }
 @media (prefers-reduced-motion: reduce) {
   :is([data-slot='popover-content'], [data-slot='select-content'], [data-slot='dropdown-menu-content'], [data-slot='dialog-content'], [data-slot='tooltip-content']) { animation: none !important; }
+}
+
+/* Full-page loader: bamboo grove grows joint by joint, leaves open, then a slow sway (AppHydrationLoader) */
+.kw-loader { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; animation: kw-rise 0.32s var(--ease) both; }
+.kw-loader__grove { width: 112px; height: 96px; overflow: visible; }
+.kw-loader__ground { stroke: var(--border); stroke-width: 1.5; stroke-linecap: round; transform-box: fill-box; transform-origin: center; animation: kw-loader-ground 0.5s var(--ease) both; }
+.kw-loader__seg { fill: var(--fg); transform-box: fill-box; transform-origin: 50% 100%; animation: kw-loader-grow 0.42s cubic-bezier(0.2, 1.25, 0.4, 1) both; }
+.kw-loader__leaf { fill: var(--green); transform-box: fill-box; animation: kw-loader-leaf 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.kw-loader__leaf--right { transform-origin: 0% 100%; }
+.kw-loader__leaf--left { transform-origin: 100% 100%; }
+.kw-loader__stalk { transform-box: fill-box; transform-origin: 50% 100%; animation: kw-loader-sway 4.8s ease-in-out infinite; }
+@keyframes kw-loader-ground { from { transform: scaleX(0); } }
+@keyframes kw-loader-grow { from { transform: scaleY(0); opacity: 0; } }
+@keyframes kw-loader-leaf { from { transform: scale(0) rotate(-20deg); } }
+@keyframes kw-loader-sway { 25% { transform: rotate(-1.6deg); } 75% { transform: rotate(1.6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .kw-loader, .kw-loader__ground, .kw-loader__seg, .kw-loader__leaf, .kw-loader__stalk { animation: none; }
 }

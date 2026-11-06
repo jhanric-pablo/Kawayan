@@ -1,6 +1,5 @@
 import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, m, LazyMotion, domAnimation, MotionConfig } from 'motion/react';
-import PageSkeleton from './components/PageSkeleton';
 import { Routes, Route, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { ViewState, BrandProfile, User, VerificationStatus } from './types';
 
@@ -49,7 +48,7 @@ import {
 } from './utils/sessionView';
 import { clearAuthSession, isStoredTokenExpired, readCachedUser, cacheVerificationStatus, readCachedVerificationStatus, getStoredToken } from './utils/authSession';
 import { isTourDone, markTourDone } from './utils/tourState';
-import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3, Sparkles, PencilLine, LifeBuoy } from 'lucide-react';
+import { ChartGantt, Lock, ArrowRight, Settings as SettingsIcon, Share2, CreditCard, MessageSquare, BarChart3, PencilLine, LifeBuoy, CalendarPlus } from 'lucide-react';
 import KawayanLogo, { KawayanMark } from './components/KawayanLogo';
 
 // Heavy screens load on demand (recharts, the consoles, chat); Suspense shows a skeleton.
@@ -102,12 +101,7 @@ const App: React.FC = () => {
   const [tourFirstRun, setTourFirstRun] = useState(false);
   // Shell → calendar requests (Create post, search hits, notifications).
   const [calendarIntent, setCalendarIntent] = useState<CalendarIntent | null>(null);
-  // Settings section to open on arrival (e.g. Channels from a Reconnect button); cleared on leaving.
-  const [settingsSection, setSettingsSection] = useState<string | undefined>();
   const [helpTicketId, setHelpTicketId] = useState<string | null>(null);
-  useEffect(() => {
-    if (view !== ViewState.SETTINGS) setSettingsSection(undefined);
-  }, [view]);
   // Month planner page: which month to open on (YYYY-MM).
   const [plannerMonth, setPlannerMonth] = useState<string | null>(null);
   const loginInProgressRef = useRef(false);
@@ -561,7 +555,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: ViewState.SUPPORT_DASHBOARD, label: 'Support', icon: MessageSquare, roles: ['support'], group: 'Plan', tour: 'nav-support' },
     { id: ViewState.CALENDAR, label: 'Calendar', icon: ChartGantt, roles: ['user'], group: 'Plan', tour: 'nav-timeline' },
-    { id: ViewState.PLANNER, label: 'Month planner', icon: Sparkles, roles: ['user'], group: 'Plan', tour: 'nav-planner' },
+    { id: ViewState.PLANNER, label: 'Month planner', icon: CalendarPlus, roles: ['user'], group: 'Plan', tour: 'nav-planner' },
     { id: ViewState.STUDIO, label: 'Post studio', icon: PencilLine, roles: ['user'], group: 'Plan', tour: 'nav-studio' },
     { id: ViewState.INSIGHTS, label: 'Insights', icon: BarChart3, roles: ['user'], group: 'Plan', tour: 'nav-insights' },
     { id: ViewState.SETTINGS, label: 'Settings', icon: SettingsIcon, roles: ['user', 'support'], group: 'Account', tour: 'nav-settings' },
@@ -628,24 +622,16 @@ const App: React.FC = () => {
   const isAuthView = authViews.includes(view);
   const blockForHydration = isHydrating && !isAuthView && view !== ViewState.LANDING;
 
-  const accountActions = {
-    onSignOut: handleLogout,
-    onSwitchAccount: async () => {
-      await handleLogout();
-      navigateView(ViewState.LOGIN);
-    },
-    onSettings: showNav && (user?.role === 'user' || user?.role === 'support') ? () => goTo(ViewState.SETTINGS) : undefined,
-    onBilling: showNav && user?.role === 'user' ? () => goTo(ViewState.BILLING) : undefined,
-  };
+  const accountActions = { onSignOut: handleLogout };
   // The admin console brings its own top bar and sidebar, edge to edge.
   const adminConsole = user?.role === 'admin' && view === ViewState.ADMIN_DASHBOARD && !blockForHydration;
   const pageClass = `w-full ${
     isAuthView ? 'min-h-[calc(100vh-0px)]' :
     view === ViewState.LANDING || view === ViewState.VERIFICATION ? '' :
-    view === ViewState.CALENDAR || view === ViewState.PLANNER || view === ViewState.STUDIO ? 'py-6 px-2 sm:px-6 lg:px-8' :
+    view === ViewState.CALENDAR || view === ViewState.PLANNER || view === ViewState.STUDIO ? 'py-4 px-2 sm:px-6 lg:px-8' :
     adminConsole || view === ViewState.SUPPORT_DASHBOARD ? '' :
-    (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-6 px-4 sm:px-6 lg:px-8' :
-    'max-w-[1400px] mx-auto py-6 px-4 sm:px-6 lg:px-8'
+    (view === ViewState.ADMIN_DASHBOARD || view === ViewState.SETTINGS) ? 'max-w-[1600px] mx-auto py-4 px-4 sm:px-6 lg:px-8' :
+    'max-w-[1400px] mx-auto py-4 px-4 sm:px-6 lg:px-8'
   }`;
 
   // Calendar, Month planner and Post studio are one ContentCalendar (shared state) in different layouts.
@@ -660,10 +646,7 @@ const App: React.FC = () => {
         intent={calendarIntent}
         onIntentDone={() => setCalendarIntent(null)}
         onOpenInsights={() => goTo(ViewState.INSIGHTS)}
-        onOpenChannels={() => {
-          setSettingsSection('channels');
-          goTo(ViewState.SETTINGS);
-        }}
+        onOpenChannels={() => goTo(ViewState.SOCIAL)}
         onOpenPlanner={(m) => {
           setPlannerMonth(m);
           goTo(ViewState.PLANNER);
@@ -743,7 +726,7 @@ const App: React.FC = () => {
             case ViewState.STUDIO:
               return calendarPage('studio');
             case ViewState.SETTINGS:
-              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} themePref={themePref} onChooseTheme={chooseTheme} onOpenBilling={user?.role === 'user' ? () => goTo(ViewState.BILLING) : undefined} onAccountDeleted={handleLogout} initialSection={settingsSection} key={settingsSection ?? 'settings'} /> : <AppHydrationLoader />;
+              return (user?.role === 'support' || brandProfile) ? <Settings profile={brandProfile} user={user} onProfileUpdate={handleProfileUpdate} onUserUpdate={handleUserUpdate} darkMode={darkMode} toggleDarkMode={() => toggleThemePref()} onReplayTour={user?.role === 'user' ? handleReplayTour : undefined} themePref={themePref} onChooseTheme={chooseTheme} onAccountDeleted={handleLogout} /> : <AppHydrationLoader />;
             case ViewState.INSIGHTS:
               return user ? <InsightsDashboard userId={user.id} /> : <AppHydrationLoader />;
             case ViewState.SOCIAL:
@@ -813,7 +796,7 @@ const App: React.FC = () => {
           }}
           businessName={brandProfile?.businessName || user.businessName}
         >
-          <Suspense fallback={<PageSkeleton />}>
+          <Suspense fallback={<AppHydrationLoader sub="Opening the page" />}>
             <PageFade id={view}>
               <div className={pageClass}>{page}</div>
             </PageFade>
@@ -908,7 +891,7 @@ const App: React.FC = () => {
 
       {/* ── Main Content ──────────────────────────────────────────── */}
       <main className="grow">
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<AppHydrationLoader sub="Opening the page" />}>
           <div className={pageClass}>{page}</div>
         </Suspense>
       </main>

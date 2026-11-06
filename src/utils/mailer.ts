@@ -19,7 +19,8 @@ function htmlToText(html: string): string {
 // which silently hangs a raw SMTP connection instead of failing fast.
 // Returns false (and logs) when RESEND_API_KEY is unset, so a dev without
 // creds still works off the reset link the caller logs / echoes.
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+// Pass `text` for table-based templates, where the derived plain text would be messy.
+export async function sendEmail(to: string, subject: string, html: string, text?: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     logger.warn('sendEmail skipped: RESEND_API_KEY not set', { to, subject });
@@ -38,7 +39,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
         to,
         subject,
         html,
-        text: htmlToText(html),
+        text: text ?? htmlToText(html),
       }),
     });
     if (!res.ok) {

@@ -21,14 +21,14 @@ const THEMES: { id: ThemeId; name: string; note: string; c: Swatch }[] = [
   {
     id: 'light',
     name: 'Light',
-    note: 'White and grey, a touch of green',
-    c: { canvas: '#F4F4F5', surface: '#FFFFFF', border: '#E4E4E7', ink: '#0A0A0A', button: '#0B7A4E', accent: '#0B7A4E', today: 'rgba(11,122,78,0.08)' },
+    note: 'Warm paper, deep ink, a touch of bamboo',
+    c: { canvas: '#F6F5F1', surface: '#FFFFFF', border: '#E4E1DA', ink: '#1B211E', button: '#2D6A4F', accent: '#2D6A4F', today: 'rgba(27,33,30,0.05)' },
   },
   {
     id: 'dark',
     name: 'Dark',
     note: 'Near-black, mint accents',
-    c: { canvas: '#09090B', surface: '#111113', border: '#27272A', ink: '#FAFAFA', button: '#34D399', accent: '#34D399', today: 'rgba(52,211,153,0.12)' },
+    c: { canvas: '#121311', surface: '#171816', border: '#2B2C29', ink: '#ECEBE5', button: '#7BBF98', accent: '#7BBF98', today: 'rgba(236,235,229,0.05)' },
   },
 ];
 

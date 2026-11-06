@@ -4,7 +4,8 @@ import type { Channel } from 'stream-chat';
 import TextareaAutosize from 'react-textarea-autosize';
 import Markdown from 'react-markdown';
 import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
-import { ArrowLeft, ArrowUp, ChevronRight, House, Loader2, MessageSquare, MessagesSquare, Phone, Search, Sparkles, Video, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ChevronRight, House, Loader2, MessageSquare, MessagesSquare, Phone, Search, Video, X } from 'lucide-react';
+import { KawayanMark } from './KawayanLogo';
 import clsx from 'clsx';
 import type { Ticket } from '../types';
 import { chatWithSupportBot } from '../services/aiService';
@@ -22,7 +23,10 @@ const CallWindow = lazy(() => import('./support/CallWindow'));
 type Screen = 'home' | 'messages' | 'assistant' | 'thread' | 'new';
 type Mode = 'chat' | CallInfo['kind'];
 const PUSHED: Screen[] = ['thread', 'new'];
-const TABS = [['home', 'Home', House], ['messages', 'Messages', MessagesSquare], ['assistant', 'Assistant', Sparkles]] as const;
+/** The assistant is Kawayan's AI, so its tab wears the bamboo mark. */
+const AssistantIcon: React.FC<{ className?: string }> = ({ className }) => <KawayanMark className={className} size={20} />;
+
+const TABS = [['home', 'Home', House], ['messages', 'Messages', MessagesSquare], ['assistant', 'Assistant', AssistantIcon]] as const;
 const CATEGORIES: Ticket['category'][] = ['Technical', 'Billing', 'General'];
 const STATUS_DOT: Record<Ticket['status'], string> = { Open: 'bg-(--primary)', Pending: 'bg-(--amber)', Resolved: 'bg-(--border-strong)' };
 const STATUS_TEXT: Record<Ticket['status'], string> = { Open: 'Waiting for support', Pending: 'Support replied', Resolved: 'Resolved' };
@@ -44,7 +48,10 @@ const ago = (iso?: string) => {
  * Messages lists past conversations; a conversation opens on top with calls inside it. A call docks
  * at the top of the panel so the chat stays usable, and floats in the corner if the panel closes.
  */
-const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+/** A conversation Kawi hands over: opened here as a new ticket, with a call if the owner asked for one. */
+export interface KawiHandoff { key: number; subject: string; text: string; mode: Mode }
+
+const HelpPanel: React.FC<{ open: boolean; onClose: () => void; handoff?: KawiHandoff | null; onHandoffDone?: () => void }> = ({ open, onClose, handoff, onHandoffDone }) => {
   const toast = useToast();
   const panelRef = useRef<HTMLElement>(null);
   const me = readCachedUser();
@@ -163,6 +170,23 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
     openThread(ticket.id);
     if (mode !== 'chat') setPendingCall(mode);
   };
+
+  // Kawi handed the owner over: start the ticket with its notes, open it, and ring if they picked a call.
+  useEffect(() => {
+    if (!open || !handoff || !me) return;
+    let cancelled = false;
+    (async () => {
+      const ticket = await supportService.createTicket(me, handoff.subject, 'Medium', handoff.text, 'General', 'kawi');
+      if (cancelled) return;
+      onHandoffDone?.();
+      if (!ticket) return toast.error('Could not reach the team. Try again in a moment.');
+      setTickets((list) => [ticket, ...(list || []).filter((t) => t.id !== ticket.id)]);
+      openThread(ticket.id);
+      if (handoff.mode !== 'chat') setPendingCall(handoff.mode);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, handoff?.key]);
 
   const markReplied = () => {
     if (activeId) supportApi(`/tickets/${encodeURIComponent(activeId)}/replied`, { method: 'POST' }).catch(() => undefined);
@@ -409,7 +433,7 @@ const HelpPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                       ) : (
                         ai.map((x, i) => (
                           <div key={i} className={clsx('sp-grp', x.sender === 'user' && 'is-right')}>
-                            {x.sender === 'bot' && <span className="sp-sender"><span className="sp-av sm" aria-hidden><Sparkles className="h-3 w-3" /></span>Assistant</span>}
+                            {x.sender === 'bot' && <span className="sp-sender"><span className="sp-av sm" aria-hidden><KawayanMark size={12} /></span>Assistant</span>}
                             {x.sender === 'bot' ? <div className="sp-bub sp-md"><Markdown>{x.text}</Markdown></div> : <div className="sp-bub">{x.text}</div>}
                           </div>
                         ))
